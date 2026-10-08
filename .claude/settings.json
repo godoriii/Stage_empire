@@ -1,0 +1,56 @@
+{
+  "$comment": "Stage Empire 프로젝트 공통 설정. hooks 는 서브에이전트 안에서도 돈다. 경계 정책은 tools/hooks/boundary_policy.json.",
+  "permissions": {
+    "allow": [
+      "Bash(python3 tools/validate_data.py*)",
+      "Bash(python3 tools/hooks/boundary.py --self-test)",
+      "Bash(tools/run_tests.sh*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git worktree list*)",
+      "Bash(ls*)",
+      "Bash(find*)",
+      "Bash(rg*)",
+      "Bash(grep*)",
+      "Bash(cat*)",
+      "Bash(head*)",
+      "Bash(tail*)",
+      "Bash(wc*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf*)",
+      "Write(.claude/settings.json)",
+      "Edit(.claude/settings.json)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/tools/hooks/boundary.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/tools/hooks/check_commit.py",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}

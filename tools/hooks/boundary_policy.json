@@ -1,0 +1,14 @@
+{
+  "_comment": "에이전트별 쓰기 허용 루트. CLAUDE.md '에이전트 구성' 표와 같아야 한다. .claude/agents/*.md 의 설명과 함께 갱신할 것.",
+  "agents": {
+    "producer":        { "allow": ["docs/tickets", "docs/status", "docs/adr", "docs/reviews"] },
+    "game-designer":   { "allow": ["docs/gdd", "project/data", "docs/tickets"] },
+    "content-writer":  { "allow": ["project/data/text", "project/data/artists"] },
+    "sim-engineer":    { "allow": ["project/core", "project/sim", "project/world", "tests/sim"] },
+    "render-engineer": { "allow": ["project/view", "project/ui", "tests/view"] },
+    "art-pipeline":    { "allow": ["project/assets/review-queue", "project/data/furniture", "tools/assets"] },
+    "audio":           { "allow": ["project/assets/review-queue/audio", "project/data/audio"] },
+    "qa":              { "allow": ["tests", "docs/reports", "tools/bot"] },
+    "reviewer":        { "allow": ["docs/reviews"], "readonly": true }
+  }
+}

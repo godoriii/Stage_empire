@@ -1,0 +1,20 @@
+# Godot
+project/.godot/
+project/export_presets.cfg.bak
+*.import.bak
+/build/
+*.tmp
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude Code 로컬 설정 (개인 권한/환경)
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# worktrees (리포지토리 밖에 두지만 혹시 안에 만들면)
+.worktrees/

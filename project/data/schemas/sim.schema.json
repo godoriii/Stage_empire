@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sim",
+  "description": "시뮬레이션 전역 상수. 출처: docs/PRD.md '아키텍처 원칙'. 틱 수 변경은 ADR 필요.",
+  "type": "object",
+  "required": ["version", "ticks_per_second", "tile_size_m", "chunk_size", "phases"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "ticks_per_second": { "type": "integer", "enum": [10] },
+    "tile_size_m": { "type": "number", "enum": [1.0] },
+    "chunk_size": { "type": "integer", "enum": [32] },
+    "individual_agent_max_tier": { "type": "integer", "minimum": 1, "maximum": 6 },
+    "individual_agent_cap": { "type": "integer", "minimum": 1 },
+    "phases": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "ticks", "pausable", "speeds"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "enum": ["day", "evening", "show", "close"] },
+          "name": { "type": "string" },
+          "ticks": { "type": "integer", "minimum": 0 },
+          "pausable": { "type": "boolean" },
+          "speeds": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 3 } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "id": "tier_1", "tier": 1, "name": "지하 라이브클럽",
+      "capacity_min": 50, "capacity_max": 150,
+      "unlock_reputation": 0, "unlock_cash": 0,
+      "grid_size": 24, "outdoor": false,
+      "new_systems": ["basic_build", "local_booking", "bar_income"],
+      "pressures": ["noise_complaint", "rent", "fire_code"]
+    },
+    {
+      "id": "tier_2", "tier": 2, "name": "지상 라이브하우스",
+      "capacity_min": 300, "capacity_max": 600,
+      "unlock_reputation": 500, "unlock_cash": 30000,
+      "grid_size": 48, "outdoor": false,
+      "new_systems": ["sound_light_grades", "staff_hiring", "recurring_events"],
+      "pressures": ["rival_venue", "equipment_failure"]
+    },
+    {
+      "id": "tier_3", "tier": 3, "name": "도심 콘서트 베뉴",
+      "capacity_min": 1500, "capacity_max": 3000,
+      "unlock_reputation": 2000, "unlock_cash": 200000,
+      "grid_size": 96, "outdoor": false,
+      "new_systems": ["seating", "merch_shop", "sponsor_contracts", "artist_exclusive"],
+      "pressures": ["traffic_parking", "scalpers"]
+    },
+    {
+      "id": "tier_4", "tier": 4, "name": "야외 원데이 페스티벌",
+      "capacity_min": 5000, "capacity_max": 10000,
+      "unlock_reputation": 6000, "unlock_cash": 1000000,
+      "grid_size": 160, "outdoor": true,
+      "new_systems": ["multi_stage", "weather", "sanitation_water", "food_zone"],
+      "pressures": ["heavy_rain", "safety_incident", "timetable_clash"]
+    },
+    {
+      "id": "tier_5", "tier": 5, "name": "사흘짜리 캠핑 페스티벌",
+      "capacity_min": 20000, "capacity_max": 40000,
+      "unlock_reputation": 15000, "unlock_cash": 5000000,
+      "grid_size": 256, "outdoor": true,
+      "new_systems": ["camping_zone", "overnight_ops", "media_broadcast", "local_community"],
+      "pressures": ["waste_hygiene", "fan_expectation", "headliner_cancel"]
+    },
+    {
+      "id": "tier_6", "tier": 6, "name": "글로벌 메가 페스티벌",
+      "capacity_min": 80000, "capacity_max": 200000,
+      "unlock_reputation": 40000, "unlock_cash": 30000000,
+      "grid_size": 400, "outdoor": true,
+      "new_systems": ["overseas_franchise", "global_tour", "legacy_ending"],
+      "pressures": ["yearly_trend_shift", "identity_dilution"]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "ticks_per_second": 10,
+  "tile_size_m": 1.0,
+  "chunk_size": 32,
+  "individual_agent_max_tier": 3,
+  "individual_agent_cap": 3000,
+  "phases": [
+    { "id": "day",     "name": "낮(준비)",   "ticks": 1800, "pausable": true,  "speeds": [0, 1, 2, 3] },
+    { "id": "evening", "name": "저녁(개장)", "ticks": 600,  "pausable": true,  "speeds": [0, 1] },
+    { "id": "show",    "name": "공연",       "ticks": 900,  "pausable": false, "speeds": [1] },
+    { "id": "close",   "name": "마감(정산)", "ticks": 0,    "pausable": true,  "speeds": [0] }
+  ]
+}
