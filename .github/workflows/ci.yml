@@ -82,8 +82,8 @@ jobs:
             if [ "$rc" -ne 0 ]; then rc_all=$rc; fi
           done
           exit $rc_all
-      - name: 실패 시 캡처·로그 업로드
-        if: failure()
+      - name: 캡처·diff 로그 업로드 (러너 vs 로컬 차이 진단용 — 항상)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots-${{ github.run_id }}
