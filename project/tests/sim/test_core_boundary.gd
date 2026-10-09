@@ -1,12 +1,21 @@
 extends GutTest
 ## SE-001 AC1(리터럴), AC12(Node·시간·직접 난수 금지, class_name + RefCounted/Resource).
-## project/core/**/*.gd 소스를 FileAccess 로 읽어 패턴 검사한다. docs/gdd/tick.md#틱, #결정성과-rng.
+## project/core/**/*.gd 와 project/sim/**/*.gd(SE-012 D3, tick.md "금지 (sim·core·world)") 소스를 FileAccess 로 읽어
+## 패턴 검사한다. docs/gdd/tick.md#틱, #결정성과-rng.
 
 const CORE_ROOT: String = "res://core"
+const SIM_ROOT: String = "res://sim"
 const RNG_FILE: String = "res://core/rng.gd"
 const EXPECTED: Array[String] = [
 	"res://core/event_bus.gd", "res://core/rng.gd", "res://core/sim_config.gd", "res://core/tick.gd",
+	"res://sim/economy.gd", "res://sim/economy_config.gd",
 ]
+## view/ui 참조 금지(시뮬레이션 → 렌더 방향 의존 없음).
+const PRESENTATION_RE: String = "res://(view|ui)/"
+## 정수·소수 리터럴(식별자·소수점에 붙은 것 제외).
+const NUMBER_RE: String = "(?<![\\w.])\\d+(\\.\\d+)?(?![\\w.])"
+## const 선언 밖에서 허용하는 리터럴(항등원·증감 단위). 그 밖의 수는 데이터(project/data)나 이름 있는 const 로.
+const ALLOWED_BARE_NUMBERS: Array[String] = ["0", "1"]
 const TICK_LITERAL_RE: String = "(?<![\\w.])(10|1800|600|900|3300|330)(?![\\w.])"
 
 
@@ -62,8 +71,15 @@ func _hits(re: RegEx, text: String, file: String) -> PackedStringArray:
 	return out
 
 
+## 검사 대상: core + sim.
+func _sim_side_files() -> PackedStringArray:
+	var out: PackedStringArray = _list_gd(CORE_ROOT)
+	out.append_array(_list_gd(SIM_ROOT))
+	return out
+
+
 func test_sources_found() -> void:
-	var files: PackedStringArray = _list_gd(CORE_ROOT)
+	var files: PackedStringArray = _sim_side_files()
 	for f: String in EXPECTED:
 		assert_true(files.has(f), "%s 존재" % f)
 
@@ -75,14 +91,15 @@ func test_no_tick_literals_in_core() -> void:
 	assert_eq(_hits(re, "const U := 1000000\nconst P := 16777619\nvar f := 0.10\nvar g := 2147483647", "self").size(), 0, "상수표 상수는 안 걸린다")
 	assert_eq(_strip_comments_and_strings("var s := \"10\" # 10 tick"), "var s := \"\" ", "주석·문자열 제거")
 	var hits: PackedStringArray = []
-	for f: String in _list_gd(CORE_ROOT):
+	for f: String in _sim_side_files():
 		hits.append_array(_hits(re, _strip_comments_and_strings(FileAccess.get_file_as_string(f)), f))
-	assert_eq(hits.size(), 0, "core 에 틱·구간 리터럴 없음: %s" % ", ".join(hits))
+	assert_eq(hits.size(), 0, "core·sim 에 틱·구간 리터럴 없음: %s" % ", ".join(hits))
 
 
 func test_core_has_no_node_or_direct_random() -> void:
-	var files: PackedStringArray = _list_gd(CORE_ROOT)
-	assert_gt(files.size(), 0, "core 스크립트를 찾는다")
+	var files: PackedStringArray = _sim_side_files()
+	assert_gt(files.size(), 0, "core·sim 스크립트를 찾는다")
+	var presentation: RegEx = RegEx.create_from_string(PRESENTATION_RE)
 	var forbidden: RegEx = RegEx.create_from_string("extends\\s+Node|_process\\(|_physics_process\\(|get_node\\(|(?<![\\w])Time\\.")
 	var random_re: RegEx = RegEx.create_from_string("randi\\(|randf\\(|randomize\\(|RandomNumberGenerator")
 	var class_re: RegEx = RegEx.create_from_string("(?m)^class_name\\s+\\w+\\s*$")
@@ -92,6 +109,7 @@ func test_core_has_no_node_or_direct_random() -> void:
 	for f: String in files:
 		var src: String = FileAccess.get_file_as_string(f)
 		bad.append_array(_hits(forbidden, src, f))
+		bad.append_array(_hits(presentation, src, f))
 		if f != RNG_FILE:
 			bad.append_array(_hits(random_re, src, f))
 		if class_re.search_all(src).size() != 1:
@@ -104,3 +122,27 @@ func test_core_has_no_node_or_direct_random() -> void:
 	assert_eq(bad.size(), 0, "금지 패턴 없음: %s" % ", ".join(bad))
 	# rng.gd 는 RandomNumberGenerator 를 실제로 쓴다(검사기 자체 확인).
 	assert_gt(_hits(random_re, FileAccess.get_file_as_string(RNG_FILE), RNG_FILE).size(), 0, "rng.gd 에서는 걸린다")
+
+
+## SE-012 D3: project/sim 의 매직 넘버 0. const 선언 줄 밖의 수 리터럴은 0·1 만 허용(금액·비율·일수는 economy.json).
+func test_sim_has_no_magic_numbers() -> void:
+	var re: RegEx = RegEx.create_from_string(NUMBER_RE)
+	var const_re: RegEx = RegEx.create_from_string("^\\s*const\\s")
+	# 검사기 자체 확인.
+	assert_eq(_bare_numbers(re, const_re, "var a := x * 600\nconst K: int = 10000\nvar b := 1\nvar c := y0 + 0"), ["600"], "const 밖 600 만 걸린다")
+	var bad: PackedStringArray = []
+	for f: String in _list_gd(SIM_ROOT):
+		for n: String in _bare_numbers(re, const_re, _strip_comments_and_strings(FileAccess.get_file_as_string(f))):
+			bad.append("%s: %s" % [f, n])
+	assert_eq(bad.size(), 0, "sim 에 const 밖 매직 넘버 없음: %s" % ", ".join(bad))
+
+
+func _bare_numbers(re: RegEx, const_re: RegEx, text: String) -> Array:
+	var out: Array = []
+	for line: String in text.split("\n"):
+		if const_re.search(line) != null:
+			continue
+		for m: RegExMatch in re.search_all(line):
+			if not ALLOWED_BARE_NUMBERS.has(m.get_string()):
+				out.append(m.get_string())
+	return out

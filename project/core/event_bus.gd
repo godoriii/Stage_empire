@@ -140,6 +140,12 @@ static func normalize_commands(a: Variant) -> Variant:
 	return out
 
 
+## E4 기본형 검사(재귀). 키는 String/StringName, 값은 null/bool/int/(float)/String/StringName/Array/Dictionary.
+## TickLoop 이 시스템 snapshot_hook 반환값 검사(SH2)에 쓴다(allow_float = true).
+static func is_valid_value(v: Variant, allow_float: bool) -> bool:
+	return _is_valid_value(v, allow_float)
+
+
 ## Callable 의 == 는 bind() 인자를 구별하지 않으므로 바인드 인자까지 같아야 같은 핸들러로 본다.
 static func _find_handler(list: Array, handler: Callable) -> int:
 	var args: Array = handler.get_bound_arguments()

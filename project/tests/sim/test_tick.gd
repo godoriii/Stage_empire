@@ -15,6 +15,11 @@ func before_each() -> void:
 	_log = []
 	_bad = []
 	_loop = null
+	_reentry_on = false
+	_reentry_snap_done = false
+	_reentry_restore_done = false
+	_reentry_log = []
+	_reentry_state = {"n": 0}
 
 
 func _new_loop(seed_value: int = 42) -> TickLoop:
@@ -447,8 +452,12 @@ func test_snapshot_restore_equivalence() -> void:
 	var want: Array = []
 	want.append_array(TickLoop.SNAPSHOT_KEYS)
 	want.sort()
-	assert_eq(keys, want, "#스냅샷 표의 9개 키만")
-	assert_eq(keys.size(), 9)
+	assert_eq(keys, want, "#스냅샷 표의 10개 키만")
+	assert_eq(keys.size(), 10)
+	assert_eq(keys, ["day", "pending_commands", "phase", "rng", "schema_version", "seed", "speed", "systems", "tick", "tick_in_phase"], "tick.md 표 리터럴(SE-011)")
+	assert_eq(snap["systems"], {}, "훅 시스템 없음 → systems == {}")
+	# SE-012 2차(sim.json v3) 뒤 리터럴 2 로 교체: assert_eq(snap["schema_version"], 2)
+	assert_eq(snap["schema_version"], 2, "schema_version == 2 (tick.md 스냅샷 표 리터럴)")
 	assert_true(_all_primitive(snap), "기본형만")
 	assert_typeof(snap["rng"]["audience"], TYPE_STRING)
 	assert_eq(snap["pending_commands"], [{"name": "time.speed_requested", "payload": {"speed": 3}}], "미적용 명령 포함")
@@ -537,5 +546,291 @@ func test_restore_rejects_bad_snapshot() -> void:
 	assert_push_error_count(errs, "seed max passes: push_error 추가 0회")
 	assert_eq(target.master_seed, 2147483647, "seed max passes: master_seed")
 	assert_eq(target.snapshot()["seed"], 2147483647, "seed max passes: snapshot seed")
+	# SE-011: restore 5단계 systems 불일치(D5). 훅 없는 target.
+	var before_sys: String = _hash(target)
+	var sys_bads: Dictionary = {}
+	s = good.duplicate(true)
+	s.erase("systems")
+	sys_bads["systems 키 없음"] = s
+	s = good.duplicate(true)
+	s["systems"] = []
+	sys_bads["systems 배열"] = s
+	s = good.duplicate(true)
+	s["systems"] = {"build": 5}
+	sys_bads["systems.build 값이 객체 아님"] = s
+	for label: String in sys_bads:
+		assert_false(target.restore(sys_bads[label]), label + " → false")
+		errs += 1
+		assert_push_error_count(errs, label + ": push_error 1회")
+		assert_eq(_hash(target), before_sys, label + ": 상태 불변")
+	# 훅 시스템(build)이 등록된 target2 에 systems == {} → 항목 없음(③) 실패, restore_hook 호출 0회.
+	var journal: Array = []
+	var fake: FakeSys = FakeSys.new("build", journal)
+	var target2: TickLoop = _new_loop(11)
+	assert_true(target2.register_system("build", fake.update, fake.snapshot_hook, fake.restore_hook))
+	var before2: String = _hash(target2)
+	assert_false(target2.restore(good), "훅 시스템 항목 없음 → false")
+	errs += 1
+	assert_push_error_count(errs, "③: push_error 1회")
+	assert_eq(_hash(target2), before2, "③: target2 상태 불변")
+	assert_eq(fake.restore_calls, 0, "③: restore_hook 호출 0회")
+	# 훅 시스템이 아닌 id(system_order 밖 weather, 미등록 staff) → 경고 후 무시, true.
+	s = good.duplicate(true)
+	s["systems"] = {"weather": {}, "staff": {}}
+	assert_true(target.restore(s), "모르는 id 항목은 경고 후 무시")
+	assert_push_warning_count(2, "id 마다 push_warning 1회")
+	assert_push_error_count(errs, "push_error 추가 0")
+	assert_eq(_hash(target), _hash(loop), "경고 항목은 버려져 systems == {}")
 	assert_true(target.restore(good), "정상 스냅샷은 통과")
 	assert_eq(_hash(target), _hash(loop))
+
+
+# --- AC10 SE-011: 시스템 스냅샷 훅 (tick.md#명령-큐와-틱-순서 "시스템 등록", #스냅샷) -----------------
+
+## 테스트용 가짜 시스템(tick.md#테스트-방법). 상태 {n}, update 가 n += 1, 훅은 깊은 복사·검사 후 교체(SH3).
+## 공유 journal 에 restore_hook 호출을 [id, d.n] 으로 남긴다.
+class FakeSys:
+	extends RefCounted
+	var id: String = ""
+	var journal: Array = []
+	var state: Dictionary = {"n": 0}
+	var restore_calls: int = 0
+	var fail_restore: bool = false
+	## 0 보다 크면 restore_calls 가 이 값 이상인 호출부터 false.
+	var fail_from_call: int = 0
+	var override_on: bool = false
+	var override_value: Variant = null
+
+	func _init(p_id: String, p_journal: Array) -> void:
+		id = p_id
+		journal = p_journal
+
+	func update(_ctx: Dictionary) -> void:
+		state["n"] = int(state["n"]) + 1
+
+	func snapshot_hook() -> Variant:
+		if override_on:
+			return override_value
+		return state.duplicate(true)
+
+	func restore_hook(d: Dictionary) -> bool:
+		restore_calls += 1
+		journal.append([id, d.get("n")])
+		if fail_restore or (fail_from_call > 0 and restore_calls >= fail_from_call):
+			return false
+		var n: Variant = d.get("n")
+		if n is float and is_finite(n) and n == floorf(n):
+			n = int(n)
+		if not (n is int):
+			return false
+		state = {"n": n}
+		return true
+
+
+func _journal_ids(journal: Array) -> Array:
+	var out: Array = []
+	for e: Array in journal:
+		out.append(e[0])
+	return out
+
+
+func _register_fakes(loop: TickLoop, journal: Array) -> Dictionary:
+	var f: Dictionary = {
+		"reputation": FakeSys.new("reputation", journal),
+		"build": FakeSys.new("build", journal),
+		"audience": FakeSys.new("audience", journal),
+	}
+	assert_true(loop.register_system("reputation", f["reputation"].update, f["reputation"].snapshot_hook, f["reputation"].restore_hook))
+	assert_true(loop.register_system("build", f["build"].update, f["build"].snapshot_hook, f["build"].restore_hook))
+	assert_true(loop.register_system("audience", f["audience"].update), "2인자(훅 없음)")
+	return f
+
+
+func test_register_system_rejects_half_hooks() -> void:
+	var journal: Array = []
+	var fake: FakeSys = FakeSys.new("build", journal)
+	var loop: TickLoop = _new_loop()
+	var upd: Callable = fake.update
+	var snap: Callable = fake.snapshot_hook
+	var rest: Callable = fake.restore_hook
+	var bad: Callable = Callable(fake, "no_such_method")
+	assert_false(loop.register_system("build", upd, snap), "(1) restore 비움 → G5")
+	assert_false(loop.register_system("build", upd, Callable(), rest), "(2) snapshot 비움 → G5")
+	assert_false(loop.register_system("build", upd, bad, rest), "(3) snapshot 무효 → G6")
+	assert_false(loop.register_system("build", upd, snap, bad), "(4) restore 무효 → G6")
+	assert_false(loop.register_system("build", bad, snap, rest), "(5) update 무효 → G4")
+	assert_push_error_count(5, "실패마다 push_error 1회")
+	assert_eq(loop.snapshot()["systems"], {}, "등록 안 됨: systems == {}")
+	loop.advance(1)
+	assert_eq(fake.state["n"], 0, "등록 안 됨: update 호출 0회")
+	assert_true(loop.register_system("build", upd, snap, rest), "(6) 앞 실패가 등록을 남기지 않아 G3 에 안 걸림")
+	assert_false(loop.register_system("build", upd, snap, rest), "(7) 같은 id 재등록 → G3")
+	assert_true(loop.register_system("staff", _fake_system.bind("staff")), "(8) 2인자 하위 호환")
+	assert_eq(loop.snapshot()["systems"].keys(), ["build"])
+	assert_push_error_count(6)
+
+
+func test_system_snapshot_hooks_included_in_order() -> void:
+	# (a) 훅 시스템 없는 루프
+	var plain: TickLoop = _new_loop()
+	var ks: Array = plain.snapshot().keys()
+	ks.sort()
+	assert_eq(ks, ["day", "pending_commands", "phase", "rng", "schema_version", "seed", "speed", "systems", "tick", "tick_in_phase"], "10개 키 리터럴")
+	assert_eq(plain.snapshot()["systems"], {})
+	# (b) reputation(훅), build(훅), audience(훅 없음) 순서로 등록
+	var journal: Array = []
+	var a: TickLoop = _new_loop(42)
+	var fa: Dictionary = _register_fakes(a, journal)
+	a.advance(5)
+	var rec_a: EventRecorder = EventRecorder.new(a.bus)
+	var snap: Dictionary = a.snapshot()
+	assert_eq(snap.size(), 10, "최상위 키 10개(SNAPSHOT_KEYS)")
+	assert_eq(snap.size(), TickLoop.SNAPSHOT_KEYS.size())
+	# SE-012 2차(sim.json v3) 뒤 리터럴 2 로 교체: assert_eq(snap["schema_version"], 2)
+	assert_eq(snap["schema_version"], 2)
+	assert_eq(snap["systems"].keys(), ["build", "reputation"], "system_order 순 삽입(등록 순서 무관)")
+	assert_false(snap["systems"].has("audience"), "훅 없는 시스템은 항목 없음")
+	assert_eq(snap["systems"]["build"]["n"], 5)
+	assert_eq(_hash(a), JSON.stringify(snap, "", true), "두 번 호출해도 같은 해시(SH1)")
+	assert_eq([fa["build"].state, fa["reputation"].state, fa["audience"].state], [{"n": 5}, {"n": 5}, {"n": 5}], "가짜 상태 불변")
+	snap["systems"]["build"]["n"] = 999
+	assert_eq(fa["build"].state["n"], 5, "스냅샷을 고쳐도 시스템 불변(SH7 깊은 복사)")
+	# (c) JSON 왕복 → 새 루프 + 새 가짜에 복원
+	var parsed: Dictionary = JSON.parse_string(JSON.stringify(a.snapshot()))
+	var b: TickLoop = _new_loop(7)
+	var fb: Dictionary = _register_fakes(b, journal)
+	var rec_b: EventRecorder = EventRecorder.new(b.bus)
+	journal.clear()
+	assert_true(b.restore(parsed), "restore true")
+	assert_eq(_journal_ids(journal), ["build", "reputation"], "restore_hook 각 1회, system_order 순")
+	assert_eq(_hash(b), _hash(a), "복원 직후 해시 동일")
+	# (d) snapshot()/restore() 동안 이벤트 0개
+	assert_eq(rec_a.events, [], "snapshot 중 이벤트 0개")
+	assert_eq(rec_b.events, [], "restore 중 이벤트 0개")
+	a.advance(100)
+	b.advance(100)
+	assert_eq(_hash(b), _hash(a), "양쪽 advance(100) 후 해시 동일")
+	assert_eq([fb["build"].state["n"], fb["reputation"].state["n"]], [105, 105], "훅 가짜 n == 105")
+
+
+func test_system_restore_rolls_back_on_failure() -> void:
+	var journal: Array = []
+	var loop: TickLoop = _new_loop(42)
+	var f: Dictionary = {}
+	for id: String in ["build", "audience", "economy"]:
+		f[id] = FakeSys.new(id, journal)
+		assert_true(loop.register_system(id, f[id].update, f[id].snapshot_hook, f[id].restore_hook))
+	loop.advance(10)
+	var s: Dictionary = JSON.parse_string(JSON.stringify(loop.snapshot()))
+	assert_eq(s["systems"]["build"]["n"], 10.0, "전제: 스냅샷 n == 10")
+	loop.advance(20)
+	_req_speed(loop, 2)
+	var before_snap: Dictionary = loop.snapshot()
+	var before: String = JSON.stringify(before_snap, "", true)
+	# (a) economy 의 restore_hook 이 false → 역순 롤백
+	f["economy"].fail_restore = true
+	journal.clear()
+	assert_false(loop.restore(s), "restore false")
+	assert_eq(_journal_ids(journal), ["build", "audience", "economy", "audience", "build"], "적용 2 → 실패 1 → 역순 롤백 2")
+	assert_eq([journal[3][1], journal[4][1]], [30, 30], "롤백은 사전 스냅샷(n == 30)")
+	for id: String in f:
+		assert_eq(f[id].state["n"], 30, "%s n == 30" % id)
+	assert_eq(_hash(loop), before, "TickLoop 카운터·rng·명령 큐(1개)·시스템 상태 불변")
+	assert_eq([loop.tick, loop.bus.get_pending_commands().size()], [30, 1])
+	assert_push_error_count(1, "시스템 실패 1")
+	# (b) build 롤백도 실패(적용은 성공) → 복구 불능, push_error 누적 3
+	f["build"].fail_from_call = f["build"].restore_calls + 2
+	assert_false(loop.restore(s))
+	assert_push_error_count(3, "시스템 실패 1 + 롤백 실패 1")
+	var now: Dictionary = loop.snapshot()
+	var was: Dictionary = before_snap.duplicate(true)
+	now.erase("systems")
+	was.erase("systems")
+	assert_eq(JSON.stringify(now, "", true), JSON.stringify(was, "", true), "systems 를 뺀 TickLoop 상태 불변")
+	# (c) 실패 설정을 끄면 성공
+	f["economy"].fail_restore = false
+	f["build"].fail_from_call = 0
+	assert_true(loop.restore(s))
+	for id: String in f:
+		assert_eq(f[id].state["n"], 10, "%s n == 10" % id)
+	assert_eq(loop.tick, 10)
+
+
+func test_system_snapshot_rejects_invalid_hook_return() -> void:
+	var journal: Array = []
+	var fake: FakeSys = FakeSys.new("build", journal)
+	var loop: TickLoop = _new_loop()
+	assert_true(loop.register_system("build", fake.update, fake.snapshot_hook, fake.restore_hook))
+	loop.advance(3)
+	var good: Dictionary = loop.snapshot()
+	var bad_values: Array = [[], "x", {"v": Vector2(1, 2)}, {"o": RefCounted.new()}, {"a": [Callable()]}, {1: 2}]
+	fake.override_on = true
+	var n: int = 0
+	for v: Variant in bad_values:
+		fake.override_value = v
+		assert_eq(loop.snapshot(), {}, "반환값 %s → {}" % [v])
+		n += 1
+		assert_push_error_count(n, "push_error 1회")
+	var tick0: int = loop.tick
+	var rng0: Dictionary = loop.rng.get_state()
+	var cmds0: Array = loop.bus.get_pending_commands()
+	assert_false(loop.restore(good), "6단계 사전 스냅샷 실패 → false")
+	assert_eq(fake.restore_calls, 0, "restore_hook 호출 0회")
+	assert_eq([loop.tick, loop.rng.get_state(), loop.bus.get_pending_commands()], [tick0, rng0, cmds0], "TickLoop 필드 불변")
+	assert_push_error_count(7)
+	fake.override_on = false
+	assert_eq(loop.snapshot().size(), 10, "정상 반환이면 키 10개")
+	assert_true(loop.restore(good))
+	# 호출 시점에 훅이 무효(객체 해제)이면 snapshot() 은 {} + push_error.
+	var loop2: TickLoop = _new_loop()
+	var gone: FakeSys = FakeSys.new("build", journal)
+	assert_true(loop2.register_system("build", gone.update, gone.snapshot_hook, gone.restore_hook))
+	gone = null
+	assert_eq(loop2.snapshot(), {}, "해제된 객체의 훅 → {}")
+	assert_push_error_count(8)
+
+
+var _reentry_on: bool = false
+var _reentry_snap_done: bool = false
+var _reentry_restore_done: bool = false
+var _reentry_log: Array = []
+var _reentry_state: Dictionary = {"n": 0}
+
+
+func _re_update(_ctx: Dictionary) -> void:
+	_reentry_state["n"] = int(_reentry_state["n"]) + 1
+
+
+func _re_snapshot() -> Dictionary:
+	if _reentry_on and not _reentry_snap_done:
+		_reentry_snap_done = true
+		_reentry_log.append(_loop.snapshot())
+		_reentry_log.append(_loop.advance(1))
+		_reentry_log.append(_loop.register_system("staff", _fake_system.bind("staff")))
+	return _reentry_state.duplicate(true)
+
+
+func _re_restore(d: Dictionary) -> bool:
+	if _reentry_on and not _reentry_restore_done:
+		_reentry_restore_done = true
+		_reentry_log.append(_loop.restore(_loop_snap))
+	_reentry_state = {"n": int(d["n"])}
+	return true
+
+
+func test_system_hooks_reject_reentry() -> void:
+	_loop = _new_loop()
+	assert_true(_loop.register_system("build", _re_update, _re_snapshot, _re_restore))
+	_loop.advance(2)
+	_loop_snap = _loop.snapshot()
+	var tick0: int = _loop.tick
+	_reentry_on = true
+	var snap: Dictionary = _loop.snapshot()
+	assert_eq(snap.size(), 10, "바깥 snapshot 은 정상")
+	assert_eq(_reentry_log, [{}, 0, false], "snapshot_hook 안: snapshot {} · advance 0 · register_system false")
+	assert_true(_loop.restore(snap), "바깥 restore 는 true")
+	assert_eq(_reentry_log.slice(3), [false], "restore_hook 안: restore false")
+	assert_push_error_count(4)
+	assert_eq(_loop.tick, tick0, "tick 불변")
+	_reentry_on = false
+	assert_true(_loop.register_system("staff", _fake_system.bind("staff")), "훅 안 시도가 등록을 남기지 않음")
