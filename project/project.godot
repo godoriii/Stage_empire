@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Stage Empire"
 config/description="지하 라이브클럽에서 글로벌 페스티벌까지 키우는 2.5D 아이소메트릭 건설·경영 시뮬레이션"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 run/main_scene=""
 
 [editor_plugins]
