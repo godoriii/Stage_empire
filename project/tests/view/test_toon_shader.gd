@@ -165,3 +165,54 @@ func test_no_shader_constants_in_code() -> void:
 	])
 	assert_eq(_literal_hits(fake, "fake").size(), 2, "대조군(strict): 3 과 1.1 이 있는 두 줄")
 	assert_eq(_literal_hits(fake, "fake", SHADER_LINE_PATTERN).size(), 1, "대조군(targeted): set_shader_parameter 줄 1건")
+
+
+# --- SE-021 AC5 -------------------------------------------------------------
+
+const SS_SHADER: String = "res://view/shaders/outline_ss.gdshader"
+const SS_PASS_SCENE: String = "res://view/shaders/outline_ss_pass.tscn"
+
+
+## 셰이더 소스의 uniform 이름 전부(설정할 수 없는 화면/깊이 텍스처 힌트 샘플러는 뺀다).
+static func _settable_uniforms(src: String) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	var re: RegEx = RegEx.create_from_string("(?m)^\\s*uniform\\s+\\w+\\s+(\\w+)([^;]*);")
+	for m: RegExMatch in re.search_all(src):
+		if m.get_string(2).contains("hint_depth_texture") or m.get_string(2).contains("hint_screen_texture"):
+			continue
+		out.append(m.get_string(1))
+	return out
+
+
+func test_ss_uniforms_all_in_tres() -> void:
+	var src: String = _src(SS_SHADER)
+	assert_false(src.is_empty(), "outline_ss.gdshader 읽기")
+	var uniforms: PackedStringArray = _settable_uniforms(src)
+	for u: String in ["outline_px", "outline_color", "depth_threshold_px", "normal_threshold", "facing_bias",
+			"plane_epsilon_px", "normal_fit_px"]:
+		assert_true(uniforms.has(u), "outline_ss uniform %s" % u)
+	var ss_text: String = _src(OUTLINE_TRES_PATTERN % "ss")
+	for u: String in uniforms:
+		assert_true(ss_text.contains("shader_parameter/%s = " % u), "outline_ss.tres 에 %s 명시" % u)
+	var ol_ss: ShaderMaterial = load(OUTLINE_TRES_PATTERN % "ss") as ShaderMaterial
+	var ol_b: ShaderMaterial = load(OUTLINE_TRES_PATTERN % "b") as ShaderMaterial
+	assert_eq(ol_ss.shader, load(SS_SHADER), "outline_ss.tres shader == outline_ss.gdshader")
+	assert_almost_eq(float(ol_ss.get_shader_parameter("outline_px")), 2.0, 0.0001, "outline_px == 2")
+	assert_eq(ol_ss.get_shader_parameter("outline_color"), ol_b.get_shader_parameter("outline_color"), "외곽선 색 == B")
+	assert_eq(ol_ss.render_priority, Material.RENDER_PRIORITY_MAX, "투명 패스 맨 뒤")
+	# toon_ss = toon_b 와 같은 파라미터, next_pass 없음.
+	var toon_ss: ShaderMaterial = load(TOON_TRES_PATTERN % "ss") as ShaderMaterial
+	var toon_b: ShaderMaterial = load(TOON_TRES_PATTERN % "b") as ShaderMaterial
+	assert_eq(toon_ss.shader, toon_b.shader, "toon_ss shader == toon.gdshader")
+	assert_null(toon_ss.next_pass, "toon_ss next_pass 없음")
+	var toon_text: String = _src(TOON_TRES_PATTERN % "ss")
+	for u: String in _settable_uniforms(_src(TOON_SHADER)):
+		assert_true(toon_text.contains("shader_parameter/%s = " % u), "toon_ss.tres 에 %s 명시" % u)
+		assert_eq(toon_ss.get_shader_parameter(u), toon_b.get_shader_parameter(u), "toon_ss.%s == toon_b" % u)
+	# 포스트 패스 씬은 outline_ss.tres 를 쓰고 그림자를 드리우지 않는다.
+	var scene_text: String = _src(SS_PASS_SCENE)
+	assert_true(scene_text.contains("res://view/shaders/params/outline_ss.tres"), "포스트 패스 씬 → outline_ss.tres")
+	assert_true(scene_text.contains("cast_shadow = 0"), "포스트 패스 그림자 off")
+	# 대조군: 정규식이 힌트 샘플러를 빼고 일반 uniform 은 잡는다.
+	var fake: String = "uniform sampler2D t : hint_depth_texture;\nuniform float a : hint_range(0.0, 1.0) = 0.5;\n// uniform float b;"
+	assert_eq(_settable_uniforms(fake), PackedStringArray(["a"]), "대조군: 설정 가능한 uniform 1개")

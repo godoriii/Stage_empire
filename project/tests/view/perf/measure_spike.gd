@@ -6,7 +6,7 @@ extends Node
 ##   godot --path project res://tests/view/perf/measure_spike.tscn -- --config=E [--out=<경로.json>] [--commit=<해시>]
 ##
 ## 구성 결정: @export config_id > 명령줄 --config= > settings.default_config_id. 없는 구성이면 종료 코드 2.
-## SE-004/SE-018 시안: @export material_id > 명령줄 --material=<plain|a|b|c> > ShaderVariants.DEFAULT_ID(시안 B).
+## SE-004/SE-018 시안: @export material_id > 명령줄 --material=<plain|a|b|c|ss> > ShaderVariants.DEFAULT_ID(시안 B).
 ##   없는 시안(예전 "default" 포함)이면 종료 코드 2. JSON 에 material 키. ticket 값은 SE-013 그대로
 ##   (시안별 결과는 --out 파일명과 material 키로 구분). 기본 출력 파일명은 항상 SE-013_<config>_<material>.json
 ##   (plain 도 _plain. SE-018 에서 SE-013 파일명 호환 특례 제거).

@@ -33,7 +33,7 @@ func test_resolve_and_validate_ids() -> void:
 
 func test_default_is_b_and_plain_is_legacy() -> void:
 	assert_eq(ShaderVariants.DEFAULT_ID, "b", "기본 시안 = b(SE-018)")
-	assert_eq(ShaderVariants.IDS, PackedStringArray(["plain", "a", "b", "c"]), "시안 id 목록")
+	assert_eq(ShaderVariants.IDS, PackedStringArray(["plain", "a", "b", "c", "ss"]), "시안 id 목록(SE-021 ss 추가)")
 	assert_eq(ShaderVariants.SELECTABLE_IDS, PackedStringArray(["a", "b", "c"]), "런타임 전환 시안 불변")
 	assert_false(ShaderVariants.is_valid_id("default"), "\"default\" 는 더 이상 유효 id 가 아니다")
 	assert_true(ShaderVariants.is_valid_id("plain"), "plain 유효")
@@ -179,3 +179,44 @@ func test_apply_rejects_unknown_id_without_changes() -> void:
 	assert_push_error("'default' 없음")
 	for g: GeometryInstance3D in t["targets"]:
 		assert_eq(g.material_override, load(TOON_TRES_PATTERN % "c"), "없는 id 는 아무것도 바꾸지 않는다")
+
+
+# --- SE-021 AC4 -------------------------------------------------------------
+
+func test_ss_adds_exactly_one_post_pass_node() -> void:
+	var t: Dictionary = _make_tree()
+	var root: Node3D = t["root"]
+	var targets: Array[GeometryInstance3D] = t["targets"]
+	var exclude: Array[Node] = [t["excluded"]]
+	var before: int = _descendant_count(root)
+	var toon_ss: ShaderMaterial = load(TOON_TRES_PATTERN % "ss") as ShaderMaterial
+	assert_not_null(toon_ss, "toon_ss.tres 로드")
+	assert_true(ShaderVariants.is_valid_id("ss"), "ss 유효")
+	assert_false(ShaderVariants.SELECTABLE_IDS.has("ss"), "ss 는 런타임 전환 키 없음")
+	assert_ne(ShaderVariants.DEFAULT_ID, "ss", "기본값은 그대로(사람 Q2)")
+	assert_eq(ShaderVariants.apply(root, "ss", exclude), targets.size(), "적용 수 = 대상 수(포스트 패스 노드는 세지 않음)")
+	assert_eq(_descendant_count(root), before + 1, "ss: 포스트 패스 노드 정확히 1개 추가")
+	var pass_node: Node = ShaderVariants.get_post_pass(root)
+	assert_not_null(pass_node, "포스트 패스 노드")
+	if pass_node != null:
+		assert_eq(pass_node.get_parent(), root, "root 직속")
+		assert_true(pass_node is MeshInstance3D, "전체 화면 쿼드 MeshInstance3D")
+		assert_eq((pass_node as MeshInstance3D).material_override, load(OUTLINE_TRES_PATTERN % "ss"), "쿼드 머티리얼 == outline_ss.tres")
+		assert_true(pass_node.is_in_group(ShaderVariants.POST_PASS_GROUP), "포스트 패스 그룹")
+	for g: GeometryInstance3D in targets:
+		assert_eq(g.material_override, toon_ss, "%s: toon_ss.tres" % g.get_class())
+		assert_null(g.material_override.next_pass, "%s: ss 는 next_pass 없음" % g.get_class())
+	# 2회 연속 호출해도 +1 유지.
+	ShaderVariants.apply(root, "ss", exclude)
+	assert_eq(_descendant_count(root), before + 1, "ss 2회: 중복 추가 없음")
+	assert_eq(ShaderVariants.get_post_pass(root), pass_node, "같은 노드 유지")
+	# b 로 되돌리면 노드 수 복원, next_pass 복원.
+	ShaderVariants.apply(root, "b", exclude)
+	assert_eq(_descendant_count(root), before, "b: 노드 수 복원")
+	assert_null(ShaderVariants.get_post_pass(root), "b: 포스트 패스 없음")
+	for g: GeometryInstance3D in targets:
+		assert_eq(g.material_override.next_pass, load(OUTLINE_TRES_PATTERN % "b"), "%s: next_pass == outline_b.tres" % g.get_class())
+	# apply_materials 는 포스트 패스를 건드리지 않는다(스파이크용).
+	ShaderVariants.apply_materials(root, "ss", exclude)
+	assert_eq(_descendant_count(root), before, "apply_materials: 노드 추가 없음")
+	assert_eq(get_errors().size(), 0, "오류 없음")

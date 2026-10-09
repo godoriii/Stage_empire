@@ -167,3 +167,16 @@ func test_default_material_id_has_single_source() -> void:
 		"var x: String = \"bb\"",
 	])
 	assert_eq(ViewTestUtil.grep_lines(fake, B_LITERAL_PATTERN).size(), 1, "대조군: 코드 줄 \"b\" 1건")
+
+
+# --- SE-021 AC7 -------------------------------------------------------------
+
+func test_ss_shader_has_no_forward_plus_only_features() -> void:
+	var path: String = "res://view/shaders/outline_ss.gdshader"
+	var src: PackedStringArray = PackedStringArray([path])
+	assert_true(_all_view_files().has(path), "검사 대상에 outline_ss.gdshader 포함")
+	assert_eq(ViewTestUtil.grep(src, "hint_normal_roughness_texture").size(), 0, "법선 버퍼(forward_plus 전용) 0건")
+	assert_eq(ViewTestUtil.grep(src, "hint_depth_texture").size(), 1, "깊이 텍스처 1건")
+	assert_gt(ViewTestUtil.grep(src, "RENDERER_COMPATIBILITY").size(), 0, "Compatibility NDC 분기")
+	assert_eq(ViewTestUtil.grep_lines(PackedStringArray(["uniform sampler2D n : hint_normal_roughness_texture;"]),
+		"hint_normal_roughness_texture").size(), 1, "대조군")
