@@ -64,10 +64,10 @@ jobs:
         env:
           GODOT_BIN: godot
         run: project/tests/view/screenshots/recapture.sh "$RUNNER_TEMP/shots"
-      - name: 기준 PNG 와 픽셀 차 (지금은 보고만 — strict 전환 규칙은 SE-020 티켓)
+      - name: 기준 PNG 와 픽셀 차 (strict — 2026-10-09 전환, 연속 0 3회 확인 후)
         env:
           # 3회 연속 diff_pixels=0 이 확인되면 이 값을 "--strict" 로 바꾼다(1줄).
-          STRICT_FLAG: ""
+          STRICT_FLAG: "--strict"
         run: |
           set -u +e
           base=project/tests/view/screenshots
