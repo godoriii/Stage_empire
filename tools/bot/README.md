@@ -45,11 +45,11 @@ tools/bot/mutate_and_test.sh <patch.diff> [tests_subdir=tests/sim] [--keep]
 
 | 패치 | 변이 | 기대 (tests/sim) |
 |---|---|---|
-| `mutations/se016_bankrupt_order.diff` | SE-016 순서 되돌리기: `_on_phase_changed`·`_on_day_started` 의 `if bankrupt: return` 을 맨 앞으로 | 실패 정확히 1건 `test_bankrupt_after_bailouts_exhausted` |
+| `mutations/se016_bankrupt_order.diff` | SE-016 순서 되돌리기: `_on_phase_changed`·`_on_day_started` 의 `if bankrupt: return` 을 맨 앞으로 | 실패 정확히 2건 `test_bankrupt_after_bailouts_exhausted`, `test_bankrupt_restore_keeps_pending_bailout`(후자는 SE-022 테스트라 SE-023 때도 걸렸어야 하나 기록이 1건이었다 — SE-044 QA 에서 origin/main 에서도 2건임을 확인) |
 | `mutations/se015_range_check_6_off.diff` | SE-015 ⑥ 검사(`loans[].paid` 범위)를 `if false:` 로 | 실패 정확히 1건 `test_restore_rejects_out_of_range` |
 
 ```bash
-tools/bot/mutate_and_test.sh tools/bot/mutations/se016_bankrupt_order.diff          # exit 1, 실패 1건이 잡힘
+tools/bot/mutate_and_test.sh tools/bot/mutations/se016_bankrupt_order.diff          # exit 1, 실패 2건이 잡힘
 tools/bot/mutate_and_test.sh tools/bot/mutations/se015_range_check_6_off.diff
 : > /tmp/empty.diff && tools/bot/mutate_and_test.sh /tmp/empty.diff                 # exit 0 (기준선)
 tools/bot/mutate_and_test.sh /tmp/empty.diff tests/view                             # view 85+ 사본 실행
