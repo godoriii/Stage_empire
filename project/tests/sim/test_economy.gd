@@ -723,6 +723,59 @@ func test_bankrupt_after_bailouts_exhausted() -> void:
 	bus.publish("time.day_started", {"day": "x"})
 	assert_push_warning("time.day_started 페이로드 무시", "파산 뒤에도 페이로드 검사")
 	assert_eq([econ.day, econ.phase], [15, "close"], "잘못된 페이로드는 day 를 바꾸지 않는다")
+	# SE-022 AC3: 잘못된 time.phase_changed 페이로드(to 가 문자열이 아님)도 파산 뒤 push_warning 후 무시.
+	var before_bad: String = _ehash(econ)
+	rec.clear()
+	bus.publish("time.phase_changed", {"to": 1, "day": 15})
+	assert_push_warning("time.phase_changed 페이로드 무시", "파산 뒤에도 phase_changed 페이로드 검사")
+	assert_push_warning_count(2, "day_started 1 + phase_changed 1")
+	assert_eq([econ.day, econ.phase], [15, "close"], "잘못된 phase_changed 는 day·phase 를 바꾸지 않는다")
+	assert_eq(_ehash(econ), before_bad, "잘못된 phase_changed 뒤 경제 상태 해시 불변")
+	assert_eq(_econ_events(rec), [], "잘못된 phase_changed 뒤 economy.* 이벤트 0")
+
+
+## SE-022 AC4 — restore() 로 만든 bankrupt: true + pending_bailout != null 상태(범위 검사 ⑦ 없음 → 복원 통과,
+## producer 결정 로그 2026-10-09). 이어 time.day_started 가 와도 day 만 따라가고 자동 수락하지 않는다
+## (economy.md "파산 뒤", _on_day_started 의 `if bankrupt: return` 이 _accept_bailout(true) 앞에 있어야 함).
+func test_bankrupt_restore_keeps_pending_bailout() -> void:
+	var src: Economy = _econ_with_loan_and_pending()[1]
+	var good: Dictionary = _rt(src.snapshot())
+	assert_false(good["bankrupt"], "전제: 원본은 파산 아님")
+	assert_not_null(good["pending_bailout"], "전제: pending_bailout 있음")
+	assert_eq((good["pending_bailout"]["installments"] as Array).size(), int(good["pending_bailout"]["repay_days"]), "전제: installments 개수 == repay_days")
+	var s: Dictionary = good.duplicate(true)
+	s["bankrupt"] = true
+	var u: Array = _unit()
+	var bus: EventBus = u[0]
+	var econ: Economy = u[1]
+	var rec: EventRecorder = u[2]
+	assert_true(econ.restore(s), "bankrupt: true + pending_bailout != null 은 복원된다(⑦ 없음)")
+	assert_push_error_count(0, "복원 push_error 0")
+	assert_true(econ.bankrupt, "전제: 복원 뒤 bankrupt")
+	assert_not_null(econ.pending_bailout, "전제: 복원 뒤 pending_bailout 있음")
+	var pb0: Dictionary = (econ.pending_bailout as Dictionary).duplicate(true)
+	assert_eq(pb0, src.pending_bailout, "전제: 복원한 pending_bailout == 원본")
+	var cash0: int = econ.cash
+	var rest0: String = _hash_without_day_phase(econ)
+	var n: int = econ.day + 1
+	assert_eq(n, 3, "리터럴: 복원 day 2 → 다음 날 3")
+	rec.clear()
+	bus.publish("time.day_started", {"day": n})
+	assert_eq(econ.day, n, "파산 뒤에도 day 추적")
+	assert_eq(econ.pending_bailout, pb0, "pending_bailout 그대로(자동 수락 없음)")
+	assert_eq(rec.of("economy.bailout_taken").size(), 0, "bailout_taken 0건")
+	assert_eq(rec.of("economy.cash_changed").size(), 0, "cash_changed 0건")
+	assert_eq(econ.cash, cash0, "cash 불변")
+	assert_eq(_hash_without_day_phase(econ), rest0, "day·phase 를 뺀 상태 불변")
+	assert_eq(_econ_events(rec), [], "economy.* 이벤트 0")
+	# 같은 날 close 진입: 파산 뒤라 S0(자동 수락)·정산 없음.
+	bus.publish("time.phase_changed", {"from": "close", "to": "day", "day": n, "tick": (n - 1) * _scfg.day_ticks})
+	_close(bus, n)
+	assert_eq([econ.day, econ.phase], [n, "close"], "phase 추적")
+	assert_eq(econ.pending_bailout, pb0, "close 뒤에도 pending_bailout 그대로(S0 없음)")
+	assert_eq(_hash_without_day_phase(econ), rest0, "close 뒤에도 day·phase 를 뺀 상태 불변(정산 없음)")
+	assert_eq(_econ_events(rec), [], "close 뒤에도 economy.* 이벤트 0")
+	assert_push_warning_count(0, "S0 push_warning 없음")
 
 
 # --- EC13 --------------------------------------------------------------------
