@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "base_by_grade": {"disaster": -30, "poor": -10, "ok": 12, "good": 22, "rave": 32},
+  "admission_factor": {"admissions_ref": 100, "min_bp": 5000, "max_bp": 10000},
+  "focus": {
+    "min_genre_sum": 50,
+    "identity_share_bp": 7000,
+    "identity_bonus_bp": 2000,
+    "breadth_min_share_bp": 1500,
+    "breadth_bonus_bp": 2000
+  },
+  "tier_unlock": {"max_tier": 2},
+  "checks": {
+    "tier2_reputation_day_range": [20, 30],
+    "rookie_unlock_day_range": [6, 12],
+    "tier2_reputation_cash_gap_max_days": 3,
+    "main_scenario": "local_daily_good_30"
+  },
+  "reference_scenarios": [
+    {
+      "id": "local_daily_good_30",
+      "description": "30일 기준 시나리오(AC2). 기준 배치 + 로컬 상위 indie(s07)를 매일 공연. 공연 입력은 audience local_top_baseline(입장 83, 평균 만족 6,732 → 호평)을 30일 고정, 정산 현금은 economy tier1_baseline 일자 검증(1일차 건설 뒤 2,000 + 매일 net 1,142)을 그대로 이어 붙인 합성 시나리오. 연동(명성 → 입장 증가, 아티스트 성장)은 reputation.md 부록 C",
+      "days": 30,
+      "show_cycle": [
+        {"genre": "indie", "satisfaction_bp": 6732, "admissions": 83}
+      ],
+      "cash": {"start": 2000, "per_day": 1142},
+      "cash_from_economy_scenario": "tier1_baseline",
+      "expected": {
+        "grade": ["good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good"],
+        "factor_bp": [8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300],
+        "focus": ["none", "none", "none", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity"],
+        "computed_delta": [18, 18, 18, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21],
+        "delta": [18, 18, 18, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21],
+        "total": [18, 36, 54, 75, 96, 117, 138, 159, 180, 201, 222, 243, 264, 285, 306, 327, 348, 369, 390, 411, 432, 453, 474, 495, 516, 537, 558, 579, 600, 621],
+        "by_genre_final": {"rock": 0, "indie": 621, "electronic": 0},
+        "tier_unlocked_days": [25],
+        "day_reach_rookie_unlock": 8,
+        "day_reach_tier2_reputation": 25,
+        "day_reach_tier2_cash": 25
+      }
+    },
+    {
+      "id": "rotation_good_30",
+      "description": "확산 전략: rock → indie → electronic 을 돌아가며 매일 공연(입장 83, 만족 6,732 고정). 4일차부터 확산 보너스, 명성 궤적이 집중 전략과 같다",
+      "days": 30,
+      "show_cycle": [
+        {"genre": "rock", "satisfaction_bp": 6732, "admissions": 83},
+        {"genre": "indie", "satisfaction_bp": 6732, "admissions": 83},
+        {"genre": "electronic", "satisfaction_bp": 6732, "admissions": 83}
+      ],
+      "cash": {"start": 2000, "per_day": 1142},
+      "cash_from_economy_scenario": "tier1_baseline",
+      "expected": {
+        "grade": ["good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good"],
+        "factor_bp": [8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300],
+        "focus": ["none", "none", "none", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth", "breadth"],
+        "computed_delta": [18, 18, 18, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21],
+        "delta": [18, 18, 18, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21],
+        "total": [18, 36, 54, 75, 96, 117, 138, 159, 180, 201, 222, 243, 264, 285, 306, 327, 348, 369, 390, 411, 432, 453, 474, 495, 516, 537, 558, 579, 600, 621],
+        "by_genre_final": {"rock": 207, "indie": 207, "electronic": 207},
+        "tier_unlocked_days": [25],
+        "day_reach_rookie_unlock": 8,
+        "day_reach_tier2_reputation": 25,
+        "day_reach_tier2_cash": 25
+      }
+    },
+    {
+      "id": "failure_floor_6",
+      "description": "실패 감소와 하한 0, 라인업 없는 날. 호평 83명 → 참사 83명(Δ −24, 하한으로 실제 −18) → 공연 없음(null) → 부진 40명(Δ −5, 실제 0) → 보통 83명 → 열광 122명",
+      "days": 6,
+      "show_cycle": [
+        {"genre": "indie", "satisfaction_bp": 6732, "admissions": 83},
+        {"genre": "indie", "satisfaction_bp": 2000, "admissions": 83},
+        null,
+        {"genre": "indie", "satisfaction_bp": 4000, "admissions": 40},
+        {"genre": "indie", "satisfaction_bp": 5500, "admissions": 83},
+        {"genre": "indie", "satisfaction_bp": 7600, "admissions": 122}
+      ],
+      "cash": {"start": 2000, "per_day": 0},
+      "expected": {
+        "grade": ["good", "disaster", null, "poor", "ok", "rave"],
+        "factor_bp": [8300, 8300, null, 5000, 8300, 10000],
+        "focus": ["none", "none", null, "none", "none", "none"],
+        "computed_delta": [18, -24, null, -5, 9, 32],
+        "delta": [18, -18, null, 0, 9, 32],
+        "total": [18, 0, 0, 0, 9, 41],
+        "by_genre_final": {"rock": 0, "indie": 41, "electronic": 0},
+        "tier_unlocked_days": [],
+        "day_reach_rookie_unlock": null,
+        "day_reach_tier2_reputation": null,
+        "day_reach_tier2_cash": null
+      }
+    },
+    {
+      "id": "reputation_first_40",
+      "description": "명성이 먼저 차는 경우(AND 조건). 공연은 local_daily_good_30 과 같고 현금은 매일 +800 → 명성 500 은 25일, 자금 30,000 은 35일, 해금은 35일 1회",
+      "days": 40,
+      "show_cycle": [
+        {"genre": "indie", "satisfaction_bp": 6732, "admissions": 83}
+      ],
+      "cash": {"start": 2000, "per_day": 800},
+      "expected": {
+        "grade": ["good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good"],
+        "factor_bp": [8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300],
+        "focus": ["none", "none", "none", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity", "identity"],
+        "computed_delta": [18, 18, 18, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21],
+        "delta": [18, 18, 18, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21],
+        "total": [18, 36, 54, 75, 96, 117, 138, 159, 180, 201, 222, 243, 264, 285, 306, 327, 348, 369, 390, 411, 432, 453, 474, 495, 516, 537, 558, 579, 600, 621, 642, 663, 684, 705, 726, 747, 768, 789, 810, 831],
+        "by_genre_final": {"rock": 0, "indie": 831, "electronic": 0},
+        "tier_unlocked_days": [35],
+        "day_reach_rookie_unlock": 8,
+        "day_reach_tier2_reputation": 25,
+        "day_reach_tier2_cash": 35
+      }
+    }
+  ]
+}

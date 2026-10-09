@@ -74,6 +74,7 @@ ArtistSystem 이 소유하는 상태. `pending`만 빼고 전부 스냅샷 대�
 | K4 | `reputation_total < grades[grade].unlock_reputation`이고 `discovered_here == false`. `grade`는 그 아티스트의 **현재** 등급 | `artist.booking_rejected` · `grade_locked` |
 | K5 | 그 밖 | 개런티 지출 제안(#경제-핸드셰이크 H1). 결과는 H2~H5 |
 
+- 거절 이벤트 키: `artist.booking_rejected {day: int, artist_id: <받은 값, 키가 없으면 null>, reason: String}`(events.md 와 같다). `reason`은 아래 5종 중 하나.
 - 페이로드 형식 오류를 먼저 본다(K1). 그래서 낮이 아닐 때 모르는 id 를 보내면 `unknown_artist`다. 테스트는 `not_allowed`를 볼 때 명단에 있는 id 를 쓴다.
 - K4 면제(발굴 아티스트)는 "내 무대에서 키운 아티스트가 승급하자마자 섭외할 수 없게 되는" 상황을 막는다. 예: `local` 아티스트를 열광 공연으로 5회 만에 `rookie`로 올렸는데 명성이 아직 150 미만인 경우. PRD 발굴 보너스("우선 섭외권")의 v0 최소판이다(Q3). 개런티 할인은 버티컬 슬라이스.
 - 파산 여부는 artist 가 알지 못한다. 파산 뒤 섭외는 economy C1 이 거절하고 H3 이 `not_allowed`로 바꾼다.
@@ -137,8 +138,8 @@ economy.md #입력-계약 "같은 경계 안의 핸드셰이크"와 build.md #�
 - 상태를 먼저 전부 갱신하고(tick.md E8) `artist.grown {day, artist_id, grade: grade', popularity: popularity', skill: skill', popularity_delta: popularity' − popularity, skill_delta: skill' − skill, shows_played: shows_played', promoted}`를 낸다. 델타는 자른 뒤의 실제 변화량이다.
 - 승급은 한 공연에 최대 한 단계다. v0 에서 `rookie.promote_to == null`이라 게임 전체에서 아티스트당 최대 1회다.
 - 강등은 없다. `rookie`가 참사 공연으로 인기 40 아래가 되어도 `rookie`로 남는다.
-- 성장은 공연 등급(`show_grades`)만 본다. 관객 수·만족 bp 는 show 가 등급으로 접어 넣는다(만족도의 진실의 출처는 show.md).
-- 피로·휴식은 없다(Q 범위 밖). 같은 아티스트를 매일 섭외해도 된다.
+- 성장은 공연 등급(`show_grades`)만 본다. 관객 수·만족 bp 는 show 가 등급으로 접어 넣는다(만족도의 진실의 출처는 `audience.day_summary.avg_satisfaction_bp`, 등급 임계는 show.md — show.md SR1).
+- 피로·휴식은 없다(v0 범위 밖). 같은 아티스트를 매일 섭외해도 된다.
 
 ### 명성과의 상호작용
 
@@ -181,7 +182,7 @@ economy.md #입력-계약 "같은 경계 안의 핸드셰이크"와 build.md #�
 
 ### 설정 로드 검사
 
-`ArtistConfig.load()`가 스키마로 못 하는 교차 검사를 한다. 실패하면 `push_error`, `null`. CI 의 `validate_data.py`는 `jsonschema` 없이 내장 부분집합으로 돌아 `maxItems`·`maxLength`를 검사하지 않으므로(Q9), 아래 L6·L7 이 그 몫을 런타임에 다시 막는다.
+`ArtistConfig.load()`가 스키마로 못 하는 교차 검사를 한다. 실패하면 `push_error`, `null`. CI 는 `jsonschema`를 설치해 스키마 제약(`maxItems`·`maxLength` 포함)을 전부 검사한다(ci.yml 400ce59, Q9). `jsonschema`가 없는 로컬 실행은 내장 부분집합이라 `maxItems`·`maxLength`를 보지 않으므로, 아래 L6·L7 이 런타임에서도 같은 제약을 막는다.
 
 | # | 검사 |
 |---|---|
@@ -194,7 +195,7 @@ economy.md #입력-계약 "같은 경계 안의 핸드셰이크"와 build.md #�
 | L7 | 명단 행마다 `personality`가 서로 다른 2개, 둘 다 `personality_tags`에 있음, `personality_exclusive_pairs`의 어느 쌍과도 같지 않음. `personality_exclusive_pairs`의 태그는 전부 `personality_tags`에 있음 |
 | L8 | 명단 행의 등급에 승급 규칙이 있으면 `popularity < promote_at_popularity`(새 게임에 이미 승급 조건을 넘은 로컬이 없음) |
 
-검사하지 않는 것(로더 밖): 명단 구성(12행, 3장르 × 4, 등급 8/4, `roster_plan` 일치)과 `bio_key` 문장 존재. 테스트 사본이 적은 행으로 로드될 수 있게 로더는 막지 않고, qa 스크립트(AR10)와 SE-033 AC6 테스트가 실제 데이터를 검사한다. `roster_plan`·`reference_scenarios`는 런타임이 읽지 않는다(테스트·qa 용).
+검사하지 않는 것(로더 밖): 명단 구성(12행, 3장르 × 4, 등급 8/4, `roster_plan` 일치)과 `bio_key` 문장 존재. 테스트 사본이 적은 행으로 로드될 수 있게 로더는 막지 않고, qa 스크립트(AR11)와 SE-033 AC6 테스트가 실제 데이터를 검사한다. `roster_plan`·`reference_scenarios`는 런타임이 읽지 않는다(테스트·qa 용).
 
 ### 공개 API (SE-033 구현 대상, 이름 제안)
 
@@ -340,7 +341,7 @@ economy.md #입력-계약 "같은 경계 안의 핸드셰이크"와 build.md #�
 
 ## 테스트 방법
 
-- 데이터(이 티켓): `python3 tools/validate_data.py --strict` — `artist.json`·`artists.json`(·2차 `artists_ko.json`)이 스키마를 통과. CI 는 `jsonschema` 없이 돌아 `maxItems`(성격 2개·라이더 0개)와 `maxLength`(바이오 120자)를 보지 않으므로 아래 qa 스크립트가 그 몫을 한다.
+- 데이터(이 티켓): `python3 tools/validate_data.py --strict` — `artist.json`·`artists.json`(·2차 `artists_ko.json`)이 스키마를 통과. CI 는 `jsonschema`를 설치해 `maxItems`(성격 2개·라이더 0개)와 `maxLength`(바이오 120자)까지 검사한다(ci.yml 400ce59). 명단 구성(12행·장르·등급·슬롯 일치)은 스키마 밖이라 아래 qa 스크립트가 검사한다.
 - 명단 검사(qa, 2차 뒤 AR11): 리포 루트에서
 
 ```bash
@@ -372,8 +373,6 @@ for t in rules["personality_tags"]:
 print("\n".join(err) or "AR11 OK"); sys.exit(1 if err else 0)
 PY
 ```
-
-  1차(구조 예시 2행) 상태에서는 "행 2 != 12"·"artists_ko.json 없음 또는 비어 있음" 등으로 exit 1 인 것이 정상이다.
 - 헤드리스(SE-033): `tools/run_tests.sh project/tests/sim` → `test_artist_config.gd`(AR1), `test_artist_system.gd`(AR2~AR10). 단위 케이스는 `EventBus` + `Economy`(실제 economy 설정)에 `time.*`·`show.ended`·`reputation.changed`를 테스트가 직접 발행하고, AR5·AR9·AR10(b)는 `TickLoop`으로 구동한다(artist·economy 를 훅과 함께 등록). `show.ended`의 발행 주체(SE-035)가 없어도 테스트가 발행한다. Godot 이 없으면 SKIP → CI(`godot-tests`).
 - 변이(qa, SE-033): "K2 구간 검사 제거" 패치 → AR3 의 `not_allowed` 케이스만 실패. "K4 발굴 면제 제거" → AR4 의 면제 케이스만 실패.
 - 스펙 대조(reviewer): AR13·AR14, 이 문서의 이벤트 이름·페이로드와 events.md, 수치표와 `artist.json`.
@@ -392,7 +391,7 @@ PY
 | Q6 | 참사 공연의 인기 감소 | (a) 0 (b) −1/−2(로컬/신인) | **(b).** 나쁜 공연에도 비용이 있어야 배치·라인업을 신경 쓴다. 강등은 없다 | 데이터만 |
 | Q7 | 티켓 초안 `booked_days` | (a) `booked_day` 단일 값 (b) 섭외 이력 배열 | **(a).** v0 규칙이 이력을 읽지 않는다 | (b)는 스냅샷 형식 변경 |
 | Q8 | `artist.lineup_set` 페이로드 | (a) `{day, artist_id}` (b) 장르·등급·인기·실력 포함 | **(b).** 받는 시스템이 artist 상태를 읽지 않게 한다 | — |
-| Q9 | CI 검증기가 `maxItems`·`maxLength`·`minProperties`·`propertyNames`를 무시(`jsonschema` 미설치 시 내장 부분집합) | (a) 로더 L6·L7 + qa 스크립트로 보완 (b) `tools/validate_data.py` 부분집합에 키워드 추가 | **(a) 지금, (b)는 후속 티켓 제안**(producer, `tools/` 범위라 game-designer 가 고치지 않는다) | — |
+| Q9 | CI 검증기가 `maxItems`·`maxLength`·`minProperties`·`propertyNames`를 무시(`jsonschema` 미설치 시 내장 부분집합) | (a) 로더 L6·L7 + qa 스크립트로 보완 (b) `tools/validate_data.py` 부분집합에 키워드 추가 (c) CI 에 `jsonschema` 설치 | **(a) + (c).** CI data job 이 `jsonschema`를 설치해 전체 제약을 검사한다(ci.yml 400ce59). 로더 L6·L7 은 `jsonschema` 없는 로컬 실행·런타임 방어로 유지 | — |
 | Q10 | 공연 등급 id | `disaster`/`poor`/`ok`/`good`/`rave` | 이 문서가 먼저 정했다. show.md(SE-030)가 같은 id 를 쓴다. 이름을 바꾸려면 SE-030 이 `artist.json` `show_grades`·`popularity_delta_by_show_grade` 키와 함께 바꾼다(스키마 version 2) | — |
 
 ## 변경 이력
@@ -401,3 +400,4 @@ PY
 |---|---|---|---|
 | 2026-10-09 | artist.md v0 | SE-031 1차 | 신규 작성 |
 | 2026-10-09 | `artist.json` v1·`artist.schema.json` version 1, `artists.schema.json` version 1, `text.schema.json` version 1, `artists.json` v1(구조 예시 2행) | SE-031 1차 | 신규 테이블. `artist.json`: `mvp_genres`, `booking_phases`, `guarantee_mode`, `stat_max`, 관계도 범위, `show_grades`, `grades`(local·rookie), 성격 태그 어휘·배타 쌍, `roster_plan`(12 슬롯), `reference_scenarios`(성장 7건). `artists.json` 행: `rows` 빈 배열 불허(minItems 1), `rider` 빈 배열만(maxItems 0), `personality` 정확히 2개. `text.schema.json`은 `project/data/text/*.json` 공용(SE-039 `ui_ko.json` 재사용). 티켓 초안에서 바꾼 것: `booked_days` → `booked_day`(Q7), `artist.lineup_set`·`artist.booked`·`artist.grown` 페이로드 키 추가(Q8), economy 거절의 `reason` 매핑(Q4). 기존 테이블(`economy.json`·`genres.json` 등) 변경 없음 |
+| 2026-10-09 | artist.md v0 (후속 수정), 스키마 `version` 불변(description 만) | SE-030 (docs/reviews/SE-031.md 낮음 항목 이관) | 참조 번호 정리: `artist.schema.json`의 옛 번호 L9·G5 를 L5·GR4 로, 명단 검사 참조를 AR11 로(`artist.schema.json` 1곳, `artists.schema.json` 2곳, 이 문서 #설정-로드-검사 1곳 — 스냅샷 테스트 AR10 은 그대로). CI 가 `jsonschema`를 설치한다(ci.yml 400ce59)는 사실로 #설정-로드-검사·#테스트-방법·Q9 문구 갱신. 명단 검사 스크립트 뒤의 1차 상태 안내 문장 삭제(2차 완료), 피로·휴식 행의 범위 표기를 "v0 범위 밖"으로. #섭외-규칙에 `artist.booking_rejected {day, artist_id\|null, reason}` 키 목록 한 줄(events.md 와 같음). `relationship_min` 설명을 데이터 −100 에 맞춤. #성장의 만족도 진실의 출처를 `audience.day_summary.avg_satisfaction_bp`로(show.md SR1 — audience.md Q7 과 일치). 규칙·수치·이벤트 변경 없음 |

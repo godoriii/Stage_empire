@@ -1,10 +1,13 @@
 {
   "version": 1,
   "rows": [
-    { "id": "rock",       "name": "록",        "accent_color": "#d64545" },
+    { "id": "rock",       "name": "록",        "accent_color": "#d64545",
+      "affinity": { "rock": 1.0, "indie": 0.5, "electronic": 0.2 } },
     { "id": "hiphop",     "name": "힙합",      "accent_color": "#f2a93b" },
-    { "id": "electronic", "name": "일렉트로닉", "accent_color": "#3bc9db" },
-    { "id": "indie",      "name": "인디",      "accent_color": "#8fbf6a" },
+    { "id": "electronic", "name": "일렉트로닉", "accent_color": "#3bc9db",
+      "affinity": { "rock": 0.2, "indie": 0.4, "electronic": 1.0 } },
+    { "id": "indie",      "name": "인디",      "accent_color": "#8fbf6a",
+      "affinity": { "rock": 0.5, "indie": 1.0, "electronic": 0.4 } },
     { "id": "jazz",       "name": "재즈",      "accent_color": "#7b5ea7" },
     { "id": "pop",        "name": "팝",        "accent_color": "#ef7fb8" },
     { "id": "metal",      "name": "메탈",      "accent_color": "#5c5c66" },

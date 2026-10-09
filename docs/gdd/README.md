@@ -4,14 +4,14 @@ game-designer가 쓴다. 파일 하나가 시스템 하나. 티켓은 여기의 
 
 | 파일 | 시스템 | 상태 |
 |---|---|---|
-| `events.md` | 이벤트 버스 이벤트 이름·페이로드 (sim/view 공용 계약) | 등록된 도메인 확정 (`tick.*`·`time.*` SE-006, `economy.*` SE-005, `build.*` SE-028, `artist.*` SE-031, `audience.*` SE-029). 새 도메인은 그 스펙 티켓에서 추가 |
+| `events.md` | 이벤트 버스 이벤트 이름·페이로드 (sim/view 공용 계약) | 등록된 도메인 확정 (`tick.*`·`time.*` SE-006, `economy.*` SE-005, `build.*` SE-028, `artist.*` SE-031, `audience.*` SE-029, `show.*`·`reputation.*` SE-030). 새 도메인은 그 스펙 티켓에서 추가 |
 | `tick.md` | 틱, 세션 구간(낮/저녁/공연/마감), 배속, 명령 큐, 결정성·RNG, 스냅샷(시스템 훅 `systems`), 이벤트 순서 | v0 (SE-006, SE-011 시스템 스냅샷) |
 | `economy.md` | 수익·비용·파산·구제, 하루 1회 정산, 티켓 가격, 시작 자금 | v0 (SE-005, SE-011 `TickLoop` 스냅샷 연결) |
 | `build.md` | 맵(타일 종류), 가구 20종, 좌표·회전·점유, 배치·철거 규칙, economy 핸드셰이크, 커버리지(음향·시야·바·수용·피난), 스냅샷 | v0 (SE-028) |
 | `artist.md` | 아티스트 등급·개런티·섭외(거절 5종, economy 핸드셰이크)·라인업·성장·승급·명성 가용, MVP 장르 3, 명단 설계·이름 규칙. 관계·라이더는 필드만 예약 | v0 (SE-031) |
-| `show.md` | 공연 만족도 공식, 사고 이벤트 | 미작성 |
+| `show.md` | 공연 시작 조건(라인업·무대 → `show.started`/`show.skipped`), 만족도 진실의 출처(관객 평균 → 등급 5단계 임계), `show.ended`·`revenue_hint`, 마감 리포트 필드(SE-039 인계), 스냅샷. 사고 이벤트는 `events_crisis.md` | v0 (SE-030) |
 | `audience.md` | 관객 유형 3(색·장르 적합·가격 민감·바·인내), 입장 수 공식(인기·장르·명성·가격·수용 150, 시드 고정 ±10%), 에이전트 ≤150 상태 기계·타일 이동·혼잡 대기·조기 퇴장, 만족(라인업·음향·시야·가격·혼잡·대기), `economy.sales_reported` 발행, 스냅샷. 흐름장(티어 4+)은 범위 밖 | v0 (SE-029) |
-| `reputation.md` | 장르별 명성 벡터, 티어 해금 | 미작성 |
+| `reputation.md` | 종합 명성 + MVP 3장르 벡터, Δ = 등급 기본값 × 입장 계수 × 장르 집중/확산 보정(`genres.json` `affinity`), 실패 감소·하한 0, 티어 2 해금 판정(`economy.day_settled.cash` ∧ 명성, 게임당 1회 알림), 30일 기준 시나리오(500 도달 25일), 스냅샷 | v0 (SE-030) |
 | `staff.md` | 스태프 직군, 숙련·피로, 구역 배정 | 미작성 |
 | `events_crisis.md` | 날씨·고장·노쇼·민원·사고·바이럴 | 미작성 |
 | `materials.md` | 머티리얼 슬롯·에셋 규약 (`base`/`accent`/`emissive`/`glass`, 슬롯 = 별도 서피스, glass, 정점 알파·군중 색) | v0 (SE-019) |
