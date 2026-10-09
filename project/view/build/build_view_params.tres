@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="BuildViewParams" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://view/build/build_view_params.gd" id="1_params"]
+
+[resource]
+script = ExtResource("1_params")
+ghost_valid_color = Color(0.3, 0.9, 0.45, 0.45)
+ghost_invalid_color = Color(0.95, 0.25, 0.25, 0.45)
+demolish_color = Color(1, 0.5, 0.15, 0.5)
+ghost_padding_m = 0.02
+ghost_label_offset_m = 0.5
+ghost_label_pixel_size = 0.01
+ghost_label_font_size = 40
+decal_y_offset_m = 0.012
+decal_fill_ratio = 0.94
+overlay_covered_colors = {
+"bar": Color(1, 0.6, 0.2, 0.6),
+"sight": Color(1, 0.88, 0.3, 0.6),
+"sound": Color(0.25, 0.75, 1, 0.6)
+}
+overlay_uncovered_color = Color(0.85, 0.2, 0.3, 0.35)
+radius_preview_colors = {
+"bar_service_radius": Color(1, 0.6, 0.2, 0.3),
+"sound_radius": Color(0.25, 0.75, 1, 0.3)
+}
+proxy_fallback_color = Color(0.6, 0.6, 0.65, 1)
