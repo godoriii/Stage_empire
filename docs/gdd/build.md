@@ -205,6 +205,7 @@ economy.md #입력-계약 "같은 경계 안의 핸드셰이크"를 그대로 �
 
 | 출력 | 입력 | 식 |
 |---|---|---|
+| `blocked_cells` | `instances` | 모든 인스턴스의 점유 셀(G3) 합집합 = 아래 `R`의 BFS 가 지나가지 못하게 막는 셀. 배열, G6 순서. 매번 전체 목록(증분 아님) |
 | `R` (도달 집합) | 맵, `occupancy` | 모든 `entrance` 타일에서 시작하는 4방향 BFS. 지나갈 수 있는 타일 = `walkable == true`이고 점유되지 않은 타일. 결과는 집합(순회 순서 무관) |
 | `floor_free` | `R` | `count({t ∈ R : standing(t)})` (도달 가능한 빈 `floor`) |
 | 무대 `S` | `instances` | `category == "stage"`인 인스턴스(B9 로 0 또는 1 개). 없으면 `has_stage = false`, 관람 타일 ∅ |
@@ -263,6 +264,8 @@ func line(a: [x0, z0], b: [x1, z1]) -> Array:   # a 와 b 를 포함한 셀 목�
 | `"demolished"` | D4, `economy.upkeep_reported` 뒤 |
 | `"sync"` | `time.phase_changed {to: "evening"}` 수신 시 1회(설치 목록이 그대로여도). 새 게임·복원 직후에는 이벤트가 없으므로(스냅샷 훅은 이벤트를 내지 않는다, SH4) 관객·공연 시스템은 매일 저녁 개장 직전에 이 값으로 동기화한다 |
 
+`blocked_cells`(SE-044): 모든 `cause`의 페이로드에 점유 셀 전체(C0, G6 순서, 증분 아님)를 싣는다 — 복원 뒤 첫 저녁 `"sync"`에도 실리므로 이 이벤트 하나로 점유 상태가 완전히 재구성된다. 소비자는 SE-034 관객 경로(자기 `TilePath`를 받을 때마다 이 목록으로 맞춘다, `BuildSystem`을 직접 부르지 않는다). SE-037 오버레이는 이 키를 쓰지 않는다(무시).
+
 ### 이벤트 페이로드
 
 명령 페이로드 숫자는 `int`만(tick.md E4). 좌표는 `[x, z]` 2원소 `int` 배열, 좌표 목록은 G6 순서.
@@ -272,9 +275,9 @@ func line(a: [x0, z0], b: [x1, z1]) -> Array:   # a 와 b 를 포함한 셀 목�
 | `build.place_requested` | `{furniture_id: String, cell: [x, z], rotation: int}` |
 | `build.demolish_requested` | `{entity_id: String}` |
 | `build.placed` | `{entity_id: String, furniture_id: String, cell: [x, z], rotation: int, cells: Array[[x, z]], cost: int}` — `cost` = 승인된 건설비(= `paid`) |
-| `build.rejected` | `{action: "place"\|"demolish", reason: String, furniture_id, cell, rotation, entity_id}` — `reason`은 B·D·H 표의 값 15종(`invalid`, `not_allowed`, `unknown_furniture`, `bad_rotation`, `out_of_bounds`, `blocked_tile`, `overlap`, `wall_required`, `limit_reached`, `path_blocked`, `insufficient_cash`, `bankrupt`, `charge_invalid`, `charge_unresolved`, `not_found`). `action:"place"`: `furniture_id`·`cell`·`rotation`은 **받은 값 그대로**(키가 없으면 `null`), `entity_id`는 `null`. `action:"demolish"`: `entity_id`는 받은 값(없으면 `null`), 나머지 셋은 인스턴스가 있으면 그 값, 없으면 `null` |
+| `build.rejected` | `{action: "place"\|"demolish", reason: String, furniture_id, cell, rotation, entity_id}` — `reason`은 B·D·H 표의 값 15종(`invalid`, `not_allowed`, `unknown_furniture`, `bad_rotation`, `out_of_bounds`, `blocked_tile`, `overlap`, `wall_required`, `limit_reached`, `path_blocked`, `insufficient_cash`, `bankrupt`, `charge_invalid`, `charge_unresolved`, `not_found`). `action:"place"`: `furniture_id`·`cell`·`rotation`은 **받은 값 그대로**(키가 없으면 `null`), `entity_id`는 `null`. `action:"demolish"`: `entity_id`는 받은 값(없으면 `null`), 나머지 셋은 인스턴스가 있으면 그 값, 없으면 `null`. 타입: 네 필드는 **받은 값 그대로(any)**, 키가 없으면 `null`. `reason != "invalid"`이면 각각 `String`·`[x, z]`(`int` 2개)·`int`·`String`(또는 `null`)으로 좁혀진다(`invalid` 거절은 `cell: "5,5"`, `rotation: "0"`, `entity_id: 5` 같은 값을 그대로 돌려준다, BC3·BC17) |
 | `build.demolished` | `{entity_id: String, furniture_id: String, cell: [x, z], rotation: int, cells: Array[[x, z]], base_amount: int}` — `base_amount` = `paid` |
-| `build.coverage_changed` | `{cause: "placed"\|"demolished"\|"sync", has_stage: bool, floor_free: int, viewing_count: int, viewing_tiles: Array[[x, z]], sound_tiles: Array[[x, z]], sight_tiles: Array[[x, z]], bar_tiles: Array[[x, z]], sound_bp: int, sight_bp: int, bar_bp: int, capacity: int, evac_capacity: int, evac_shortfall: int, light_grade: int, satisfaction_bonus_bp: int, upkeep_per_day: int}` — 타일 배열 4개는 관객 시스템 입력(관람 위치)과 오버레이(SE-037) 입력 |
+| `build.coverage_changed` | `{cause: "placed"\|"demolished"\|"sync", has_stage: bool, floor_free: int, viewing_count: int, viewing_tiles: Array[[x, z]], sound_tiles: Array[[x, z]], sight_tiles: Array[[x, z]], bar_tiles: Array[[x, z]], sound_bp: int, sight_bp: int, bar_bp: int, capacity: int, evac_capacity: int, evac_shortfall: int, light_grade: int, satisfaction_bonus_bp: int, upkeep_per_day: int, blocked_cells: Array[[x, z]]}` — 타일 배열 4개는 관객 시스템 입력(관람 위치)과 오버레이(SE-037) 입력. `blocked_cells`(마지막 키)는 점유 셀 전체(C0, G6 순서, 증분 아님), 관객 경로(SE-034) 입력이고 오버레이는 무시 |
 
 ### 결정성과 RNG
 
@@ -286,9 +289,9 @@ func line(a: [x0, z0], b: [x1, z1]) -> Array:   # a 와 b 를 포함한 셀 목�
 
 `TickLoop.register_system("build", build.update, build.snapshot, build.restore)`로 **반드시** 등록한다(economy 와 같은 이유: 등록하지 않으면 설치 목록이 세이브에서 사라진다). `system_order`의 첫 시스템이라 구독도 가장 먼저다(tick.md "시스템 등록").
 
-`Build.snapshot() -> Dictionary` = `{instances: [{entity_id, furniture_id, cell: [x, z], rotation, paid}, …], next_entity: int, phase: String}`(깊은 복사본, 기본형만). `pending`·파생값은 넣지 않는다.
+`BuildSystem.snapshot() -> Dictionary` = `{instances: [{entity_id, furniture_id, cell: [x, z], rotation, paid}, …], next_entity: int, phase: String}`(깊은 복사본, 기본형만). `pending`·파생값은 넣지 않는다.
 
-`Build.restore(d) -> bool`. 정수 필드는 `int`로 정규화(JSON 왕복의 `float`). 아래 검사를 **전부 끝낸 뒤** 적용한다(SH3). 첫 위반에서 `push_error` 1회, `false`, 상태 불변, 이벤트 0.
+`BuildSystem.restore(d) -> bool`. 정수 필드는 `int`로 정규화(JSON 왕복의 `float`). 아래 검사를 **전부 끝낸 뒤** 적용한다(SH3). 첫 위반에서 `push_error` 1회, `false`, 상태 불변, 이벤트 0.
 
 | # | 검사 |
 |---|---|
@@ -323,7 +326,7 @@ func line(a: [x0, z0], b: [x1, z1]) -> Array:   # a 와 b 를 포함한 셀 목�
 
 FC6(economy 가정 목록 `reference_sets[economy_tier1_baseline]`의 합 == `economy.json` `reference_scenarios[tier1_baseline]`의 `upkeep_per_day`·`initial_build_spend`)와 FC7(`starter_max_trio` 건설비 ≤ `starting_cash` < `all_rows_once` 건설비, 각 `expected.affordable_with_starting_cash`와 일치)은 로드 검사가 아니라 테스트다(BC20). 데이터를 바꿀 때 game-designer 가 지킨다.
 
-### 공개 API (SE-032 구현 대상, 이름 제안)
+### 공개 API (SE-032 구현, SE-044 에서 구현 이름으로 정리)
 
 파일은 `project/world/`(CLAUDE.md "World: 그리드, 배치 규칙, 경로 탐색, 커버리지 계산"). 짝 테스트 `project/tests/sim/test_<이름>.gd`.
 
@@ -332,10 +335,11 @@ FC6(economy 가정 목록 `reference_sets[economy_tier1_baseline]`의 합 == `ec
 | `BuildConfig` | `static load(furniture_path := "res://data/furniture/furniture.json", map_path := "res://data/maps/tier1_club.json") -> BuildConfig`, `static from_dicts(furniture: Dictionary, map: Dictionary, tiers: Dictionary, economy: Dictionary) -> BuildConfig` | MK·FC 검사. `tiers.json`·`economy.json`은 기본 경로에서 읽는다(읽기 전용) |
 | | `furniture(id) -> Dictionary`, `has_furniture(id) -> bool`, `tile_kind(cell) -> Dictionary`(맵 밖 `{}`), `layout(id) -> Dictionary`, `reference_set(id) -> Dictionary`, `capacity_max`, `rate_scale` | 읽기 전용, 깊은 복사 |
 | | `static rotated_size(footprint: Array, rotation: int) -> Array`, `static cells_of(footprint, cell, rotation) -> Array`, `static line(a: Array, b: Array) -> Array` | 순수 함수(G2·G3·시야 레이). 단위 테스트용 |
-| `Build` | `new(config: BuildConfig, bus: EventBus)` | `build.place_requested`, `build.demolish_requested`, `economy.charge_resolved`, `time.phase_changed` 구독. 이벤트를 내지 않는다 |
+| `BuildSystem` | `new(config: BuildConfig, bus: EventBus)` | `build.place_requested`, `build.demolish_requested`, `economy.charge_resolved`, `time.phase_changed` 구독. 이벤트를 내지 않는다 |
 | | `update(ctx)`, `snapshot()`, `restore(d)` | H5, #스냅샷 |
 | | `coverage() -> Dictionary` | 마지막 계산 결과(= `build.coverage_changed` 페이로드에서 `cause` 뺀 것). 읽기 전용 |
 | | `check_place(furniture_id: String, cell: Array, rotation: int) -> String` | B1·B3~B10 판정만(구간 B2·자금 제외), 통과면 `""`. **상태 불변, 이벤트 없음.** UI 배치 미리보기(유효/무효 타일 색)용(Q4) |
+| | `find_path(from: Array, to: Array) -> Array`, `path_from_entrance(to: Array) -> Array` | 현재 점유 기준 4방향 타일 경로(`[x, z]` 목록, 도달 불가·맵 밖이면 `[]`). **UI·테스트용 읽기 쿼리, sim 시스템은 부르지 않는다**(원칙 4 — 관객 경로는 `build.coverage_changed.blocked_cells`로 자기 `TilePath`를 맞춘다). 상태 불변, 이벤트 없음(BC32) |
 
 ### UI 계약 (SE-037)
 
@@ -405,7 +409,7 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 
 구현 티켓(SE-032)의 테스트 케이스 목록이다. 파일은 SE-032 가 정하는 `project/tests/sim/test_build*.gd`. 기대 수치는 테스트에 하드코딩하지 않고 `tier1_club.json` `reference_layouts[].expected`와 `furniture.json` `reference_sets[].expected`, 행 값에서 읽는다(수치가 바뀌어도 테스트 코드는 그대로). 아래 리터럴은 현재 데이터 값이다.
 
-공통 전제: 새 게임(`starting_cash` 5,000, `phase "day"`, 설치 0), `Build`와 `Economy`를 `system_order` 순으로 같은 버스에 구독, 명령은 `bus.publish` 후 `dispatch_commands()`(또는 `TickLoop.advance(0)`).
+공통 전제: 새 게임(`starting_cash` 5,000, `phase "day"`, 설치 0), `BuildSystem`과 `Economy`를 `system_order` 순으로 같은 버스에 구독, 명령은 `bus.publish` 후 `dispatch_commands()`(또는 `TickLoop.advance(0)`).
 
 ### 배치·철거 판정 (유효/무효 케이스)
 
@@ -436,7 +440,7 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 | # | 내용 | 기대 |
 |---|---|---|
 | BC20 | `furniture.json` `reference_sets` 3개: 항목 합 | `economy_tier1_baseline`: 건설비 3,000 == `economy.json` `initial_build_spend`, 유지비 200 == 그 시나리오 `upkeep_per_day`(FC6). `starter_max_trio` 2,900 ≤ `starting_cash`, `all_rows_once` 7,700 > `starting_cash`(FC7). 각 `expected`와 같음 |
-| BC21 | `baseline_show` 배치 뒤 `speaker_floor` `[5,10]` r0, `[18,10]` r0 추가 | `viewing_count` 403, 음향 313칸, `sound_bp` 7,766 (스피커 2 → 4 로 23.70% → 77.66%) |
+| BC21 | `reference_layouts[baseline_plus_two_speakers]` 레이아웃 데이터(= `baseline_show` 6개 + `speaker_floor` `[5,10]` r0, `[18,10]` r0) 8개를 순서대로 place | 8개 모두 placed(f1~f8). `coverage()`·마지막 `build.coverage_changed`가 그 레이아웃의 `expected`와 같음(테스트에 리터럴을 두지 않는다): `viewing_count` 403, 음향 313칸·7,766 bp(스피커 2 → 4 로 23.70% → 77.66%), `floor_free` 455, 시야 362칸·8,982 bp, 바 121칸·3,002 bp, 수용 121, 피난 80, 부족 41, 유지비 153, 건설비 합 2,540, cash 2,460, 시야 차단 41칸(새 바닥 스피커는 `sight_block` 아님 — `baseline_show`와 같은 41칸) |
 | BC22 | `reference_layouts[empty_room]` | `coverage()`가 `expected`와 같음: 무대 없음, `floor_free` 478, 관람 0, 음향·시야·바 0, 수용 119, 피난 80, 부족 39, 연출 0, 만족 0, 유지비 0, 건설비 0, cash 5,000 |
 | BC23 | `reference_layouts[baseline_show]` 6개를 순서대로 place | 6개 모두 placed(f1~f6). 마지막 `build.coverage_changed`가 `expected`와 같음: `floor_free` 457, `viewing_count` 405, 음향 96칸·2,370 bp, 시야 364칸·8,987 bp, 바 122칸·3,012 bp, 수용 122, 피난 80, 부족 42, 연출 0, 만족 100, 유지비 123, 건설비 합 2,140, cash 2,860, 시야 차단 41칸 = `expected.sight_blocked_cells`. 마지막 `economy.upkeep_reported.total` 123 |
 | BC24 | 순수 함수 | `rotated_size([3,1], 90) == [1,3]`, `cells_of([3,1],[20,4],90) == [[20,4],[20,5],[20,6]]`, `line([4,1],[12,20])`가 `[7,8]`을 지남(기둥 → 시야 차단), `line([12,1],[12,20])`은 x = 12 직선 20칸 |
@@ -448,8 +452,8 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 | # | 내용 | 기대 |
 |---|---|---|
 | BC27 | `rng.get_state()` | BC23 전후 `world`(와 모든 스트림) 상태 같음 |
-| BC28 | 스냅샷 왕복 | BC23 뒤 `TickLoop.snapshot()["systems"]["build"]` = `{instances: 6개(f1~f6, paid 1000/200/200/500/120/120), next_entity: 7, phase: "day"}`. close 경계에서 찍은 스냅샷을 복원한 새 `Build`는 `phase "close"`라 place 가 `not_allowed`. JSON 왕복 → 새 루프 `restore` → `true`, `coverage()`가 BC23 기대값과 같음, 해시 동일(SH6). 이어서 같은 명령 열 → 연속 진행과 같은 해시 |
-| BC29 | 잘못된 스냅샷 | RS1~RS7 을 하나씩 깬 사본(예: `entity_id:"f01"`, 겹치는 두 인스턴스, 벽 위 인스턴스, 무대 2개, `paid: -1`)은 `Build.restore` → `false`, `push_error` 1회, 상태 불변. `TickLoop.restore` 경로면 `push_error` 2회(tick.md 표의 `Economy` 행과 같은 꼴) |
+| BC28 | 스냅샷 왕복 | BC23 뒤 `TickLoop.snapshot()["systems"]["build"]` = `{instances: 6개(f1~f6, paid 1000/200/200/500/120/120), next_entity: 7, phase: "day"}`. close 경계에서 찍은 스냅샷을 복원한 새 `BuildSystem`은 `phase "close"`라 place 가 `not_allowed`. JSON 왕복 → 새 루프 `restore` → `true`, `coverage()`가 BC23 기대값과 같음, 해시 동일(SH6). 이어서 같은 명령 열 → 연속 진행과 같은 해시 |
+| BC29 | 잘못된 스냅샷 | RS1~RS7 을 하나씩 깬 사본(예: `entity_id:"f01"`, 겹치는 두 인스턴스, 벽 위 인스턴스, 무대 2개, `paid: -1`)은 `BuildSystem.restore` → `false`, `push_error` 1회, 상태 불변. `TickLoop.restore` 경로면 `push_error` 2회(tick.md 표의 `Economy` 행과 같은 꼴) |
 | BC30 | 저녁 동기화 | `time.phase_changed {to:"evening"}` → `build.coverage_changed {cause:"sync"}` 1회(설치 변화 없어도). 다른 구간 전환에는 없음 |
 | BC31 | H5 | economy 를 구독시키지 않고 place → `dispatch_commands()` → `update(ctx)` 호출 시 `push_warning` 1회 + `rejected · charge_unresolved`, `instances` 불변 |
 
@@ -489,7 +493,7 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 | Q3 | 시야·음향을 벽·기둥이 막나 | 시야만 막음 / 둘 다 / 둘 다 안 막음 | **시야만.** 음향 차폐는 반경 오버레이를 읽기 어렵게 만든다 | 음향 차폐를 넣으면 C1 에 `line()` 조건 추가 |
 | Q4 | UI 미리보기가 sim 을 직접 읽어도 되나(원칙 1 "구독만") | (a) 읽기 전용 쿼리 `check_place` 허용 (b) `build.preview_requested` 명령 → 결과 이벤트 | **(a).** 상태를 바꾸지 않는 읽기이고, (b)는 다음 경계까지 지연돼 커서 이동마다 깜빡인다. 규칙을 view 에 복제하는 안은 버림(규칙 이중화) | reviewer 가 원칙 위반으로 보면 (b)로 events.md 에 2행 추가 |
 | Q5 | 슬롯 색 | 임시 hex / 팔레트 id | **임시 hex**(`#RRGGBB`). 스키마는 `pal_*` id 도 받는다. 팔레트 확정 티켓이 값만 교체(스키마 변경 없음) | 데이터만 |
-| Q6 | 복원 직후 `phase` | (a) 새 `Build`처럼 `"day"`로 두고 다음 `time.phase_changed`를 따른다 (b) 스냅샷에 넣는다 (c) `TickLoop`에서 읽는다 | **(b).** 오토세이브는 close 진입 경계라(tick.md) (a)면 복원 직후 close 동안 배치가 잘못 허용된다. (c)는 시스템이 `TickLoop`을 읽게 만든다. economy 가 `phase`를 자기 스냅샷에 두는 선례를 따른다 | 닫힘 |
+| Q6 | 복원 직후 `phase` | (a) 새 `BuildSystem`처럼 `"day"`로 두고 다음 `time.phase_changed`를 따른다 (b) 스냅샷에 넣는다 (c) `TickLoop`에서 읽는다 | **(b).** 오토세이브는 close 진입 경계라(tick.md) (a)면 복원 직후 close 동안 배치가 잘못 허용된다. (c)는 시스템이 `TickLoop`을 읽게 만든다. economy 가 `phase`를 자기 스냅샷에 두는 선례를 따른다 | 닫힘 |
 | Q7 | 가구 이동 | 철거+재배치 / 이동 명령(무손실) | **철거+재배치**(30% 손실). PRD 환불 70% 와 같은 결 | 이동 명령은 events.md 행 추가 + 비용 규칙 필요 |
 
 ## 변경 이력
@@ -497,6 +501,7 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 | 날짜 | 대상 | 티켓 | 내용 |
 |---|---|---|---|
 | 2026-10-09 | build.md v0, `furniture.json` v1 + `furniture.schema.json` version 1, `tier1_club.json` v1 + `maps.schema.json` version 1 | SE-028 | 신규. 맵(타일 5종), 가구 20종, 배치 B1~B11·철거 D1~D4·핸드셰이크 H1~H5, 커버리지 C0~C8, 스냅샷 RS1~RS7, 로드 검사 MK1~MK6·FC1~FC5, 수용 기준 BC1~BC31·DT1~DT8. events.md 의 `build.*` "골격" 3행을 6행으로 확정(`build.rejected` 페이로드에 `action`·`rotation`·`entity_id` 추가, 명령 `build.demolish_requested`, 상태 `build.demolished`·`build.coverage_changed` 신규). `economy.json`·`tiers.json`·`sim.json` 변경 없음(가정 목록 합을 economy 값에 맞춤) |
+| 2026-10-09 | build.md, `tier1_club.json`(파일 `version` 1 유지, 항목 추가만), events.md `build.*` | SE-044 | SE-032 리뷰 후속 A·B. `reference_layouts`에 `baseline_plus_two_speakers` 추가(BC21 기대값을 데이터로, `build_oracle.py --layouts` 18키 일치). `build.coverage_changed`·`coverage()`에 `blocked_cells`(C0 점유 셀 전체, G6, 증분 아님, 마지막 키) 추가. 공개 API 표 `Build` → `BuildSystem`, `find_path`·`path_from_entrance` 행 추가(UI·테스트용, sim 시스템은 부르지 않음). `build.rejected` 필드 타입 문장(any / `reason != invalid`이면 좁혀짐). 스키마 변경 없음 |
 
 ## 부록 A. 기준 배치 손계산
 
