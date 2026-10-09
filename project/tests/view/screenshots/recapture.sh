@@ -7,14 +7,13 @@
 #   project/tests/view/screenshots/recapture.sh [out_dir]
 #
 #   out_dir  PNG 5장 + 로그 5개(<name>.log)를 쓸 디렉터리. 생략하면 mktemp -d (경로를 마지막 줄에 출력).
-#            리포지토리 안(특히 커밋된 기준 PNG 폴더)을 가리키면 거부한다 — 기준 PNG 는 SE-018 에서만 바꾼다.
-# 환경 변수:
-#   GODOT_BIN        Godot 바이너리(없으면 PATH 의 godot / godot4). tools/run_tests.sh 와 같은 규칙.
-#   SE_PROJECT_DIR   캡처할 Godot 프로젝트 경로(기본 project). 셰이더 오류 주입 검증용 스크래치 사본에만 쓴다.
+#            상대 경로는 **호출자의 cwd** 기준이다(리포지토리 루트 기준 아님). 없으면 만든다.
+#            리포지토리 안(특히 커밋된 기준 PNG 폴더)을 가리키면 디렉터리를 만들기 **전에** 거부한다 — 기준 PNG 는 SE-018 에서만 바꾼다.
 # 종료 코드: 0 = 5장 모두 생성·1920x1080·셰이더 오류 없음, 1 = 캡처 실패/오류 패턴/크기 이상, 2 = 환경(Godot·xvfb-run 없음, 인자 오류).
 set -uo pipefail
-cd "$(dirname "$0")/../../../.."   # 리포지토리 루트(project/tests/view/screenshots 의 4단계 위)
-ROOT="$PWD"
+CALLER_PWD="$PWD"   # out_dir 상대 경로의 기준(아래 cd 로 cwd 가 바뀌기 전에 잡는다)
+cd "$(dirname "$0")/../../../.." || { echo "FAIL: 리포지토리 루트로 이동할 수 없다 ($0 기준 4단계 위)"; exit 2; }   # project/tests/view/screenshots 의 4단계 위
+ROOT="$(pwd -P)"
 
 GODOT="${GODOT_BIN:-$(command -v godot || command -v godot4 || true)}"
 PROJECT="${SE_PROJECT_DIR:-project}"
@@ -22,15 +21,36 @@ if [ -z "$GODOT" ]; then echo "FAIL: Godot 바이너리를 찾을 수 없다 (GO
 if ! command -v xvfb-run >/dev/null 2>&1; then echo "FAIL: xvfb-run 없음 (apt-get install -y xvfb)"; exit 2; fi
 if [ $# -gt 1 ]; then echo "usage: $0 [out_dir]"; exit 2; fi
 
+# 존재하지 않는 경로도 디렉터리를 만들지 않고 물리 경로(심볼릭 링크 해석)로 절대화한다:
+# 존재하는 가장 가까운 조상까지 올라가 pwd -P 로 해석하고, 나머지 이름을 뒤에 붙인다.
+abs_path() {
+  local p="$1" tail="" name
+  case "$p" in /*) ;; *) p="$CALLER_PWD/$p" ;; esac
+  while [ ! -d "$p" ]; do
+    name="$(basename "$p")"
+    if [ "$name" = ".." ]; then echo "FAIL: out_dir 가 존재하지 않는 디렉터리 뒤에 '..' 를 포함한다 ($1)" >&2; return 1; fi
+    if [ "$name" != "." ]; then tail="/$name$tail"; fi
+    p="$(dirname "$p")"
+  done
+  local base
+  base="$(cd "$p" && pwd -P)" || return 1
+  echo "$base$tail"
+}
+
+inside_repo() { case "$1/" in "$ROOT"/*) return 0 ;; esac; return 1; }
+
 if [ $# -eq 1 ]; then
-  mkdir -p "$1" || exit 2
-  OUT="$(cd "$1" && pwd)"
+  if [ -z "$1" ]; then echo "usage: $0 [out_dir]  (out_dir 가 빈 문자열이다)"; exit 2; fi
+  OUT="$(abs_path "$1")" || exit 2
+  # 리포지토리 안 거부는 mkdir 보다 먼저 — 거부된 호출이 리포지토리에 빈 디렉터리를 남기지 않는다.
+  if inside_repo "$OUT"; then echo "FAIL: out_dir 가 리포지토리 안이다 ($OUT). 스크래치/RUNNER_TEMP 를 쓴다."; exit 2; fi
+  mkdir -p "$OUT" || { echo "FAIL: out_dir 를 만들 수 없다 ($OUT)"; exit 2; }
 else
-  OUT="$(mktemp -d)"
+  OUT="$(mktemp -d)" || exit 2
+  OUT="$(cd "$OUT" && pwd -P)" || exit 2
+  # TMPDIR 이 리포지토리 안이면 방금 만든 빈 디렉터리를 치우고 거부한다.
+  if inside_repo "$OUT"; then rmdir "$OUT" 2>/dev/null; echo "FAIL: mktemp 결과가 리포지토리 안이다 ($OUT). TMPDIR 를 리포지토리 밖으로 지정한다."; exit 2; fi
 fi
-case "$OUT/" in
-  "$ROOT"/*) echo "FAIL: out_dir 가 리포지토리 안이다 ($OUT). 스크래치/RUNNER_TEMP 를 쓴다."; exit 2 ;;
-esac
 
 # 셰이더 컴파일 오류 패턴(하나라도 로그에 있으면 실패).
 ERR_PATTERNS=('SHADER ERROR' 'shader compilation' 'Failed to compile')

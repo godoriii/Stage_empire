@@ -47,10 +47,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-      - name: Xvfb·Mesa(llvmpipe) 설치
+      - name: Xvfb·Mesa(llvmpipe)·한글 폰트 설치
+        # fonts-wqy-zenhei: 로컬 캡처와 같은 한글 폴백 폰트. 없으면 HUD 한글이 □ 로 그려져 기준 PNG 와 HUD 영역(bbox 28,16,593,198)이 달라진다(SE-025 진단).
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri
+          sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri fonts-wqy-zenhei
       - name: Godot 설치
         uses: chickensoft-games/setup-godot@v2
         with:
@@ -63,10 +64,10 @@ jobs:
         env:
           GODOT_BIN: godot
         run: project/tests/view/screenshots/recapture.sh "$RUNNER_TEMP/shots"
-      - name: 기준 PNG 와 픽셀 차 (지금은 보고만 — strict 전환 규칙은 SE-020 티켓)
+      - name: 기준 PNG 와 픽셀 차 (strict — 2026-10-09 전환, 연속 0 3회 확인 후)
         env:
           # 3회 연속 diff_pixels=0 이 확인되면 이 값을 "--strict" 로 바꾼다(1줄).
-          STRICT_FLAG: ""
+          STRICT_FLAG: "--strict"
         run: |
           set -u +e
           base=project/tests/view/screenshots

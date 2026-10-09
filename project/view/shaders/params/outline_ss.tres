@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://view/shaders/outline_ss.gdshader" id="1_outline_ss"]
+
+[resource]
+resource_name = "outline_ss"
+render_priority = 127
+shader = ExtResource("1_outline_ss")
+shader_parameter/outline_px = 2.0
+shader_parameter/outline_color = Color(0.05, 0.04, 0.07, 1)
+shader_parameter/depth_threshold_px = 16.0
+shader_parameter/normal_threshold = 0.6
+shader_parameter/facing_bias = 0.02
+shader_parameter/plane_epsilon_px = 1.0
+shader_parameter/normal_fit_px = 0.25
