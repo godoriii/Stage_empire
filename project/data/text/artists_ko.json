@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "locale": "ko",
+  "strings": {
+    "artist.bio.gray_shutter": "매일 연습실에서 열 시간씩 합을 맞추는 개러지 록 3인조다. 말수가 적어 무대에서도 인사를 못 건네지만 연주는 흔들림이 없다.",
+    "artist.bio.makgeolli_amp": "동네 술집 무대에서 자란 펑크 2인조로, 불이 붙으면 앰프부터 올리고 본다. 성질은 급해도 함께 올라온 동료는 끝까지 챙긴다.",
+    "artist.bio.flipped_setlist": "공연 직전까지 곡 순서를 뒤엎는 블루스 록 솔로다. 기분이 가라앉은 날엔 연주가 거칠어지고, 마음에 안 들면 한 곡을 처음부터 다시 친다.",
+    "artist.bio.red_stairs": "첫 EP로 이름이 오르내리기 시작한 4인조 록 밴드다. 객석을 휘어잡는 무대 매너만큼 더 큰 무대를 향한 욕심도 빠르게 자란다.",
+    "artist.bio.blanket_tape": "방 안에서 한 소절씩 다시 녹음하는 포크 싱어송라이터다. 완벽한 소리를 찾느라 밤을 새우지만 무대 앞에만 서면 손이 떨린다.",
+    "artist.bio.two_cups": "대학가 카페에서 시작한 어쿠스틱 듀오로, 무슨 일이든 느긋하게 웃어넘긴다. 첫 무대를 열어 준 사람들을 지금도 잊지 않고 찾아간다.",
+    "artist.bio.thumbnail_soda": "영상 하나로 먼저 이름이 퍼진 인디 팝 가수다. 무대에서는 즉흥으로 움직이며 객석을 웃기지만 라이브 연주는 아직 서툴다.",
+    "artist.bio.slow_fog_garden": "정규 1집을 낸 몽환적인 기타 팝 밴드다. 기분에 따라 공연의 색이 달라지지만 합주실에는 누구보다 먼저 나와 연습한다.",
+    "artist.bio.found_synth": "버려진 신시사이저를 주워다 고쳐 쓰는 앰비언트 DJ다. 정해진 셋리스트 없이 그날 공기에 맞춰 천천히 소리를 쌓는다.",
+    "artist.bio.eight_opener": "메인 시간대를 노리며 오프닝 무대를 도맡는 DJ다. 매주 새 믹스를 만들어 오는 성실함이 큰 무대로 가는 사다리가 된다.",
+    "artist.bio.glitter_twins": "화려한 의상으로 플로어를 달구는 하우스 DJ 듀오다. 관객 반응이 식으면 둘 다 발끈해서 더 크게 볼륨을 올린다.",
+    "artist.bio.hand_solder": "직접 만든 모듈러 장비로 라이브 셋을 짜는 프로듀서다. 음 하나까지 손으로 맞추는 집요함으로 헤드라이너 자리를 노린다.",
+    "artist.tag.perfectionist": "완벽주의",
+    "artist.tag.free_spirit": "자유로움",
+    "artist.tag.shy": "수줍음",
+    "artist.tag.showman": "쇼맨",
+    "artist.tag.loyal": "의리",
+    "artist.tag.ambitious": "야심",
+    "artist.tag.moody": "기분파",
+    "artist.tag.diligent": "성실",
+    "artist.tag.hothead": "다혈질",
+    "artist.tag.easygoing": "느긋함"
+  }
+}
