@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-028). 변경 이력: docs/gdd/build.md#변경-이력. 파일 하나 = 맵 하나. 구조를 바꾸면 version enum 을 올리고 build.md 변경 이력에 적는다.",
+  "title": "maps",
+  "description": "티어별 고정 맵(벽·기둥·입구·바닥)과 기준 배치(테스트 픽스처). 규칙: docs/gdd/build.md#맵. 좌표는 타일 (x, z), 원점 (0, 0) = tiles[0] 의 첫 글자, x 는 문자열 안 인덱스, z 는 tiles 배열 인덱스. 수치 변경은 game-designer 만.",
+  "type": "object",
+  "required": ["version", "id", "tier", "name", "width", "depth", "persons_per_tile_bp", "tile_kinds", "tiles", "reference_layouts"],
+  "additionalProperties": false,
+  "$defs": {
+    "cell": {
+      "description": "[x, z] 타일 좌표",
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": { "type": "integer", "minimum": 0, "maximum": 399 }
+    }
+  },
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "tier": { "description": "tiers.json rows[].tier. width·depth 는 그 행의 grid_size 와 같아야 한다(MK2)", "type": "integer", "minimum": 1, "maximum": 6 },
+    "name": { "type": "string", "minLength": 1 },
+    "width": { "type": "integer", "minimum": 8, "maximum": 400 },
+    "depth": { "type": "integer", "minimum": 8, "maximum": 400 },
+    "persons_per_tile_bp": {
+      "description": "수용 인원 계산의 자유 바닥 타일당 인원(bp, 10,000 = 1명). build.md C4",
+      "type": "integer", "minimum": 1, "maximum": 40000
+    },
+    "tile_kinds": {
+      "description": "타일 종류 정의. id 는 고정 5종(규칙이 id 로 참조), 속성은 데이터",
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["id", "char", "buildable", "walkable", "standing", "blocks_sight", "mountable", "evac_capacity"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "enum": ["floor", "wall", "pillar", "entrance", "apron"] },
+          "char": { "description": "tiles 문자열에서 쓰는 한 글자", "type": "string", "pattern": "^[!-~]$" },
+          "buildable": { "description": "가구를 놓을 수 있다", "type": "boolean" },
+          "walkable": { "description": "비어 있으면 걸어 다닐 수 있다(경로·도달 가능성)", "type": "boolean" },
+          "standing": { "description": "관객이 서는 타일(수용 인원·관람 타일 계산 대상)", "type": "boolean" },
+          "blocks_sight": { "description": "시야 레이를 막는다", "type": "boolean" },
+          "mountable": { "description": "wall_required 가구의 등면이 붙을 수 있다", "type": "boolean" },
+          "evac_capacity": { "description": "이 종류 타일 1개당 피난 용량(명)", "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "tiles": {
+      "description": "z = 0 부터 depth 개의 행, 각 행은 width 글자(MK1). 글자는 tile_kinds[].char",
+      "type": "array", "minItems": 8,
+      "items": { "type": "string", "pattern": "^[!-~]+$" }
+    },
+    "reference_layouts": {
+      "description": "기준 배치: 새 게임 상태(낮, starting_cash)에서 placements 를 순서대로 배치한 결과의 기대값. build.md 수용 기준 BC22·BC23, 손계산은 부록 A",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "placements", "expected"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "description": { "type": "string" },
+          "placements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["furniture_id", "cell", "rotation"],
+              "additionalProperties": false,
+              "properties": {
+                "furniture_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+                "cell": { "$ref": "#/$defs/cell" },
+                "rotation": { "type": "integer", "enum": [0, 90, 180, 270] }
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": ["has_stage", "floor_free", "viewing_count", "sound_count", "sound_bp", "sight_count", "sight_bp", "bar_count", "bar_bp", "capacity", "evac_capacity", "evac_shortfall", "light_grade", "satisfaction_bonus_bp", "upkeep_per_day", "build_cost", "cash_after"],
+            "additionalProperties": false,
+            "properties": {
+              "has_stage": { "type": "boolean" },
+              "floor_free": { "type": "integer", "minimum": 0 },
+              "viewing_count": { "type": "integer", "minimum": 0 },
+              "sound_count": { "type": "integer", "minimum": 0 },
+              "sound_bp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+              "sight_count": { "type": "integer", "minimum": 0 },
+              "sight_bp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+              "bar_count": { "type": "integer", "minimum": 0 },
+              "bar_bp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+              "capacity": { "type": "integer", "minimum": 0 },
+              "evac_capacity": { "type": "integer", "minimum": 0 },
+              "evac_shortfall": { "type": "integer", "minimum": 0 },
+              "light_grade": { "type": "integer", "minimum": 0 },
+              "satisfaction_bonus_bp": { "type": "integer", "minimum": 0 },
+              "upkeep_per_day": { "type": "integer", "minimum": 0 },
+              "build_cost": { "type": "integer", "minimum": 0 },
+              "cash_after": { "description": "economy starting_cash − build_cost (배치만 한 직후, 정산 전)", "type": "integer" },
+              "sight_blocked_cells": {
+                "description": "관람 타일 중 시야가 막힌 타일 목록(정렬: z, x). 손계산 대조용",
+                "type": "array", "items": { "$ref": "#/$defs/cell" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -36,21 +36,24 @@
 | `economy.bailout_offered` | `{day: int, kind: "loan", deficit: int, amount: int, interest: int, total_due: int, repay_days: int, first_installment: int, bailouts_left_after: int}` | 정산 뒤 현금이 음수이고 남은 구제가 있을 때, `economy.day_settled` 바로 뒤 | SE-005 |
 | `economy.bailout_taken` | `{day: int, kind: "loan", amount: int, total_due: int, repay_days: int, bailouts_left: int, cash: int, auto: bool}` | 제안 중인 구제를 `economy.bailout_accept_requested`로 수락(`auto:false`) 또는 수락 없이 `time.day_started`(`auto:true`). `economy.cash_changed {reason:"bailout"}` 바로 뒤 | SE-005 |
 | `economy.bankrupt` | `{day: int, cash: int, bailouts_used: int}` | 정산 뒤 현금이 음수이고 남은 구제가 없을 때, `economy.day_settled` 바로 뒤. 게임당 1회. **게임 오버**(화면·흐름은 후속 UI 티켓) | SE-005 |
-| `build.placed` | `{entity_id: String, furniture_id: String, cell: [x, z], rotation: int}` | 배치 확정 | 골격 |
-| `build.rejected` | `{furniture_id: String, cell: [x, z], reason: String}` | 배치 실패 | 골격 |
+| `build.placed` | `{entity_id: String, furniture_id: String, cell: [x, z], rotation: int, cells: Array[[x, z]], cost: int}` — `entity_id` = `"f<n>"`, `cell` = 회전 후 점유 사각형의 최소 모서리, `cells` = 점유 셀(z, x 오름차순), `cost` = 승인된 건설비 | 배치 승인 시: `economy.charge_resolved {reason:"build", approved:true}`(같은 `request_id`) 처리 중, 인스턴스 추가 직후. 뒤이어 `economy.upkeep_reported` → `build.coverage_changed`. [build.md#경제-핸드셰이크](build.md#경제-핸드셰이크) H2 | SE-028 |
+| `build.rejected` | `{action: "place"\|"demolish", reason: String, furniture_id, cell, rotation, entity_id}` — `reason` 15종: `invalid`·`not_allowed`·`unknown_furniture`·`bad_rotation`·`out_of_bounds`·`blocked_tile`·`overlap`·`wall_required`·`limit_reached`·`path_blocked`·`insufficient_cash`·`bankrupt`·`charge_invalid`·`charge_unresolved`·`not_found`. place 는 나머지 넷에 받은 값(없으면 `null`, `entity_id`는 `null`), demolish 는 `entity_id`에 받은 값, 나머지 셋은 인스턴스 값(없으면 `null`) | 배치 명령 거절(B1~B10, 경계), 지출 거절(H3, `economy.charge_resolved` 처리 중), 응답 없는 지출 정리(H5, 단계 2), 철거 명령 거절(D1~D3, 경계). 상태 불변 | SE-028 |
+| `build.demolished` | `{entity_id: String, furniture_id: String, cell: [x, z], rotation: int, cells: Array[[x, z]], base_amount: int}` — `base_amount` = 설치 때 승인된 건설비 | 철거 명령 처리(경계), 인스턴스 제거 직후. 뒤이어 `economy.refund_proposed` → `economy.upkeep_reported` → `build.coverage_changed`. build.md D4 | SE-028 |
+| `build.coverage_changed` | `{cause: "placed"\|"demolished"\|"sync", has_stage: bool, floor_free: int, viewing_count: int, viewing_tiles, sound_tiles, sight_tiles, bar_tiles: Array[[x, z]], sound_bp: int, sight_bp: int, bar_bp: int, capacity: int, evac_capacity: int, evac_shortfall: int, light_grade: int, satisfaction_bonus_bp: int, upkeep_per_day: int}` — 공식 [build.md#커버리지](build.md#커버리지) C0~C8. 타일 배열은 z, x 오름차순 | 설치 목록이 바뀐 뒤(`placed`·`demolished`, 그 연쇄의 마지막), 그리고 `time.phase_changed {to:"evening"}` 수신 시 1회(`sync`, 목록 변화 없어도). 관객·공연 시스템과 오버레이의 입력 | SE-028 |
 
 ## 명령 이벤트 (view/ui → sim)
 
 | 이름 | 페이로드 | 처리 시스템 | 티켓 |
 |---|---|---|---|
-| `build.place_requested` | `{furniture_id: String, cell: [x, z], rotation: int}` | world/build | 골격 |
+| `build.place_requested` | `{furniture_id: String, cell: [x: int, z: int], rotation: 0\|90\|180\|270}` — 숫자는 `int`. 결과는 `build.placed`(지출 승인 뒤) 또는 `build.rejected {action:"place"}` | world/build. 판정 B1~B11(build.md #배치-규칙), 낮 구간만 | SE-028 |
+| `build.demolish_requested` | `{entity_id: String}`. 결과는 `build.demolished` 또는 `build.rejected {action:"demolish"}` | world/build. 판정 D1~D4, 낮 구간만 | SE-028 |
 | `time.speed_requested` | `{speed: 0\|1\|2\|3}` — `int`. 결과는 `time.speed_changed` 또는 `time.speed_rejected` | core/tick (`TickLoop`) | SE-006 |
 | `time.next_day_requested` | `{}` | core/tick (`TickLoop`). close 에서만 유효, 다른 구간에서는 무시(이벤트 없음) | SE-006 |
 | `artist.book_requested` | `{artist_id: String}`. 결과는 `artist.booked`(개런티 지출 승인 뒤) 또는 `artist.booking_rejected` | sim/artist. 판정 K1~K5([artist.md#섭외-규칙](artist.md#섭외-규칙)), 낮 구간만, 하루 1명 | SE-031 |
 | `economy.ticket_price_requested` | `{price: int}` — `int`. 결과는 `economy.ticket_price_changed` 또는 `economy.ticket_price_rejected` | sim/economy. 낮 구간에서만 유효, 범위 `ticket_price_min..max` | SE-005 |
 | `economy.bailout_accept_requested` | `{}` | sim/economy. 구제 제안 중일 때만 유효, 아니면 무시(이벤트 없음). 결과 `economy.cash_changed` → `economy.bailout_taken` | SE-005 |
 
-"골격" 행은 아키텍처 골격 예시다. 첫 구현 티켓에서 game-designer가 확정한다. "SE-006" 행의 상세 규칙은 [tick.md](tick.md), "SE-005" 행은 [economy.md](economy.md).
+"SE-006" 행의 상세 규칙은 [tick.md](tick.md), "SE-005" 행은 [economy.md](economy.md), "SE-028" 행은 [build.md](build.md). 새 도메인의 이벤트는 그 스펙 티켓에서 game-designer 가 이 표에 행을 더한다.
 
 `economy.charge_proposed`·`economy.refund_proposed`·`economy.sales_reported`·`economy.upkeep_reported`는 다른 sim 시스템이 발행하고 economy 만 구독하는 **입력 계약** 이벤트다(sim → sim). 이름의 도메인은 받는 쪽(economy)을 따른다.
 
