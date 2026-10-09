@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "id": "example_rock_local",
+      "name": "예시 록 로컬",
+      "genre": "rock",
+      "grade": "local",
+      "popularity": 15,
+      "skill": 22,
+      "personality": ["hothead", "loyal"],
+      "rider": [],
+      "bio_key": "artist.bio.example_rock_local"
+    },
+    {
+      "id": "example_electronic_rookie",
+      "name": "예시 일렉 신인",
+      "genre": "electronic",
+      "grade": "rookie",
+      "popularity": 50,
+      "skill": 44,
+      "personality": ["showman", "hothead"],
+      "rider": [],
+      "bio_key": "artist.bio.example_electronic_rookie"
+    }
+  ]
+}

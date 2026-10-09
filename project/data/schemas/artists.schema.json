@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-031). 변경 이력: docs/gdd/artist.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 artist.md 변경 이력에 적는다.",
+  "title": "artists",
+  "description": "아티스트 명단(새 게임 초기값). 규칙: docs/gdd/artist.md. 동적 상태(성장한 인기·실력, 공연 수, 관계도)는 여기 없고 ArtistSystem 스냅샷에 있다. 이 파일의 수치(grade·popularity·skill·personality)는 artist.json roster_plan 의 슬롯 값과 같아야 한다(qa AR10). 이름·바이오 문장은 content-writer, 수치는 game-designer.",
+  "type": "object",
+  "required": ["version", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "rows": {
+      "description": "아티스트 행. 빈 배열은 허용하지 않는다(minItems 1 — 섭외할 아티스트가 없는 게임은 성립하지 않는다). MVP 확정 명단은 12행(3장르 × 4)이지만 개수·구성은 스키마가 아니라 qa 스크립트(artist.md AR10)가 검사한다(테스트 사본이 적은 행으로 로드될 수 있게).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "genre", "grade", "popularity", "skill", "personality", "rider", "bio_key"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "영문 소문자·숫자·밑줄. 파일 안에서 유일(validate_data 가 검사). 세이브에 들어가므로 출시 뒤 바꾸지 않는다",
+            "type": "string", "pattern": "^[a-z0-9_]+$"
+          },
+          "name": {
+            "description": "표시 이름(한국어 MVP). 실존 아티스트·밴드·곡·레이블·페스티벌을 연상시키는 이름 금지(artist.md #이름과-바이오-규칙)",
+            "type": "string", "minLength": 1, "maxLength": 16
+          },
+          "genre": {
+            "description": "genres.json 의 id. MVP 는 artist.json mvp_genres 안의 값만(ArtistConfig L3)",
+            "type": "string", "enum": ["rock", "hiphop", "electronic", "indie", "jazz", "pop", "metal", "world"]
+          },
+          "grade": {
+            "description": "PRD 성장 경로 5등급. v0 데이터는 artist.json grades 에 있는 등급(local·rookie)만(ArtistConfig L4)",
+            "type": "string", "enum": ["local", "rookie", "midlevel", "headliner", "legend"]
+          },
+          "popularity": { "description": "인기(관객 흡인력 입력, audience.md). 새 게임 초기값", "type": "integer", "minimum": 0, "maximum": 100 },
+          "skill": { "description": "실력(라인업 궁합 입력, show.md). 새 게임 초기값", "type": "integer", "minimum": 0, "maximum": 100 },
+          "personality": {
+            "description": "성격 태그 정확히 2개, 서로 다름. 값은 artist.json personality_tags 중 하나, personality_exclusive_pairs 조합 금지(ArtistConfig L7). v0 규칙 효과 없음(관계 이벤트는 버티컬 슬라이스)",
+            "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z_]+$" }
+          },
+          "rider": {
+            "description": "요구 사항(라이더). 버티컬 슬라이스용 예약 필드. v0 는 빈 배열만 허용(maxItems 0). 항목 형식을 정할 때 이 스키마 version 을 올린다",
+            "type": "array", "maxItems": 0
+          },
+          "bio_key": {
+            "description": "바이오 문장의 텍스트 키. 반드시 'artist.bio.' + id (ArtistConfig L6). 문장은 project/data/text/artists_ko.json strings",
+            "type": "string", "pattern": "^artist\\.bio\\.[a-z0-9_]+$"
+          }
+        }
+      }
+    }
+  }
+}

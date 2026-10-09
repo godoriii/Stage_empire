@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-031). 변경 이력: docs/gdd/artist.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 artist.md 변경 이력에 적는다.",
+  "title": "artist",
+  "description": "아티스트 규칙 수치(섭외 구간, 등급 가용 명성, 성장 Δ, 승급 임계, 성격 태그 어휘, MVP 명단 설계, 기준 시나리오). 규칙: docs/gdd/artist.md. 개런티 금액은 여기 없다 — v0 는 economy.json guarantee_by_grade 를 그대로 쓴다(guarantee_mode by_grade). 수치 변경은 game-designer 만.",
+  "type": "object",
+  "required": ["version", "mvp_genres", "booking_phases", "guarantee_mode", "stat_max", "relationship_min", "relationship_max", "show_grades", "grades", "personality_tags", "personality_exclusive_pairs", "roster_plan", "reference_scenarios"],
+  "additionalProperties": false,
+  "$defs": {
+    "genre_id": { "type": "string", "enum": ["rock", "hiphop", "electronic", "indie", "jazz", "pop", "metal", "world"] },
+    "grade_id": { "type": "string", "enum": ["local", "rookie", "midlevel", "headliner", "legend"] },
+    "show_grade_id": { "type": "string", "enum": ["disaster", "poor", "ok", "good", "rave"] },
+    "tag": { "type": "string", "pattern": "^[a-z_]+$" },
+    "stat": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "delta_by_show_grade": {
+      "type": "object",
+      "required": ["disaster", "poor", "ok", "good", "rave"],
+      "additionalProperties": false,
+      "properties": {
+        "disaster": { "type": "integer", "minimum": -100, "maximum": 100 },
+        "poor": { "type": "integer", "minimum": -100, "maximum": 100 },
+        "ok": { "type": "integer", "minimum": -100, "maximum": 100 },
+        "good": { "type": "integer", "minimum": -100, "maximum": 100 },
+        "rave": { "type": "integer", "minimum": -100, "maximum": 100 }
+      }
+    }
+  },
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "mvp_genres": {
+      "description": "MVP 에서 쓰는 장르(PRD 콘텐츠 범위 MVP 장르 3). genres.json 8장르 중 부분집합. 이 배열이 MVP 장르의 단일 출처다(audience.json·show.json·genres affinity 는 이 값을 따른다). artist.md #MVP-장르",
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "$ref": "#/$defs/genre_id" }
+    },
+    "booking_phases": {
+      "description": "artist.book_requested 를 받아들이는 구간(K2). v0 낮만 — economy P2·build B2 와 같은 규칙",
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "enum": ["day", "evening", "show", "close"] }
+    },
+    "guarantee_mode": {
+      "description": "개런티 산정 방식. v0 는 by_grade(economy.json guarantee_by_grade[grade])만. 동적 개런티(인기·관계·발굴 할인)는 버티컬 슬라이스에서 값을 더하고 이 스키마 version 을 올린다",
+      "type": "string", "enum": ["by_grade"]
+    },
+    "stat_max": {
+      "description": "popularity·skill 상한(하한 0). artists.schema 의 0~100 범위와 같은 단위 정의라 고정",
+      "type": "integer", "enum": [100]
+    },
+    "relationship_min": { "description": "관계도 하한(예약, v0 값은 항상 0). 스냅샷 범위 검사에 쓴다", "type": "integer", "maximum": 0 },
+    "relationship_max": { "description": "관계도 상한(예약)", "type": "integer", "minimum": 0 },
+    "show_grades": {
+      "description": "show.ended.grade 의 id, 나쁜 것 → 좋은 것 순서. show.md(SE-030)가 이 id 를 그대로 쓴다(참사/부진/보통/호평/열광)",
+      "type": "array", "minItems": 5, "uniqueItems": true,
+      "items": { "$ref": "#/$defs/show_grade_id" }
+    },
+    "grades": {
+      "description": "v0 에서 쓰는 등급 규칙. 첫 행은 unlock_reputation 0 인 시작 등급(L9). 여기 없는 등급은 명단에 쓸 수 없다(L4)",
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "unlock_reputation", "promote_to", "promote_at_popularity", "popularity_delta_by_show_grade", "skill_per_show"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/grade_id" },
+          "unlock_reputation": { "description": "이 등급 아티스트를 섭외하려면 필요한 종합 명성(reputation.changed.total ≥ 값). 발굴 아티스트는 면제(K4). reputation.md 는 이 값을 참조만 한다", "type": "integer", "minimum": 0 },
+          "promote_to": { "description": "승급 대상 등급. null 이면 v0 에서 승급 없음", "type": ["string", "null"], "enum": ["local", "rookie", "midlevel", "headliner", "legend", null] },
+          "promote_at_popularity": { "description": "공연 성장 뒤 popularity ≥ 이 값이면 promote_to 로 승급(G5). promote_to 가 null 이면 null", "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+          "popularity_delta_by_show_grade": { "description": "공연 1회 뒤 popularity 변화(공연 등급별). 결과는 0~stat_max 로 자른다", "$ref": "#/$defs/delta_by_show_grade" },
+          "skill_per_show": { "description": "공연 1회 뒤 skill 증가(공연 등급과 무관 — 무대 경험)", "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      }
+    },
+    "personality_tags": {
+      "description": "성격 태그 어휘. 표시 이름은 text 키 artist.tag.<tag>",
+      "type": "array", "minItems": 2, "uniqueItems": true,
+      "items": { "$ref": "#/$defs/tag" }
+    },
+    "personality_exclusive_pairs": {
+      "description": "한 아티스트가 함께 가질 수 없는 태그 쌍(L7)",
+      "type": "array",
+      "items": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "$ref": "#/$defs/tag" } }
+    },
+    "roster_plan": {
+      "description": "MVP 명단 설계(content-writer 인계). artists.json 의 (genre, grade, popularity, skill, personality) 묶음이 slots 와 일대일로 같아야 한다(qa AR10). 런타임 로더는 읽지 않는다",
+      "type": "object",
+      "required": ["total", "per_genre", "grade_counts", "slots"],
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": "integer", "minimum": 1 },
+        "per_genre": { "type": "integer", "minimum": 1 },
+        "grade_counts": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "local": { "type": "integer", "minimum": 0 },
+            "rookie": { "type": "integer", "minimum": 0 },
+            "midlevel": { "type": "integer", "minimum": 0 },
+            "headliner": { "type": "integer", "minimum": 0 },
+            "legend": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "slots": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["slot", "genre", "grade", "popularity", "skill", "personality"],
+            "additionalProperties": false,
+            "properties": {
+              "slot": { "type": "string", "pattern": "^s[0-9]{2}$" },
+              "genre": { "$ref": "#/$defs/genre_id" },
+              "grade": { "$ref": "#/$defs/grade_id" },
+              "popularity": { "$ref": "#/$defs/stat" },
+              "skill": { "$ref": "#/$defs/stat" },
+              "personality": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "$ref": "#/$defs/tag" } }
+            }
+          }
+        }
+      }
+    },
+    "reference_scenarios": {
+      "description": "성장 규칙 회귀 테스트용(SE-033 test_artist_system.gd 가 읽는다). 시작 상태 + 공연 등급 열 → 기대 최종 상태. 수치를 바꾸면 expected 를 같은 PR 에서 갱신한다",
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "grade", "popularity", "skill", "show_grades", "expected"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "grade": { "$ref": "#/$defs/grade_id" },
+          "popularity": { "$ref": "#/$defs/stat" },
+          "skill": { "$ref": "#/$defs/stat" },
+          "show_grades": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/show_grade_id" } },
+          "expected": {
+            "type": "object",
+            "required": ["grade", "popularity", "skill", "shows_played", "promoted_on_show"],
+            "additionalProperties": false,
+            "properties": {
+              "grade": { "$ref": "#/$defs/grade_id" },
+              "popularity": { "$ref": "#/$defs/stat" },
+              "skill": { "$ref": "#/$defs/stat" },
+              "shows_played": { "type": "integer", "minimum": 0 },
+              "promoted_on_show": { "description": "승급이 일어난 공연 번호(1부터). 승급 없으면 null", "type": ["integer", "null"], "minimum": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
