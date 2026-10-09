@@ -4,7 +4,7 @@
 |---|---|
 | 상태 | v0 |
 | 스펙 티켓 | SE-005 (game-designer) |
-| 구현 티켓 | 후속 sim-engineer 티켓(SE-001 병합 후) — `project/sim/economy_config.gd`, `project/sim/economy.gd`, `project/tests/sim/test_economy.gd` |
+| 구현 티켓 | SE-012 (sim-engineer) — `project/sim/economy_config.gd`, `project/sim/economy.gd`, `project/tests/sim/test_economy_config.gd`, `project/tests/sim/test_economy.gd` (`tools/hooks/check_commit.py`가 `.gd`마다 짝 테스트 `test_<이름>.gd`를 요구한다). `TickLoop` 스냅샷 연결은 SE-011(스펙)·SE-012(구현) |
 | 데이터 | [`project/data/economy/economy.json`](../../project/data/economy/economy.json) (version 1), 스키마 [`economy.schema.json`](../../project/data/schemas/economy.schema.json). 읽기 참조: [`tiers.json`](../../project/data/tiers/tiers.json) `unlock_cash`, [`sim.json`](../../project/data/sim/sim.json) 구간·`rng_streams`·`system_order` |
 | 이벤트 | [events.md](events.md)의 `economy.*` 행 전부. 이 문서에 나오는 이벤트 이름은 전부 거기 표에 있다 |
 | 근거 | PRD "핵심 시스템 상세"(경제 행), "성장 티어"(해금 자금, "티어 2까지 약 2시간"), "기술 요구사항"(배치 규칙 "철거 환불 70%"), "결정이 필요한 질문"(파산 = 게임 오버, 구제 N회는 밸런스 시트), [tick.md](tick.md) |
@@ -13,7 +13,7 @@
 
 티어 1 의 돈 흐름을 공식 하나로 고정한다. 현금(`cash`)은 economy 시스템만 바꾸고, 다른 시스템은 이벤트로 지출·환불·매출을 **제안·보고**만 한다.
 하루에 한 번, close 구간 진입 틱에 정산하고, 정산 뒤 현금이 음수면 구제(긴급 대출)를 제안하며, 구제를 다 쓴 뒤 다시 음수면 파산(게임 오버)이다.
-모든 금액은 정수이고 경제 v0 는 난수를 쓰지 않는다. 이 문서와 `economy.json`만 보고 구현 티켓이 `economy.gd`와 `test_economy.gd`를 질문 없이 쓸 수 있어야 한다.
+모든 금액은 정수이고 경제 v0 는 난수를 쓰지 않는다. 이 문서와 `economy.json`만 보고 구현 티켓이 `economy.gd`·`economy_config.gd`와 짝 테스트(`test_economy.gd`·`test_economy_config.gd`)를 질문 없이 쓸 수 있어야 한다.
 
 v0 범위: 수익 2종(티켓, 바), 비용 4종(개런티, 임대료, 유지비, 세금), 즉시 반영 3종(건설비, 철거 환불, 개런티 선지급), 하루 1회 정산, 파산·구제, 시작 자금, 티켓 가격 변경.
 범위 밖: 음식·굿즈·스폰서·중계권(티어 2+), 인건비(`staff.md`), 개런티 동적 공식·발굴 할인(`artist.md`), 관객 수 결정(`audience.md` — v0 는 입력), 명성·티어 해금 판정(`reputation.md`), 게임 오버 화면·흐름(후속 UI 티켓).
@@ -206,7 +206,9 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 
 이 연쇄는 최외곽 `time.phase_changed` 발행 안에서 끝나므로(tick.md E2·E3) 같은 틱의 `time.speed_changed {speed: 0}`과 `tick.advanced`보다 먼저 전달된다.
 
-**틱 업데이트.** v0 경제는 틱마다 할 일이 없다. `system_order`의 `economy`는 등록하지 않아도 되고, 등록하면 `update(ctx)`는 아무것도 하지 않는다. 경제 상태는 이벤트 핸들러에서만 바뀐다.
+**틱 업데이트·등록.** v0 경제는 틱마다 할 일이 없지만 `TickLoop`에 `system_order`의 `"economy"`로 **반드시** 등록한다: `loop.register_system("economy", economy.update, economy.snapshot, economy.restore)`. `update(ctx)`는 no-op 이다.
+등록하는 이유는 스냅샷 훅이다. 등록하지 않으면 경제 상태가 `TickLoop.snapshot()`에 들어가지 않아 세이브·복원에서 사라진다(#스냅샷, tick.md #명령-큐와-틱-순서 "시스템 등록", SE-011).
+등록은 `Economy` 생성(=구독) 직후, 첫 `advance`/`step`/`restore` 전에 구동기(테스트, 후속 부트스트랩)가 한다. 경제 상태는 이벤트 핸들러와 `restore`에서만 바뀐다.
 
 ### 파산과 구제
 
@@ -281,7 +283,10 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 `Economy.snapshot() -> Dictionary`는 #상태 표의 필드 전부(기본형, JSON 왕복 가능)를 담는다.
 `Economy.restore(d: Dictionary) -> bool`은 숫자 필드를 `int()`로 정규화(`loans[].installments` 포함)하고, 필드가 빠졌거나 타입이 틀리면 `push_error`, `false`, 상태 불변이다. 이벤트를 내지 않는다.
 복원 후 진행 = 연속 진행: 같은 입력 열을 주면 경제 상태 해시(`JSON.stringify(snapshot(), "", true)`)가 같다.
-`TickLoop` 스냅샷의 `economy` 최상위 키로 묶는 연결과 `sim.json.snapshot_schema_version` 1→2 는 구현 티켓에서 한다(Q7).
+**`TickLoop` 연결(SE-011 결정, Q7).** economy 는 위 "틱 업데이트·등록"으로 훅을 준다. 그래서 `TickLoop.snapshot()["systems"]["economy"]`가 `Economy.snapshot()`과 같은 값(깊은 복사본)이다. 최상위 `economy` 키는 만들지 않는다.
+`TickLoop.restore(s)`는 `s.systems.economy`를 `Economy.restore()`에 넘긴다(tick.md #스냅샷 restore 5~7단계). `systems`에 `economy` 항목이 없으면 `TickLoop.restore()`가 실패한다. 경제 복원이 실패하면 먼저 복원한 시스템이 롤백된다. 어느 경우든 시간·RNG·명령 큐도 바뀌지 않는다.
+`Economy`의 두 메서드는 tick.md 훅 규약 SH1~SH7 을 지킨다. `snapshot()`은 상태를 바꾸지 않는다. `restore(d)`는 실패하면 상태 불변이고, 자기 스냅샷(JSON 왕복 포함)은 항상 받아들인다. 둘 다 이벤트를 내지 않고 난수를 쓰지 않는다.
+`sim.json.snapshot_schema_version`은 2(최상위 10개 키 형식)이고, `sim.json` version 3 과 함께 SE-012 에서 적용한다. 경제 항목 형식을 바꾸면 tick.md 변경 이력에 한 줄을 남긴다(tick.md Q7).
 
 ### 설정 로드와 공개 API
 
@@ -299,7 +304,8 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | `EconomyConfig` | `row(tier: int) -> Dictionary`, `guarantee(grade: String) -> int`, `starting_cash`, `bailout_count`, `rate_scale`, `demolish_refund_rate_bp`, `charge_reasons`, `reference_scenarios` | 읽기 전용. `guarantee(grade)`는 `guarantee_by_grade`에 있는 키면 그 값(int ≥ 0)을 돌려준다. 없는 키(v0 의 `midlevel`·`headliner`·`legend`, 오타 포함)면 `push_error` 후 **`-1`**을 돌려준다. `-1`을 그대로 `charge_proposed.amount`에 넣으면 C2(`amount < 0`)로 거절(`"invalid"`)되므로 현금은 바뀌지 않는다. `row(tier)`는 없는 티어면 `push_error`, `{}` |
 | `Economy` | `new(config: EconomyConfig, bus: EventBus)` | #입력-계약의 이벤트를 구독. 이벤트 발행 없음 |
 | | `cash`, `tier`, `day`, `phase`, `ticket_price`, `upkeep_per_day`, `ledger`, `bailouts_left`, `pending_bailout`, `loans`, `bankrupt` | 읽기 전용 |
-| | `snapshot() -> Dictionary`, `restore(d) -> bool` | #스냅샷 |
+| | `update(ctx: Dictionary) -> void` | no-op. `TickLoop` 등록용(#정산 "틱 업데이트·등록") |
+| | `snapshot() -> Dictionary`, `restore(d) -> bool` | #스냅샷. `TickLoop` 훅으로 그대로 등록한다 |
 | | `static compute_settlement(row: Dictionary, rate_scale: int, inputs: Dictionary) -> Dictionary` | 순수 함수. `inputs = {ticket_price, admissions, audience, upkeep, guarantee, loan_repayment}` → S1~S12, S14 의 값(`day_settled`에서 `day`·`cash` 뺀 키). 상태 불변 |
 
 ## 수치표
@@ -427,11 +433,11 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 
 ## 수용 기준
 
-구현 티켓의 테스트 케이스 목록이다. 파일은 `project/tests/sim/test_economy.gd`. 기대 수치는 테스트에 하드코딩하지 않고 `economy.json`의 `reference_scenarios`와 행 값에서 읽는다(수치가 바뀌어도 테스트 코드는 그대로).
+구현 티켓(SE-012)의 테스트 케이스 목록이다. 파일은 EC1 만 `project/tests/sim/test_economy_config.gd`이고 EC2~EC16 은 `project/tests/sim/test_economy.gd`다. 기대 수치는 테스트에 하드코딩하지 않고 `economy.json`의 `reference_scenarios`와 행 값에서 읽는다(수치가 바뀌어도 테스트 코드는 그대로).
 
 | # | 케이스 | 검증 |
 |---|---|---|
-| EC1 | `test_economy.gd::test_config_loads_and_cross_checks` | `EconomyConfig.load()`가 성공하고 `row(1)`·`guarantee("local")`가 JSON 값과 같음. K1~K4 를 하나씩 깬 사본(예: `ticket_price_min > ticket_price_default`, K4 는 `reference_scenarios[0].guarantee_grade = "midlevel"`인 사본)은 `null`. 정상 설정에서 `guarantee("midlevel") == -1`, `guarantee("nope") == -1` (#설정-로드와-공개-API) |
+| EC1 | `test_economy_config.gd::test_config_loads_and_cross_checks` | `EconomyConfig.load()`가 성공하고 `row(1)`·`guarantee("local")`가 JSON 값과 같음. K1~K4 를 하나씩 깬 사본(예: `ticket_price_min > ticket_price_default`, K4 는 `reference_scenarios[0].guarantee_grade = "midlevel"`인 사본)은 `null`. 정상 설정에서 `guarantee("midlevel") == -1`, `guarantee("nope") == -1` (#설정-로드와-공개-API) |
 | EC2 | `test_economy.gd::test_new_game_state` | 생성 직후 `cash == starting_cash`, `ticket_price == ticket_price_default`, `bailouts_left == bailout_count`, `bankrupt == false`, 생성자가 이벤트 0개 (#시작-자금) |
 | EC3 | `test_economy.gd::test_settles_once_on_close_entry` | `TickLoop`으로 `advance(3300)` → `economy.day_settled` 정확히 1회(`day: 1`), 그 틱의 `tick.advanced`보다 먼저. 같은 `time.phase_changed {to:"close", day:1}`를 다시 발행해도 정산 0회. 다음 날 close 에서 `day: 2`로 1회 더 (#정산 1회성) |
 | EC4 | `test_economy.gd::test_immediate_vs_settlement_items` | `charge_proposed {reason:"build", amount:1000}` → 즉시 `cash −1000`, `day_settled.operating_costs`·`pretax`에 안 들어감. `{reason:"guarantee", amount:400}` → 즉시 `cash −400`, `day_settled.guarantee == 400`이고 `operating_costs`에 포함, `settlement_delta`에는 안 들어감. `sales_reported`는 정산 전까지 `cash` 불변 (#즉시-반영-항목과-정산-반영-항목) |
@@ -446,13 +452,13 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | EC13 | `test_economy.gd::test_ticket_price_rules` | P1~P5: 비정수 `"invalid"`, 낮 아닌 구간 `"not_allowed"`, 범위 밖 `"out_of_range"`, 같은 값 무시, 정상 → `ticket_price_changed {price, from}`. `{price: 25.0}`·`{price: 25.5}` → 각각 `publish()` `false` + `push_error` 1회, 경계 처리 뒤 `economy.ticket_price_*` 이벤트 0개, 상태 해시 불변(tick.md E4) (#티켓-가격) |
 | EC14 | `test_economy.gd::test_settlement_event_order` | close 진입 틱의 이벤트: `time.phase_changed {to:"close"}` → `economy.cash_changed {reason:"settlement"}` → `economy.day_settled` → (`economy.bailout_offered` 또는 `economy.bankrupt`) → `time.speed_changed {speed:0}` → `tick.advanced`. 정산 연쇄는 최외곽 `time.phase_changed` 발행 안에서 끝난다(tick.md E3). `settlement_delta == 0`이면 `cash_changed` 없음 (#정산 이벤트) |
 | EC15 | `test_economy.gd::test_determinism_no_rng` | 같은 시드·같은 명령/입력 열로 두 번 돌린 `economy.*` 이벤트 열과 `snapshot()` 해시가 같음. 정산 전후 `rng.get_state()["economy"]` 불변 (#결정성과-rng) |
-| EC16 | `test_economy.gd::test_snapshot_roundtrip` | 대출 진행 중인 상태에서 `snapshot()` → JSON 왕복 → 새 `Economy.restore()` → 같은 입력 열 → 연속 진행과 상태 해시가 같음. 잘못된 스냅샷은 `false`, 상태 불변 (#스냅샷) |
+| EC16 | `test_economy.gd::test_snapshot_roundtrip` | 대출 진행 중(`loans` 1개, `paid` ≥ 1)이고 `pending_bailout`이 있는 상태에서. (a) **`Economy` 단독 왕복:** `Economy.snapshot()` → JSON 왕복 → 새 `Economy.restore()` → 같은 입력 열 → 연속 진행과 경제 상태 해시가 같음. (b) **`TickLoop` 수준 왕복(SE-011):** economy 를 훅과 함께 등록한 루프에서 `TickLoop.snapshot()["systems"]["economy"] == Economy.snapshot()` → JSON 왕복 → 새 `TickLoop` + 새 `Economy`(같은 방식으로 등록)에 `restore()` `true` → 양쪽 `advance(3300)` + 같은 입력 → `TickLoop` 상태 해시(`systems.economy` 포함)와 `economy.*` 이벤트 열이 같음(복원 후 진행 = 연속 진행). (c) 잘못된 스냅샷(필드 누락, `loans[].installments`에 `1.5`, `cash`가 문자열): `Economy.restore()`가 `false`, 상태 불변. 같은 항목을 `systems.economy`에 넣은 `TickLoop` 스냅샷은 `TickLoop.restore()`가 `false`이고 `TickLoop`·`Economy` 해시 불변. 어느 경우든 복원 중 이벤트 0개 (#스냅샷, tick.md #스냅샷 restore 5~7단계) |
 
 ## 테스트 방법
 
 - 데이터: `python3 tools/validate_data.py --strict` — `economy.json`이 `economy.schema.json`(version `enum [1]`, `additionalProperties: false`, `rate_scale` `enum [10000]`, `demolish_refund_rate_bp` `enum [7000]`)을 통과.
 - 손계산(qa, 이 티켓): #기준-시나리오와 #파산-시나리오 표를 이 문서의 공식과 `economy.json` 값만으로 다시 계산해 `docs/reports/SE-005.md`에 일치/불일치를 적는다. 기대값은 `reference_scenarios[].expected`와도 대조한다.
-- 헤드리스(구현 티켓): `tools/run_tests.sh project/tests/sim` → `test_economy.gd`의 EC1~EC16. 단위 케이스는 `EventBus` 하나에 `time.*` 이벤트를 테스트가 직접 발행해 구동하고, EC3·EC10·EC14·EC15 는 `TickLoop`으로 구동한다. Godot 이 없으면 `SKIP` → CI(`godot-tests`).
+- 헤드리스(구현 티켓): `tools/run_tests.sh project/tests/sim` → `test_economy_config.gd`의 EC1, `test_economy.gd`의 EC2~EC16. 단위 케이스는 `EventBus` 하나에 `time.*` 이벤트를 테스트가 직접 발행해 구동하고, EC3·EC10·EC14·EC15·EC16(b) 는 `TickLoop`으로 구동한다(economy 를 훅과 함께 등록). Godot 이 없으면 `SKIP` → CI(`godot-tests`).
 - 스펙 대조(reviewer): AC1·AC2·AC7·AC8 → `docs/reviews/SE-005.md`. 특히 이 문서의 이벤트 이름과 `events.md` 표, 공식의 상수와 `economy.json` 필드.
 
 ## 열린 질문
@@ -469,7 +475,7 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | Q4 | 티켓가 플레이어 조정 범위 | (a) 고정(기본가 20) (b) 5~40, 1 단위(현재) (c) 10~30 | **(b), 단 audience.md 가 가격 → 입장 수 반응을 넣기 전까지 UI 는 (a)처럼 잠근다.** v0 경제에서 입장 수는 입력이라 가격을 올리면 손해 없이 매출만 오른다 | 데이터만(`ticket_price_min/max`). UI 잠금은 UI 티켓 |
 | Q5 | 구제 거절 허용 | (a) 불가 — 수락 명령 또는 다음 날 자동 수락(현재) (b) 거절 가능, 거절 = 즉시 파산 | **(a).** 거절의 유일한 결과가 게임 오버라 선택지가 아니다. 스폰서(Q2 (c))가 생기면 "어느 구제를 받을지"만 고르게 한다 | (b)는 거절 명령 1개 추가(채택 시 events.md 에 이름 등록) + 이 문서 개정 |
 | Q6 | (producer, 사람 결정 불요) 입력 이벤트 발행 주체 연결 | build·artist·audience 스펙이 #입력-계약의 `economy.charge_proposed`·`refund_proposed`·`sales_reported`·`upkeep_reported`를 쓰게 | 각 스펙 티켓의 범위에 "economy 입력 계약 준수"를 넣는다. 가구 필드 `upkeep_per_day`(예약), `build_cost`(제안) | — |
-| Q7 | (producer, 사람 결정 불요) 스냅샷 연결 | 경제 상태를 `TickLoop.snapshot()`에 넣는 방법이 tick.md v0 에 없다(시간만) | 경제 구현 티켓에 (1) 시스템 스냅샷 등록 API(core, sim-engineer) (2) `sim.json.snapshot_schema_version` 1→2(game-designer, sim.json version 3)를 함께 넣는다. 이번 티켓은 `sim.json`을 바꾸지 않았다 | — |
+| Q7 | (producer, 사람 결정 불요) 스냅샷 연결 | 경제 상태를 `TickLoop.snapshot()`에 넣는 방법이 tick.md v0 에 없다(시간만) | **결정(SE-011):** 최상위 `economy` 키 대신 `TickLoop.register_system(id, update, snapshot_hook, restore_hook)` 훅으로 `TickLoop.snapshot()["systems"]["economy"]`에 넣는다. 복원은 tick.md #스냅샷 restore 5~7단계(불일치 규칙, 사전 스냅샷, 역순 롤백)를 따른다. economy 는 등록 필수다(#정산 "틱 업데이트·등록"). `snapshot_schema_version` 1→2·`sim.json` version 3 은 리터럴 테스트 3곳을 고치는 SE-012 와 같은 PR 에서 적용한다(game-designer 2차). 근거와 D1~D7 은 tick.md 변경 이력 SE-011 행과 docs/tickets/SE-011.md | 닫힘 |
 
 ## 변경 이력
 
@@ -481,3 +487,4 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | 2026-10-09 | economy.md v0 (후속 수정) | SE-005 후속 (리뷰 발견 2) | 입력 계약에서 "reputation 은 정산이 끝난 `cash`를 본다"를 지웠다. 대신 정산 결과가 필요한 시스템은 `economy.day_settled`를 구독한다고 적었다(티어 해금 자금 = `day_settled.cash`, 구독 순서와 무관). 티어 2 도달 추정 절의 해석 문구도 같은 이벤트로 맞췄다. "다른 시스템은 `cash`를 직접 읽지 않는다"와 모순되는 문장은 0개다 |
 | 2026-10-09 | economy.md v0 (후속 수정), `economy.schema.json` version 1 유지 | SE-005 후속 (리뷰 발견 3) | 설정 로드 검사에 K4(`reference_scenarios[].guarantee_grade` ∈ `guarantee_by_grade` 키)를 추가했다. `EconomyConfig.guarantee()`에 모르는 등급이면 `push_error` 후 `-1`을 돌려준다고 적었다(그 값을 지출로 보내면 C2 거절). `row()`의 없는 티어 반환값(`{}`)도 적었다. EC1 에 K4 위반 사본과 `guarantee("midlevel") == -1`을 추가했다. 스키마는 enum 을 줄이지 않고(artist.md 등급 이름 5종 유지) `guarantee_grade`·`guarantee_by_grade`의 `description`만 고쳤다. 받아들이는 문서 집합이 그대로라 스키마 `version`과 `economy.json` `version`은 1 로 두었다. `economy.json`은 바꾸지 않았다 |
 | 2026-10-09 | economy.md v0 (후속 수정), `economy.json`·스키마 변경 없음 | SE-008 (SE-001 리뷰 발견 1) | 명령 페이로드 숫자 `int` 전용(tick.md E4)에 맞췄다. 입력 계약의 "정수값인 `float` 허용(tick.md 배속 요청과 같은 규칙)"을 명령 입력(`int`만, `float`는 버스가 거부해 핸들러 도달 없음)과 상태 입력(방어적 정수값 `float` 정규화 유지, 세이브 동치 무관)으로 나눴다. P1 에서 정수값 `float` 허용을 지우고 "버스가 먼저 거부"로 바꿨다. EC13 의 "`25.0` 허용"을 "`{price: 25.0}`·`{price: 25.5}` → `publish()` false + `push_error`, 이벤트 0개, 상태 해시 불변"으로 바꿨다. 이벤트 이름·페이로드 키·수치 변경 없음 |
+| 2026-10-09 | economy.md v0 (후속 수정), `economy.json`·스키마 변경 없음 | SE-011 (Q7 닫기) | `TickLoop` 스냅샷 연결을 확정했다. "틱 업데이트" 문단을 "틱 업데이트·등록"으로 바꿨다. 이전 문장은 "등록하지 않아도 된다"였고, 이제 economy 는 `register_system("economy", economy.update, economy.snapshot, economy.restore)`로 **반드시** 등록한다(`update`는 no-op). 공개 API 표에 `update(ctx)`를 더했다. 스냅샷 절에 `TickLoop.snapshot()["systems"]["economy"]` 연결, restore 5~7단계, 훅 규약 SH1~SH7 준수를 적었다. EC16 을 (a) `Economy` 단독 왕복, (b) `TickLoop` 수준 왕복(`systems.economy` 포함, 복원 후 진행 = 연속 진행), (c) 잘못된 스냅샷 거부로 넓혔다. EC1 파일을 `test_economy_config.gd`로 옮겼다. 사유: `tools/hooks/check_commit.py`가 `project/sim/economy_config.gd`의 짝 테스트 `test_economy_config.gd`를 요구한다. 상단 "구현 티켓" 행을 SE-012 와 파일 4개로, 수용 기준·테스트 방법의 파일 경로를 맞췄다. Q7 을 결정으로 닫았다. 공식·수치·이벤트 이름·`reference_scenarios` 기대값 변경 없음 |
