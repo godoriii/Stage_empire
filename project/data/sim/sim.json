@@ -1,12 +1,12 @@
 {
-  "version": 2,
+  "version": 3,
   "ticks_per_second": 10,
   "tile_size_m": 1.0,
   "chunk_size": 32,
   "individual_agent_max_tier": 3,
   "individual_agent_cap": 3000,
   "max_ticks_per_step": 30,
-  "snapshot_schema_version": 1,
+  "snapshot_schema_version": 2,
   "rng_streams": ["audience", "artist", "events", "economy", "world"],
   "system_order": ["build", "staff", "artist", "audience", "show", "crisis", "economy", "reputation"],
   "phases": [
