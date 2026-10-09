@@ -87,24 +87,72 @@ def under(path: str, roots: list[str]) -> bool:
     return False
 
 
+REDIRECT_TOKENS = {">", ">>", "&>", ">|", "&>>"}
+SEG_SEPARATORS = {"|", "||", "&&", ";", "&", ";;"}
+
+
+def _split_segments(head: str) -> list[list[str]]:
+    """셸 문법을 인식해 명령 세그먼트(토큰 목록)로 나눈다.
+
+    따옴표 안의 `|`·`;`·`>` 는 구분자나 리다이렉션이 아니다(예: `sed -i 's/a|b/c/' f`).
+    파싱이 불가능한(따옴표 불균형) 명령은 보수적으로 공백 분리로 되돌아간다.
+    """
+    try:
+        lex = shlex.shlex(head, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        toks = head.split()
+    segs: list[list[str]] = [[]]
+    for t in toks:
+        if t in SEG_SEPARATORS:
+            segs.append([])
+        else:
+            segs[-1].append(t)
+    return [s for s in segs if s]
+
+
+def _strip_heredoc(command: str) -> str:
+    """히어독 본문을 떼고 명령 헤더만 남긴다.
+
+    `cat <<EOF > path\\n...\\nEOF` → `cat  > path` (헤더 줄의 `<<EOF` 만 지우고 같은 줄 나머지는 유지).
+    """
+    m = re.search(r"<<-?\s*['\"]?\w+['\"]?", command)
+    if not m:
+        return command
+    nl = command.find("\n", m.end())
+    rest = command[m.end():] if nl < 0 else command[m.end():nl]
+    return command[: m.start()] + " " + rest
+
+
 def bash_targets(command: str) -> list[str]:
     """Bash 명령에서 쓰기 대상으로 보이는 경로를 뽑는다(보수적 휴리스틱).
 
     히어독(<<) 본문은 검사하지 않는다: 스크립트 안의 `>`·`>=` 를 리다이렉션으로 오인하지 않기 위해.
-    히어독으로 파일을 쓰는 경우(`cat <<EOF > path`)는 `>` 가 `<<` 앞 헤더 줄에 있으므로 여전히 잡힌다.
+    히어독으로 파일을 쓰는 경우(`cat <<EOF > path`)는 헤더 줄의 `> path` 를 남기므로 여전히 잡힌다.
     """
     targets: list[str] = []
-    head = command.split("<<", 1)[0]
-    for seg in re.split(r"\s*(?:&&|\|\||;|\|)\s*", head):
-        try:
-            toks = shlex.split(seg, posix=True)
-        except ValueError:
-            toks = seg.split()
+    head = _strip_heredoc(command)
+    for raw in _split_segments(head):
+        toks: list[str] = []
+        # 리다이렉션: > file, >> file, 2> file, &> file (punctuation_chars 로 `>`·`>>`·`&>` 가 토큰이 된다)
+        i = 0
+        while i < len(raw):
+            t = raw[i]
+            if t in REDIRECT_TOKENS or (t.isdigit() and i + 1 < len(raw) and raw[i + 1] in REDIRECT_TOKENS):
+                if t.isdigit():
+                    i += 1
+                if i + 1 < len(raw):
+                    targets.append(raw[i + 1])
+                i += 2
+                continue
+            if t in ("<", "<<<"):
+                i += 2
+                continue
+            toks.append(t)
+            i += 1
         if not toks:
             continue
-        # 리다이렉션: > file, >> file, 2> file, &> file
-        for m in re.finditer(r"(?:^|\s)(?:\d?>>?|&>)\s*([^\s|;&]+)", seg):
-            targets.append(m.group(1))
         # sudo/env 접두어 제거
         cmd = toks[0]
         args = toks[1:]
@@ -112,7 +160,7 @@ def bash_targets(command: str) -> list[str]:
             cmd, args = args[0], args[1:]
         base = os.path.basename(cmd)
         if base == "sed" and any(a == "-i" or a.startswith("-i") for a in args):
-            targets += [a for a in args if not a.startswith("-") and not a.startswith("s/") and not a.startswith("s|")]
+            targets += [a for a in args if not a.startswith("-") and not a.startswith(("s/", "s|", "s#"))]
         elif base in MUTATING_CMDS:
             targets += [a for a in args if not a.startswith("-")]
         elif base == "git":
@@ -193,6 +241,11 @@ def self_test() -> None:
         ({"tool_name": "Write", "tool_input": {"file_path": "project/sim/a.gd"}}, ["docs/reviews"], True, False),
         ({"tool_name": "Write", "tool_input": {"file_path": "docs/reviews/SE-1.md"}}, ["docs/reviews"], True, True),
         ({"tool_name": "Read", "tool_input": {"file_path": "project/view/camera.gd"}}, ["project/sim"], False, True),
+        ({"tool_name": "Bash", "tool_input": {"command": "sed -i 's/^| SE-012 |.*/x/' docs/status/a.md"}}, ["docs/status"], False, True),
+        ({"tool_name": "Bash", "tool_input": {"command": "grep -q 'a > b' x.md && echo ok"}}, ["docs/status"], False, True),
+        ({"tool_name": "Bash", "tool_input": {"command": "grep x f | tee project/ui/x.gd"}}, ["project/sim"], False, False),
+        ({"tool_name": "Bash", "tool_input": {"command": "echo hi 2> project/ui/err.log"}}, ["project/sim"], False, False),
+        ({"tool_name": "Bash", "tool_input": {"command": "cat <<EOF > project/ui/x.gd\nx > y\nEOF"}}, ["project/sim"], False, False),
     ]
     root = str(Path(__file__).resolve().parents[2])
     failed = 0
