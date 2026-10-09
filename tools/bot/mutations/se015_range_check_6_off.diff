@@ -1,0 +1,17 @@
+# SE-023 예시 변이: SE-015 ⑥ 범위 검사 제거 (SE-016 qa 변이 1)
+# 대상: project/sim/economy.gd  _parse_snapshot 의 loans[].paid 범위 검사
+# 변경: `if loan["paid"] < 0 or loan["paid"] >= ...size():` -> `if false:`
+# 기대(tests/sim): 실패 정확히 1건 = test_restore_rejects_out_of_range, 나머지 녹색.
+# 사용: tools/bot/mutate_and_test.sh tools/bot/mutations/se015_range_check_6_off.diff
+diff --git a/project/sim/economy.gd b/project/sim/economy.gd
+--- a/project/sim/economy.gd
++++ b/project/sim/economy.gd
+@@ -495,7 +495,7 @@
+ 		var loan: Variant = _parse_record(e, LOAN_INT_FIELDS, "loans[]")
+ 		if loan is String:
+ 			return loan
+-		if loan["paid"] < 0 or loan["paid"] >= (loan["installments"] as Array).size():
++		if false:
+ 			return "loans[].paid 가 0 이상 installments 개수 미만이 아니다"
+ 		new_loans.append(loan)
+ 	out["loans"] = new_loans
