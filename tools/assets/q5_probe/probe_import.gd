@@ -14,13 +14,13 @@ func _dump(n: Node, ind: String) -> void:
 	print(ind, n.get_class(), " ", _q(n.name))
 	if n is ImporterMeshInstance3D:
 		var im: ImporterMesh = n.mesh
-		for i in im.get_surface_count():
+		for i: int in im.get_surface_count():
 			var mat: Material = im.get_surface_material(i)
 			print(ind, "  ImporterMesh surf ", i, " surface_name=", _q(im.get_surface_name(i)),
 				" material.resource_name=", (_q(mat.resource_name) if mat else "null"))
 	if n is MeshInstance3D and n.mesh:
 		var mesh: Mesh = n.mesh
-		for i in mesh.get_surface_count():
+		for i: int in mesh.get_surface_count():
 			var mat: Material = mesh.surface_get_material(i)
 			var sname: String = ""
 			if mesh is ArrayMesh:
@@ -32,12 +32,12 @@ func _dump(n: Node, ind: String) -> void:
 			extra += " has_COLOR=" + str(arrays[Mesh.ARRAY_COLOR] != null)
 			print(ind, "  Mesh surf ", i, " surface_name=", _q(sname),
 				" material.resource_name=", (_q(mat.resource_name) if mat else "null"), extra)
-	for c in n.get_children():
+	for c: Node in n.get_children():
 		_dump(c, ind + "  ")
 
 
 func _init() -> void:
-	for f in OS.get_cmdline_user_args():
+	for f: String in OS.get_cmdline_user_args():
 		print("== ", f.get_file())
 		if f.begins_with("res://"):
 			var ps: PackedScene = load(f)

@@ -1,0 +1,11 @@
+{
+  "asset_id": "character_glass",
+  "category": "character",
+  "footprint": [
+    1,
+    1
+  ],
+  "height_m": 1.0,
+  "poly_budget": "character",
+  "ticket": "SE-027"
+}

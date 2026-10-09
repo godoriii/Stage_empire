@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "_comment": "glTF 린터(lint_gltf.py) 설정. 허용 오차와 폴리곤 예산의 유일한 출처. 예산 값의 기준은 docs/style-guide.md '폴리곤 예산' 행(여기는 복사본, 행이 바뀌면 이 파일만 고친다). 게임 데이터가 아니므로 project/data/ 대상이 아니다. GLTF_SPEC.md §7·§10.",
+  "tolerance": {
+    "pivot_m": 0.01,
+    "footprint_m": 0.01,
+    "height_ratio": 0.05,
+    "vertex_alpha": 1e-4,
+    "identity": 1e-6
+  },
+  "tile_size_m": 1.0,
+  "triangle_mode": 4,
+  "tri_budget": {
+    "furniture_small": 300,
+    "equipment_large": 1500,
+    "character": 800,
+    "lod1": 150
+  },
+  "slots": ["base", "accent", "emissive", "glass"],
+  "required_slots": ["base"],
+  "surface_count": { "min": 1, "max": 4 },
+  "mesh_nodes_required": 1,
+  "meshes_required": 1,
+  "vertex_alpha_expected": 1.0,
+  "vertex_color_white": [1.0, 1.0, 1.0],
+  "identity_transform": {
+    "translation": [0.0, 0.0, 0.0],
+    "rotation": [0.0, 0.0, 0.0, 1.0],
+    "scale": [1.0, 1.0, 1.0],
+    "matrix": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+  },
+  "meta": {
+    "_comment": "META.json 검증. category·footprint·height_m 이름과 범위는 SE-028 furniture.schema.json 과 같다. 'character' 는 가구가 아닌 에셋(군중 캐릭터)용으로 린터가 더한 값.",
+    "categories": ["stage", "sound", "light", "bar", "amenity", "safety", "decor", "character"],
+    "character_value": "character",
+    "footprint_tiles": { "min": 1, "max": 8 },
+    "height_m": { "min": 0.05, "max": 6.0 },
+    "asset_id_pattern": "^[a-z][a-z0-9_]*$",
+    "ticket_pattern": "^SE-[0-9]{3}$"
+  }
+}
