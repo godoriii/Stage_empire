@@ -14,6 +14,12 @@ extends Node3D
 ##   포스트 패스 노드 1개가 이 노드 직속에 붙는다). 키 1/2/3(shader_variant_1/2/3)으로 a/b/c 전환,
 ##   HUD 에 "시안: <id>". 없는 id(예전 "default" 포함)면 push_error + 종료 코드 2.
 ##   -- --se-zoom=<0..3> 은 시작 줌 인덱스(0 = 최근접). 범위 밖이면 push_warning 후 기본 줌 유지.
+##
+## 배치 UI(SE-037): -- --se-build-preset=<empty|baseline> 일 때만 가구 렌더·고스트·오버레이·하단 팔레트를 붙인다
+##   (인자가 없으면 SE-002/SE-004 와 같은 화면 — 기준 캡처 불변). 프리셋이 있으면 시안 플레이스홀더 세트는 숨긴다.
+##   이벤트 버스는 이 샌드박스 전용 EventBus 하나(sim 미등록): 클릭한 배치·철거 명령은 명령 큐에 남는다(SE-040 통합 전).
+##   baseline = 기준 배치(tier1_club reference_layouts[baseline_show]) + 음향 오버레이(BuildPreset 의 가짜 sim 출력).
+##   없는 프리셋 id 면 push_error + 종료 코드 2.
 
 const SCREENSHOT_ARG: String = "--se-screenshot="
 const HOVER_ARG: String = "--se-hover="
@@ -21,6 +27,9 @@ const ZOOM_ARG: String = "--se-zoom="
 const PLACEHOLDERS_SCENE: String = "res://view/scenes/shader_placeholders.tscn"
 ## 종료 코드: 없는 시안 id(SpikeMeasure.EXIT_BAD_SETUP 과 같은 값).
 const EXIT_BAD_MATERIAL: int = 2
+## 종료 코드: 없는 배치 프리셋 id.
+const EXIT_BAD_BUILD_PRESET: int = 2
+const BUILD_PALETTE_SCENE: String = "res://ui/build/build_palette.tscn"
 ## 스크린샷 전 렌더가 안정될 때까지 기다리는 프레임 수(디버그 기능 전용).
 const SCREENSHOT_WARMUP_FRAMES: int = 10
 
@@ -34,6 +43,14 @@ const SCREENSHOT_WARMUP_FRAMES: int = 10
 
 var _placeholders: ShaderPlaceholders
 var _material_id: String = ""
+## SE-037 배치 UI(프리셋이 있을 때만). 없으면 전부 null.
+var _build_preset: String = BuildPreset.NONE
+var _bus: EventBus
+var _catalog: BuildCatalog
+var _furniture_view: FurnitureView
+var _ghost: PlacementGhost
+var _overlay: CoverageOverlay
+var _palette: BuildPalette
 
 
 func _ready() -> void:
@@ -48,6 +65,10 @@ func _ready() -> void:
 	var wanted: String = ShaderVariants.resolve_material_id(material_id, args, ShaderVariants.DEFAULT_ID)
 	if not apply_material(wanted):
 		get_tree().quit(EXIT_BAD_MATERIAL)
+		return
+	var preset: String = BuildPreset.resolve(args)
+	if preset != BuildPreset.NONE and not setup_build(preset):
+		get_tree().quit(EXIT_BAD_BUILD_PRESET)
 		return
 	_run_screenshot_if_requested()
 
@@ -65,9 +86,15 @@ func apply_material(id: String) -> bool:
 		_placeholders.position = grid.get_center_world()
 		add_child(_placeholders)
 	var excluded: Array[Node] = [grid, cursor, hud]
+	# SE-037: 고스트·데칼은 반투명 무광 머티리얼 유지(가구 메시만 시안을 받는다).
+	for n: Node in [_ghost, _overlay, _palette]:
+		if n != null:
+			excluded.append(n)
 	if ShaderVariants.apply(self, wanted, excluded) < 0:
 		return false
 	_material_id = wanted
+	if _furniture_view != null:
+		_furniture_view.set_material_id(wanted)
 	hud.set_shader_variant(wanted)
 	return true
 
@@ -79,6 +106,73 @@ func get_material_id() -> String:
 
 func get_placeholders() -> ShaderPlaceholders:
 	return _placeholders
+
+
+## SE-037: 배치 UI 를 붙이고 프리셋을 적용한다. 이미 붙어 있으면 false. 없는 id 면 push_error 후 false.
+func setup_build(preset_id: String) -> bool:
+	if not BuildPreset.is_valid_id(preset_id):
+		push_error("GridSandbox: 배치 프리셋 '%s' 없음 (가능: %s)" % [preset_id, ", ".join(BuildPreset.IDS)])
+		return false
+	if _bus != null:
+		push_warning("GridSandbox: 배치 UI 가 이미 있다")
+		return false
+	_catalog = BuildCatalog.load_default()
+	if _catalog == null:
+		return false
+	_build_preset = preset_id
+	InputActions.register_build()
+	_bus = EventBus.new()
+	var t: float = grid.get_tile_size_m()
+	_furniture_view = FurnitureView.new()
+	_furniture_view.name = "FurnitureView"
+	add_child(_furniture_view)
+	_furniture_view.bind(_bus, _catalog, t)
+	_furniture_view.set_material_id(_material_id if not _material_id.is_empty() else ShaderVariants.DEFAULT_ID)
+	_ghost = PlacementGhost.new()
+	_ghost.name = "PlacementGhost"
+	add_child(_ghost)
+	_ghost.bind(_bus, _catalog, _furniture_view, t)
+	_overlay = CoverageOverlay.new()
+	_overlay.name = "CoverageOverlay"
+	add_child(_overlay)
+	_overlay.bind(_bus, t)
+	_palette = (load(BUILD_PALETTE_SCENE) as PackedScene).instantiate() as BuildPalette
+	add_child(_palette)
+	_palette.bind(_bus, _catalog, _ghost, _overlay)
+	cursor.hovered_tile_changed.connect(_ghost.on_cursor_hover)
+	if _placeholders != null:
+		_placeholders.visible = false
+	if preset_id == BuildPreset.BASELINE:
+		var placed: Array[Dictionary] = BuildPreset.placed_payloads(_catalog, BuildPreset.BASELINE_LAYOUT_ID)
+		for p: Dictionary in placed:
+			_furniture_view.on_placed(p)
+		_overlay.on_coverage_changed(BuildPreset.coverage_payload(_catalog, placed, BuildPreset.BASELINE_LAYOUT_ID))
+		_overlay.set_mode(BuildPreset.BASELINE_OVERLAY_MODE)
+	return true
+
+
+func get_build_preset() -> String:
+	return _build_preset
+
+
+func get_event_bus() -> EventBus:
+	return _bus
+
+
+func get_furniture_view() -> FurnitureView:
+	return _furniture_view
+
+
+func get_placement_ghost() -> PlacementGhost:
+	return _ghost
+
+
+func get_coverage_overlay() -> CoverageOverlay:
+	return _overlay
+
+
+func get_build_palette() -> BuildPalette:
+	return _palette
 
 
 ## SE-004: --se-zoom=<인덱스> 가 있으면 시작 줌을 바꾼다. 범위 밖·숫자 아님이면 push_warning 후 기본 줌 유지.
