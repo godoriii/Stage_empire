@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-029). 변경 이력: docs/gdd/audience.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 audience.md 변경 이력에 적는다.",
+  "title": "audience",
+  "description": "관객 시스템 수치(입장 수 공식 계수, 유형 3종, 흐름·이동, 만족 가중치, 기준 시나리오). 규칙: docs/gdd/audience.md. 비율은 economy.json rate_scale(10000) 분의 정수 bp. 수치 변경은 game-designer 만.",
+  "type": "object",
+  "required": ["version", "max_agents", "pos_scale", "admission", "flow", "satisfaction", "types", "checks", "reference_scenarios"],
+  "additionalProperties": false,
+  "$defs": {
+    "genre_id": { "type": "string", "enum": ["rock", "hiphop", "electronic", "indie", "jazz", "pop", "metal", "world"] },
+    "type_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "bp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "slot": { "type": "string", "pattern": "^s[0-9]{2}$" },
+    "by_type_int": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/type_id" },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "int_range": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": { "type": "integer", "minimum": 0 }
+    },
+    "lineup": {
+      "description": "artist.lineup_set 의 수치(slot 은 artist.json roster_plan.slots[].slot — 아티스트 id 는 쓰지 않는다)",
+      "type": "object",
+      "required": ["slot", "genre", "grade", "popularity", "skill"],
+      "additionalProperties": false,
+      "properties": {
+        "slot": { "$ref": "#/$defs/slot" },
+        "genre": { "$ref": "#/$defs/genre_id" },
+        "grade": { "type": "string", "enum": ["local", "rookie", "midlevel", "headliner", "legend"] },
+        "popularity": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "skill": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    }
+  },
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "max_agents": {
+      "description": "동시에 존재하는 에이전트 상한이자 하루 입장 상한(PRD MVP 관객 150). sim.json individual_agent_cap 이하(로더 AL4)",
+      "type": "integer", "minimum": 1
+    },
+    "pos_scale": {
+      "description": "audience.agent_moved 좌표의 고정소수 배율. 좌표 값 ÷ pos_scale = 타일 단위(m). 짝수이고 flow.move_ticks_per_tile 로 나누어떨어져야 한다(AL5)",
+      "type": "integer", "minimum": 2
+    },
+    "admission": {
+      "description": "입장 수 공식 AD1~AD10 의 전역 계수",
+      "type": "object",
+      "required": ["price_ref", "reputation_cap", "noise_bp", "price_factor_min_bp", "price_factor_max_bp"],
+      "additionalProperties": false,
+      "properties": {
+        "price_ref": { "description": "가격 계수·가격 만족의 기준 티켓가(이 가격에서 계수 10000)", "type": "integer", "minimum": 1 },
+        "reputation_cap": { "description": "입장 공식에 넣는 명성 상한", "type": "integer", "minimum": 0 },
+        "noise_bp": { "description": "입장 수 난수 폭 J. noise_bp ∈ [−J, +J]", "type": "integer", "minimum": 0, "maximum": 5000 },
+        "price_factor_min_bp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "price_factor_max_bp": { "type": "integer", "minimum": 10000, "maximum": 50000 }
+      }
+    },
+    "flow": {
+      "description": "에이전트 흐름(상태 기계 T1~T13)의 틱 수·인원 상한",
+      "type": "object",
+      "required": ["arrival_window_ticks", "entry_ticks", "move_ticks_per_tile", "spot_tile_cap", "pass_tile_cap", "bar_ticks", "bar_fail_wait_ticks"],
+      "additionalProperties": false,
+      "properties": {
+        "arrival_window_ticks": { "description": "저녁 구간 시작부터 도착을 퍼뜨리는 틱 수. 저녁 구간 틱 수 이하(AL6)", "type": "integer", "minimum": 1 },
+        "entry_ticks": { "description": "입구 타일에서 entering 으로 머무는 틱 수(입장 확인)", "type": "integer", "minimum": 1 },
+        "move_ticks_per_tile": { "description": "인접 타일 하나를 건너는 틱 수", "type": "integer", "minimum": 1 },
+        "spot_tile_cap": { "description": "관람·바 자리로 한 타일을 점유(claim)할 수 있는 에이전트 수", "type": "integer", "minimum": 1 },
+        "pass_tile_cap": { "description": "한 타일에 동시에 있을 수 있는 에이전트 수(서 있는 사람 + 지나가는 사람). leaving 은 무시", "type": "integer", "minimum": 1 },
+        "bar_ticks": { "description": "at_bar 체류 틱 수(구매 1회)", "type": "integer", "minimum": 1 },
+        "bar_fail_wait_ticks": { "description": "바 자리가 없어 구매를 포기할 때 대기에 더하는 틱 수", "type": "integer", "minimum": 0 }
+      }
+    },
+    "satisfaction": {
+      "description": "에이전트 만족 SF1~SF9 의 가중치",
+      "type": "object",
+      "required": ["weights_bp", "penalty_weights_bp", "skill_base_bp", "skill_bp_per_point", "no_lineup_bp", "price_value_mid_bp", "crowd_comfort_bp"],
+      "additionalProperties": false,
+      "properties": {
+        "weights_bp": {
+          "description": "가산 요소 가중치. 합 == 10000(AL7)",
+          "type": "object",
+          "required": ["lineup", "sound", "sight", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "lineup": { "$ref": "#/$defs/bp" }, "sound": { "$ref": "#/$defs/bp" },
+            "sight": { "$ref": "#/$defs/bp" }, "value": { "$ref": "#/$defs/bp" }
+          }
+        },
+        "penalty_weights_bp": {
+          "description": "감점 요소 가중치",
+          "type": "object",
+          "required": ["crowd", "wait"],
+          "additionalProperties": false,
+          "properties": { "crowd": { "$ref": "#/$defs/bp" }, "wait": { "$ref": "#/$defs/bp" } }
+        },
+        "skill_base_bp": { "$ref": "#/$defs/bp" },
+        "skill_bp_per_point": { "description": "아티스트 실력 1 당 공연 품질 bp", "type": "integer", "minimum": 0, "maximum": 1000 },
+        "no_lineup_bp": { "description": "라인업 없는 날의 lineup 요소 값", "$ref": "#/$defs/bp" },
+        "price_value_mid_bp": { "description": "기준 가격에서의 가격 만족(value) 값", "$ref": "#/$defs/bp" },
+        "crowd_comfort_bp": { "description": "관객 ÷ 수용 비율이 이 값 이하면 혼잡 0. 10000 미만(AL9)", "type": "integer", "minimum": 0, "maximum": 9999 }
+      }
+    },
+    "types": {
+      "description": "관객 유형. MVP 3종(PRD 콘텐츠 범위). 순서 = 표·by_type·나머지 배분의 기준 순서",
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "color", "needs_lineup", "base_centi", "popularity_centi", "reputation_centi", "genre_fit_bp", "price_sensitivity_bp", "bar_visit_bp", "patience_ticks", "spot_weights_bp"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/type_id" },
+          "name": { "description": "표시 이름(한국어 v0)", "type": "string", "minLength": 1 },
+          "color": { "description": "군중 인스턴스 색(SE-038). 임시 hex #RRGGBB 또는 팔레트 id pal_*(materials.md Q1). 알파는 view 가 1.0 으로 둔다(M3)", "type": "string", "pattern": "^(#[0-9a-fA-F]{6}|pal_[a-z0-9_]+)$" },
+          "needs_lineup": { "description": "true 면 라인업 없는 날 0 명", "type": "boolean" },
+          "base_centi": { "description": "기본 흡인(1/100 명)", "type": "integer", "minimum": 0 },
+          "popularity_centi": { "description": "아티스트 인기 1 당 흡인(1/100 명)", "type": "integer", "minimum": 0 },
+          "reputation_centi": { "description": "종합 명성 1 당 흡인(1/100 명)", "type": "integer", "minimum": 0 },
+          "genre_fit_bp": {
+            "description": "장르 적합표(장르 선호 벡터). 키 집합 == artist.json mvp_genres(AL3)",
+            "type": "object", "minProperties": 1,
+            "propertyNames": { "$ref": "#/$defs/genre_id" },
+            "additionalProperties": { "$ref": "#/$defs/bp" }
+          },
+          "price_sensitivity_bp": { "description": "티켓 1 단위당 가격 계수·가격 만족 변화(bp)", "type": "integer", "minimum": 0, "maximum": 10000 },
+          "bar_visit_bp": { "description": "유형 인원 중 바에 들르는 비율", "$ref": "#/$defs/bp" },
+          "patience_ticks": { "description": "누적 대기 허용 틱 수. 넘으면 조기 퇴장", "type": "integer", "minimum": 1 },
+          "spot_weights_bp": {
+            "description": "관람 자리 선호 점수(음향·시야·바 반경 타일 소속)",
+            "type": "object",
+            "required": ["sound", "sight", "bar"],
+            "additionalProperties": false,
+            "properties": {
+              "sound": { "$ref": "#/$defs/bp" }, "sight": { "$ref": "#/$defs/bp" }, "bar": { "$ref": "#/$defs/bp" }
+            }
+          }
+        }
+      }
+    },
+    "checks": {
+      "description": "수치 목표(qa·테스트용, 런타임은 읽지 않는다). artist.md T5",
+      "type": "object",
+      "required": ["reference_reputation", "rookie_over_local_top_min", "rookie_over_local_top_target", "local_top_slots", "rookie_slots"],
+      "additionalProperties": false,
+      "properties": {
+        "reference_reputation": { "type": "integer", "minimum": 0 },
+        "rookie_over_local_top_min": { "type": "integer", "minimum": 0 },
+        "rookie_over_local_top_target": { "$ref": "#/$defs/int_range" },
+        "local_top_slots": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/slot" } },
+        "rookie_slots": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/slot" } }
+      }
+    },
+    "reference_scenarios": {
+      "description": "기준 시나리오(테스트·qa 용, 런타임은 읽지 않는다). audience.md #기준-시나리오",
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "layout", "seed", "day", "reputation_total", "ticket_price", "lineup", "expected"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "description": { "type": "string" },
+          "layout": { "description": "tier1_club.json reference_layouts[].id", "type": "string" },
+          "seed": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+          "day": { "type": "integer", "minimum": 1 },
+          "reputation_total": { "type": "integer", "minimum": 0 },
+          "ticket_price": { "type": "integer", "minimum": 1 },
+          "lineup": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/lineup" }] },
+          "expected": {
+            "type": "object",
+            "required": ["e_centi", "expected_centi", "first_draw", "noise_bp", "raw", "admissions", "capped_by", "by_type", "admissions_range_other_seeds", "audience", "left_early", "crowd_bp", "avg_satisfaction_bp_hand", "avg_satisfaction_bp_range"],
+            "additionalProperties": false,
+            "properties": {
+              "e_centi": { "$ref": "#/$defs/by_type_int" },
+              "expected_centi": { "type": "integer", "minimum": 0 },
+              "first_draw": { "description": "그날 audience 스트림 첫 randi()(uint32)", "type": "integer", "minimum": 0, "maximum": 4294967295 },
+              "noise_bp": { "type": "integer" },
+              "raw": { "type": "integer", "minimum": 0 },
+              "admissions": { "type": "integer", "minimum": 0 },
+              "capped_by": { "type": "string", "enum": ["none", "capacity", "max_agents", "no_stage"] },
+              "by_type": { "$ref": "#/$defs/by_type_int" },
+              "admissions_range_other_seeds": { "$ref": "#/$defs/int_range" },
+              "audience": { "type": "integer", "minimum": 0 },
+              "left_early": { "type": "integer", "minimum": 0 },
+              "crowd_bp": { "$ref": "#/$defs/bp" },
+              "avg_satisfaction_bp_hand": { "$ref": "#/$defs/bp" },
+              "avg_satisfaction_bp_range": { "$ref": "#/$defs/int_range" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
