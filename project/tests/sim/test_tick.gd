@@ -456,7 +456,7 @@ func test_snapshot_restore_equivalence() -> void:
 	assert_eq(keys.size(), 10)
 	assert_eq(keys, ["day", "pending_commands", "phase", "rng", "schema_version", "seed", "speed", "systems", "tick", "tick_in_phase"], "tick.md 표 리터럴(SE-011)")
 	assert_eq(snap["systems"], {}, "훅 시스템 없음 → systems == {}")
-	# SE-012 2차(sim.json v3) 뒤 리터럴 2 로 교체: assert_eq(snap["schema_version"], 2)
+	# schema_version 2 는 SE-012 에서 적용됨(tick.md 스냅샷 표)
 	assert_eq(snap["schema_version"], 2, "schema_version == 2 (tick.md 스냅샷 표 리터럴)")
 	assert_true(_all_primitive(snap), "기본형만")
 	assert_typeof(snap["rng"]["audience"], TYPE_STRING)
@@ -548,6 +548,14 @@ func test_restore_rejects_bad_snapshot() -> void:
 	assert_eq(target.snapshot()["seed"], 2147483647, "seed max passes: snapshot seed")
 	# SE-011: restore 5단계 systems 불일치(D5). 훅 없는 target.
 	var before_sys: String = _hash(target)
+	# SE-017: restore 4(b) rng 상태 오류. push_error 는 SeededRng.set_state 1 + TickLoop 1 = 2회(tick.md#스냅샷 "push_error 횟수").
+	assert_true(good["rng"].has("audience"), "전제: good.rng 에 audience 스트림")
+	s = good.duplicate(true)
+	s["rng"]["audience"] = "x"
+	assert_false(target.restore(s), "rng audience x → false")
+	errs += 2
+	assert_push_error_count(errs, "rng audience x: push_error 2회(SeededRng.set_state 1 + TickLoop 1)")
+	assert_eq(_hash(target), before_sys, "rng audience x: 상태 불변")
 	var sys_bads: Dictionary = {}
 	s = good.duplicate(true)
 	s.erase("systems")
@@ -686,7 +694,7 @@ func test_system_snapshot_hooks_included_in_order() -> void:
 	var snap: Dictionary = a.snapshot()
 	assert_eq(snap.size(), 10, "최상위 키 10개(SNAPSHOT_KEYS)")
 	assert_eq(snap.size(), TickLoop.SNAPSHOT_KEYS.size())
-	# SE-012 2차(sim.json v3) 뒤 리터럴 2 로 교체: assert_eq(snap["schema_version"], 2)
+	# schema_version 2 는 SE-012 에서 적용됨(tick.md 스냅샷 표)
 	assert_eq(snap["schema_version"], 2)
 	assert_eq(snap["systems"].keys(), ["build", "reputation"], "system_order 순 삽입(등록 순서 무관)")
 	assert_false(snap["systems"].has("audience"), "훅 없는 시스템은 항목 없음")
