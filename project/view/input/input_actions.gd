@@ -19,6 +19,12 @@ const CAMERA_PAN_DRAG: StringName = &"camera_pan_drag"
 const SHADER_VARIANT_1: StringName = &"shader_variant_1"
 const SHADER_VARIANT_2: StringName = &"shader_variant_2"
 const SHADER_VARIANT_3: StringName = &"shader_variant_3"
+## SE-037 배치 UI. 클릭(build_confirm) = 배치/철거 실행, R = 회전, Esc = 취소, X = 철거 모드, O = 오버레이 순환.
+const BUILD_CONFIRM: StringName = &"build_confirm"
+const BUILD_ROTATE: StringName = &"build_rotate"
+const BUILD_CANCEL: StringName = &"build_cancel"
+const BUILD_DEMOLISH: StringName = &"build_demolish"
+const OVERLAY_CYCLE: StringName = &"overlay_cycle"
 
 const ALL: Array[StringName] = [
 	CAMERA_ROTATE_CW, CAMERA_ROTATE_CCW,
@@ -30,6 +36,9 @@ const ALL: Array[StringName] = [
 ## SE-004 시안 전환 액션. 카메라 액션(ALL)과 따로 둔다: SE-002 의 ALL·register() 의 의미(카메라 9개)를 바꾸지 않는다.
 const SHADER_VARIANT_ACTIONS: Array[StringName] = [SHADER_VARIANT_1, SHADER_VARIANT_2, SHADER_VARIANT_3]
 
+## SE-037 배치 UI 액션. ALL(카메라 9개)과 따로 둔다. 샌드박스는 --se-build-preset= 일 때만 등록한다.
+const BUILD_ACTIONS: Array[StringName] = [BUILD_CONFIRM, BUILD_ROTATE, BUILD_CANCEL, BUILD_DEMOLISH, OVERLAY_CYCLE]
+
 
 ## 모든 액션을 등록한다. 여러 번 불러도 안전하다. 새로 등록한 액션 수를 돌려준다.
 static func register() -> int:
@@ -39,6 +48,11 @@ static func register() -> int:
 ## SE-004 시안 전환 액션(shader_variant_1/2/3)을 등록한다. 규칙은 register() 와 같다. 새로 등록한 수.
 static func register_shader_variants() -> int:
 	return _register_list(SHADER_VARIANT_ACTIONS)
+
+
+## SE-037 배치 UI 액션(BUILD_ACTIONS)을 등록한다. 규칙은 register() 와 같다. 새로 등록한 수.
+static func register_build() -> int:
+	return _register_list(BUILD_ACTIONS)
 
 
 static func _register_list(actions: Array[StringName]) -> int:
@@ -97,6 +111,21 @@ static func default_events(action: StringName) -> Array[InputEvent]:
 			out.append(_key(KEY_2))
 		SHADER_VARIANT_3:
 			out.append(_key(KEY_3))
+		BUILD_CONFIRM:
+			out.append(_mouse_button(MOUSE_BUTTON_LEFT))
+			out.append(_joy_button(JOY_BUTTON_A))
+		BUILD_ROTATE:
+			out.append(_key(KEY_R))
+			out.append(_joy_button(JOY_BUTTON_Y))
+		BUILD_CANCEL:
+			out.append(_key(KEY_ESCAPE))
+			out.append(_joy_button(JOY_BUTTON_B))
+		BUILD_DEMOLISH:
+			out.append(_key(KEY_X))
+			out.append(_joy_button(JOY_BUTTON_X))
+		OVERLAY_CYCLE:
+			out.append(_key(KEY_O))
+			out.append(_joy_button(JOY_BUTTON_BACK))
 	return out
 
 
