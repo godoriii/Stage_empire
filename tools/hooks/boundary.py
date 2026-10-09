@@ -79,6 +79,21 @@ def rel(path: str, root: Path, cwd: Path) -> str | None:
     return None
 
 
+SCRATCHPAD_PREFIX = "/tmp/claude-"
+
+
+def is_scratchpad(path: str, cwd: Path) -> bool:
+    """Claude Code 세션 스크래치패드(`/tmp/claude-<uid>/<project>/<session>/scratchpad/...`)인가.
+
+    리포지토리 밖이지만 산출물이 아닌 임시 공간이라 경계 검사 대상이 아니다.
+    """
+    p = Path(path)
+    if not p.is_absolute():
+        p = cwd / p
+    s = p.resolve().as_posix()
+    return s.startswith(SCRATCHPAD_PREFIX) and "/scratchpad/" in s + "/"
+
+
 def under(path: str, roots: list[str]) -> bool:
     for r in roots:
         r = r.strip("/")
@@ -185,6 +200,8 @@ def check(payload: dict, allow: list[str], readonly: bool, agent: str) -> None:
     root = repo_root(str(cwd))
 
     def judge(path: str, via: str) -> None:
+        if is_scratchpad(path, cwd):
+            return  # 세션 스크래치패드(임시 스크립트·중간 결과)는 모든 에이전트에 허용
         r = rel(path, root, cwd)
         if r is None:
             deny(f"[boundary:{agent}] 리포지토리 밖 경로에 쓸 수 없다: {path} ({via})")
@@ -246,6 +263,10 @@ def self_test() -> None:
         ({"tool_name": "Bash", "tool_input": {"command": "grep x f | tee project/ui/x.gd"}}, ["project/sim"], False, False),
         ({"tool_name": "Bash", "tool_input": {"command": "echo hi 2> project/ui/err.log"}}, ["project/sim"], False, False),
         ({"tool_name": "Bash", "tool_input": {"command": "cat <<EOF > project/ui/x.gd\nx > y\nEOF"}}, ["project/sim"], False, False),
+        ({"tool_name": "Write", "tool_input": {"file_path": "/tmp/claude-0/-x/sess/scratchpad/patch.diff"}}, ["docs/reviews"], True, True),
+        ({"tool_name": "Bash", "tool_input": {"command": "tee /tmp/claude-0/-x/sess/scratchpad/a.gd"}}, ["project/sim"], False, True),
+        ({"tool_name": "Write", "tool_input": {"file_path": "/tmp/claude-0/-x/sess/other/x.md"}}, ["project/sim"], False, False),
+        ({"tool_name": "Write", "tool_input": {"file_path": "/tmp/other/scratchpad/x.md"}}, ["project/sim"], False, False),
     ]
     root = str(Path(__file__).resolve().parents[2])
     failed = 0
