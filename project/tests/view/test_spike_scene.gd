@@ -429,3 +429,44 @@ func test_material_variant_keeps_mesh_and_instance_counts() -> void:
 	var c: SpikeCrowd = _spawn_with_material("E", "C")
 	assert_eq(c.get_material_id(), "c", "대소문자 무시")
 	assert_eq(c.crowd.material_override, load("res://view/shaders/params/toon_c.tres"))
+
+
+# --- SE-024 AC5 (SE-018 후속 A) ----------------------------------------------
+
+## 로드 실패를 만드는 시안 경로 패턴(존재하지 않는 폴더). 테스트만 material_path_pattern 을 바꾼다.
+const MISSING_MATERIAL_PATTERN: String = "res://tests/view/missing_params/toon_%s.tres"
+
+
+## 시안 b 를 요청했지만 toon_b.tres 로드가 실패하면 스파이크는 plain 으로 떨어진다: get_material_id() == PLAIN_ID,
+## 군중·무대 프록시 material_override == null(= plain 룩), 라벨 "시안 plain", 포스트 패스 없음. 라벨 = 실제 룩.
+func test_material_load_failure_falls_back_to_plain() -> void:
+	for wanted: String in ["b", "ss"]:
+		var vp: SubViewport = ViewTestUtil.make_viewport(self)
+		autofree(vp)
+		var spike: SpikeCrowd = (load(SPIKE_SCENE) as PackedScene).instantiate() as SpikeCrowd
+		spike.config_id = "E"
+		spike.material_id = wanted
+		spike.material_path_pattern = MISSING_MATERIAL_PATTERN
+		vp.add_child(spike)
+		assert_push_error("시안 '%s' 머티리얼 로드 실패: %s" % [wanted, MISSING_MATERIAL_PATTERN % wanted],
+			"%s: ShaderVariants 로드 실패 push_error(경로 포함)" % wanted)
+		assert_push_error("SpikeCrowd: 시안 '%s' 머티리얼을 적용할 수 없어 plain 로 떨어진다" % wanted,
+			"%s: 스파이크 폴백 push_error" % wanted)
+		assert_eq(spike.get_material_id(), ShaderVariants.PLAIN_ID, "%s: 로드 실패 → PLAIN_ID" % wanted)
+		assert_null(spike.crowd.material_override, "%s: 군중 material_override == null(plain 룩)" % wanted)
+		for mi: MeshInstance3D in spike.get_stage_prop_nodes():
+			assert_null(mi.material_override, "%s: $StageProps/%s material_override == null" % [wanted, mi.name])
+		assert_null(ShaderVariants.get_post_pass(spike), "%s: 포스트 패스 노드 없음" % wanted)
+		spike.update_label()
+		assert_string_contains(spike.info_label.text, "시안 plain", "%s: 라벨 '시안 plain'" % wanted)
+		assert_false(spike.info_label.text.contains("시안 %s" % wanted), "%s: 라벨에 요청 시안 표기 없음" % wanted)
+		assert_eq(spike.get_instance_count(), 5000, "%s: 인스턴스 5000 그대로" % wanted)
+	assert_push_error_count(4, "push_error 4건(시안 2개 × 로드 실패·폴백)")
+	# 대조군: 기본 경로 패턴이면 같은 b 요청이 b 로 적용된다(오류 0).
+	var ok: SpikeCrowd = _spawn_with_material("E", "b")
+	assert_eq(ok.material_path_pattern, ShaderVariants.MATERIAL_PATH_PATTERN, "대조군: 기본 경로 패턴")
+	assert_eq(ok.get_material_id(), "b", "대조군: 시안 b 유지")
+	assert_eq(ok.crowd.material_override, load("res://view/shaders/params/toon_b.tres"), "대조군: toon_b.tres")
+	ok.update_label()
+	assert_string_contains(ok.info_label.text, "시안 b", "대조군: 라벨 '시안 b'")
+	assert_push_error_count(4, "대조군은 push_error 를 더하지 않는다")

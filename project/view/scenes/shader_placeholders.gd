@@ -4,9 +4,10 @@ extends Node3D
 ## 메시는 코드로 만든 프리미티브뿐이다(assets/ 참조 없음). 치수·색·라이트는 placeholder_set(.tres)에서 읽는다.
 ## 이 노드의 위치 = 세트의 기준점(샌드박스에서는 그리드 중심). 자식 오프셋은 그 기준 m.
 ##
-## 색은 정점색(COLOR)으로 넣는다: 기본 머티리얼은 StandardMaterial3D(vertex_color_use_as_albedo)라 default 시안에서도
+## 색은 정점색(COLOR)으로 넣는다: 기본 머티리얼은 StandardMaterial3D(vertex_color_use_as_albedo)라 plain 시안에서도
 ## 같은 색으로 보이고, 툰 시안은 정점색 × base_color 라 시안 간 비교에서 색이 같다(스파이크 군중과 같은 방식).
-## accent 영역(accent_top 인 박스의 윗면)은 정점 알파 0 으로 표시한다(toon.gdshader 의 accent 슬롯).
+## accent 영역(accent_top 인 박스의 윗면)은 정점 알파 0 으로 표시한다. SE-024 부터 toon.gdshader 는 정점 알파를 읽지 않으므로
+## (슬롯 = 서피스, docs/gdd/materials.md) 이 알파는 화면에 영향이 없고 accent 색은 정점색 rgb 로만 보인다.
 ## 표시 전용. 게임 상태를 바꾸지 않는다.
 
 const DEFAULT_SET_PATH: String = "res://view/scenes/shader_placeholders.tres"
@@ -69,7 +70,7 @@ func get_spot_lights() -> Array[SpotLight3D]:
 
 
 ## 프리미티브 메시를 정점색이 들어간 ArrayMesh 로 바꾼다. accent_top 이면 윗면(법선 y > 0.5) 정점은 accent 색 + 알파 0.
-## 기본 머티리얼은 정점색을 albedo 로 쓰는 StandardMaterial3D(default 시안).
+## 기본 머티리얼은 정점색을 albedo 로 쓰는 StandardMaterial3D(plain 시안).
 static func colorize(mesh: PrimitiveMesh, color: Color, accent: Color, accent_top: bool) -> ArrayMesh:
 	var arrays: Array = mesh.get_mesh_arrays()
 	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
