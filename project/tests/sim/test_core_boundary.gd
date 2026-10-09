@@ -8,7 +8,7 @@ const SIM_ROOT: String = "res://sim"
 const RNG_FILE: String = "res://core/rng.gd"
 const EXPECTED: Array[String] = [
 	"res://core/event_bus.gd", "res://core/rng.gd", "res://core/sim_config.gd", "res://core/tick.gd",
-	"res://sim/economy.gd", "res://sim/economy_config.gd",
+	"res://sim/economy.gd", "res://sim/economy_config.gd", "res://sim/artist_config.gd", "res://sim/artist_system.gd",
 ]
 ## view/ui 참조 금지(시뮬레이션 → 렌더 방향 의존 없음).
 const PRESENTATION_RE: String = "res://(view|ui)/"
