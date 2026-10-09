@@ -28,6 +28,9 @@ def main() -> int:
         ("git push " + "-f origin x", 2),
         ("git push origin " + "main", 2),
         ("git push -u origin feature/SE-001-tick", 0),
+        ("rm " + "-f a.uid && git push -u origin feature/SE-001-tick", 0),
+        ("git push origin feature/x " + "--force-with-lease=feature/x", 2),
+        ("python3 - <<'EOF'\nprint('git push " + "--force')\nEOF", 0),
         ("git status", 0),
     ]
     for cmd, want in push_cases:
@@ -48,6 +51,7 @@ def main() -> int:
     finally:
         git("rm", "-q", "--cached", str(tmp.relative_to(ROOT)))
         tmp.unlink(missing_ok=True)
+        tmp.with_suffix(".gd.uid").unlink(missing_ok=True)  # Godot 임포트가 만든 .uid 찌꺼기
 
     # 스테이징이 깨끗하면(데이터 검증 통과) 커밋이 허용되어야 한다
     rc, err = run("git commit -m test")

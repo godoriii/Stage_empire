@@ -90,13 +90,19 @@ def on_commit(root: Path) -> None:
 
 
 def on_push(command: str) -> None:
-    if re.search(r"\s(--force|-f|--force-with-lease)\b", command):
-        deny("[check_commit] force push 금지 (CLAUDE.md). 머지 커밋으로 해결한다.")
-    m = re.search(r"git\s+push\b(.*)$", command)
-    tail = m.group(1) if m else ""
-    if re.search(r"\b(main|master)\b", tail) and not re.search(r":\S*(main|master)", tail):
-        # `git push origin main` 같이 main 을 직접 지정하는 경우
-        deny("[check_commit] main 직접 push 금지. 브랜치에 push 하고 PR을 연다.")
+    # `git push …` 구간만 본다(같은 명령줄의 `rm -f` 같은 다른 명령의 -f 에 오탐하지 않도록).
+    # 히어독 본문은 검사하지 않는다(스크립트 안의 문자열에 오탐하지 않도록).
+    head = command.split("<<", 1)[0]
+    for seg in re.split(r"\s*(?:&&|\|\||;|\|)\s*", head):
+        m = re.search(r"\bgit\s+push\b(.*)$", seg)
+        if not m:
+            continue
+        tail = m.group(1)
+        if re.search(r"(^|\s)(--force|-f|--force-with-lease)(=|\s|$)", tail):
+            deny("[check_commit] force push 금지 (CLAUDE.md). 머지 커밋으로 해결한다.")
+        if re.search(r"\b(main|master)\b", tail) and not re.search(r":\S*(main|master)", tail):
+            # `git push origin main` 같이 main 을 직접 지정하는 경우
+            deny("[check_commit] main 직접 push 금지. 브랜치에 push 하고 PR을 연다.")
 
 
 def main() -> None:
@@ -108,9 +114,10 @@ def main() -> None:
         return
     command = str((payload.get("tool_input") or {}).get("command", ""))
     root = root_of(payload.get("cwd") or os.getcwd())
-    if re.search(r"\bgit\s+(-c\s+\S+\s+)*commit\b", command):
+    head = command.split("<<", 1)[0]  # 히어독 본문 제외
+    if re.search(r"\bgit\s+(-c\s+\S+\s+)*commit\b", head):
         on_commit(root)
-    if re.search(r"\bgit\s+push\b", command):
+    if re.search(r"\bgit\s+push\b", head):
         on_push(command)
 
 
