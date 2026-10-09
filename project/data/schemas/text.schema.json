@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-031). project/data/text/*.json 공용(artists_ko.json, 이후 ui_ko.json — SE-039 재사용). 변경 이력: docs/gdd/artist.md#변경-이력.",
+  "title": "text",
+  "description": "로컬라이즈 문자열 테이블. 파일 하나 = 로캘 하나의 한 묶음(예: artists_ko.json). 키는 점으로 나눈 소문자 경로, 값은 비어 있지 않은 문자열. 바이오(artist.bio.*)는 120자 이하, 성격 태그 라벨(artist.tag.*)은 8자 이하(코드 포인트 기준, 공백·문장부호 포함).",
+  "type": "object",
+  "required": ["version", "locale", "strings"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "locale": { "description": "MVP 는 ko 만. 버티컬 슬라이스에서 en", "type": "string", "enum": ["ko", "en"] },
+    "strings": {
+      "description": "키 → 문장. 빈 객체는 허용하지 않는다(minProperties 1). 키 규칙: artist.bio.<artist_id>, artist.tag.<tag>, ui.<...>(SE-039)",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$" },
+      "patternProperties": {
+        "^artist\\.bio\\.[a-z0-9_]+$": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "^artist\\.tag\\.[a-z_]+$": { "type": "string", "minLength": 1, "maxLength": 8 }
+      },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    }
+  }
+}

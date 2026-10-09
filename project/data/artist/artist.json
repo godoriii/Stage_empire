@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "mvp_genres": ["rock", "indie", "electronic"],
+  "booking_phases": ["day"],
+  "guarantee_mode": "by_grade",
+  "stat_max": 100,
+  "relationship_min": -100,
+  "relationship_max": 100,
+  "show_grades": ["disaster", "poor", "ok", "good", "rave"],
+  "grades": [
+    {
+      "id": "local",
+      "unlock_reputation": 0,
+      "promote_to": "rookie",
+      "promote_at_popularity": 40,
+      "popularity_delta_by_show_grade": { "disaster": -1, "poor": 0, "ok": 1, "good": 2, "rave": 3 },
+      "skill_per_show": 2
+    },
+    {
+      "id": "rookie",
+      "unlock_reputation": 150,
+      "promote_to": null,
+      "promote_at_popularity": null,
+      "popularity_delta_by_show_grade": { "disaster": -2, "poor": 0, "ok": 1, "good": 2, "rave": 3 },
+      "skill_per_show": 1
+    }
+  ],
+  "personality_tags": ["perfectionist", "free_spirit", "shy", "showman", "loyal", "ambitious", "moody", "diligent", "hothead", "easygoing"],
+  "personality_exclusive_pairs": [["shy", "showman"], ["easygoing", "hothead"], ["loyal", "ambitious"]],
+  "roster_plan": {
+    "total": 12,
+    "per_genre": 4,
+    "grade_counts": { "local": 8, "rookie": 4 },
+    "slots": [
+      { "slot": "s01", "genre": "rock",       "grade": "local",  "popularity": 6,  "skill": 34, "personality": ["diligent", "shy"] },
+      { "slot": "s02", "genre": "rock",       "grade": "local",  "popularity": 15, "skill": 22, "personality": ["hothead", "loyal"] },
+      { "slot": "s03", "genre": "rock",       "grade": "local",  "popularity": 24, "skill": 40, "personality": ["perfectionist", "moody"] },
+      { "slot": "s04", "genre": "rock",       "grade": "rookie", "popularity": 46, "skill": 52, "personality": ["showman", "ambitious"] },
+      { "slot": "s05", "genre": "indie",      "grade": "local",  "popularity": 9,  "skill": 46, "personality": ["perfectionist", "shy"] },
+      { "slot": "s06", "genre": "indie",      "grade": "local",  "popularity": 18, "skill": 28, "personality": ["easygoing", "loyal"] },
+      { "slot": "s07", "genre": "indie",      "grade": "local",  "popularity": 27, "skill": 18, "personality": ["showman", "free_spirit"] },
+      { "slot": "s08", "genre": "indie",      "grade": "rookie", "popularity": 42, "skill": 60, "personality": ["moody", "diligent"] },
+      { "slot": "s09", "genre": "electronic", "grade": "local",  "popularity": 12, "skill": 30, "personality": ["free_spirit", "easygoing"] },
+      { "slot": "s10", "genre": "electronic", "grade": "local",  "popularity": 21, "skill": 38, "personality": ["ambitious", "diligent"] },
+      { "slot": "s11", "genre": "electronic", "grade": "rookie", "popularity": 50, "skill": 44, "personality": ["showman", "hothead"] },
+      { "slot": "s12", "genre": "electronic", "grade": "rookie", "popularity": 55, "skill": 64, "personality": ["perfectionist", "ambitious"] }
+    ]
+  },
+  "reference_scenarios": [
+    {
+      "id": "local_top_all_good",
+      "grade": "local", "popularity": 27, "skill": 18,
+      "show_grades": ["good", "good", "good", "good", "good", "good", "good", "good"],
+      "expected": { "grade": "rookie", "popularity": 43, "skill": 33, "shows_played": 8, "promoted_on_show": 7 }
+    },
+    {
+      "id": "local_bottom_all_good",
+      "grade": "local", "popularity": 6, "skill": 34,
+      "show_grades": ["good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good", "good"],
+      "expected": { "grade": "rookie", "popularity": 40, "skill": 68, "shows_played": 17, "promoted_on_show": 17 }
+    },
+    {
+      "id": "local_top_all_rave",
+      "grade": "local", "popularity": 27, "skill": 18,
+      "show_grades": ["rave", "rave", "rave", "rave", "rave"],
+      "expected": { "grade": "rookie", "popularity": 42, "skill": 28, "shows_played": 5, "promoted_on_show": 5 }
+    },
+    {
+      "id": "promotion_threshold_exact",
+      "grade": "local", "popularity": 39, "skill": 10,
+      "show_grades": ["ok"],
+      "expected": { "grade": "rookie", "popularity": 40, "skill": 12, "shows_played": 1, "promoted_on_show": 1 }
+    },
+    {
+      "id": "floor_and_cap",
+      "grade": "local", "popularity": 1, "skill": 99,
+      "show_grades": ["disaster", "disaster", "poor"],
+      "expected": { "grade": "local", "popularity": 0, "skill": 100, "shows_played": 3, "promoted_on_show": null }
+    },
+    {
+      "id": "rookie_cap_no_further_promotion",
+      "grade": "rookie", "popularity": 98, "skill": 50,
+      "show_grades": ["rave", "rave"],
+      "expected": { "grade": "rookie", "popularity": 100, "skill": 52, "shows_played": 2, "promoted_on_show": null }
+    },
+    {
+      "id": "rookie_disaster_no_demotion",
+      "grade": "rookie", "popularity": 41, "skill": 30,
+      "show_grades": ["disaster"],
+      "expected": { "grade": "rookie", "popularity": 39, "skill": 31, "shows_played": 1, "promoted_on_show": null }
+    }
+  ]
+}
