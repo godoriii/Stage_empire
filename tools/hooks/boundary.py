@@ -76,9 +76,14 @@ def under(path: str, roots: list[str]) -> bool:
 
 
 def bash_targets(command: str) -> list[str]:
-    """Bash 명령에서 쓰기 대상으로 보이는 경로를 뽑는다(보수적 휴리스틱)."""
+    """Bash 명령에서 쓰기 대상으로 보이는 경로를 뽑는다(보수적 휴리스틱).
+
+    히어독(<<) 본문은 검사하지 않는다: 스크립트 안의 `>`·`>=` 를 리다이렉션으로 오인하지 않기 위해.
+    히어독으로 파일을 쓰는 경우(`cat <<EOF > path`)는 `>` 가 `<<` 앞 헤더 줄에 있으므로 여전히 잡힌다.
+    """
     targets: list[str] = []
-    for seg in re.split(r"\s*(?:&&|\|\||;|\|)\s*", command):
+    head = command.split("<<", 1)[0]
+    for seg in re.split(r"\s*(?:&&|\|\||;|\|)\s*", head):
         try:
             toks = shlex.split(seg, posix=True)
         except ValueError:
