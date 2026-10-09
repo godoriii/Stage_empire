@@ -2,9 +2,9 @@
 // 상수는 전부 params/toon_{a,b,c}.tres 의 shader_parameter 로 정한다(아트 디렉터 조정용). 아래 기본값은 쓰지 않는다.
 // 외곽선은 이 머티리얼의 next_pass(outline.gdshader)로 그린다.
 //
-// 머티리얼 슬롯(style-guide: base/accent/emissive. glass 는 후속 티켓):
-//   albedo = 정점색(COLOR) × base_color, 정점 알파가 0 인 곳(accent 영역)은 추가로 × accent_color.
-//   스파이크 군중은 MultiMesh 인스턴스 색이 COLOR 로 들어오므로 시안을 씌워도 색 분포가 default 와 같다.
+// 머티리얼 슬롯: 슬롯 = 서피스(docs/gdd/materials.md 채택안 (b)). 정점 알파는 의미 없는 채널이라 읽지 않는다.
+//   albedo = base_color × 정점색(COLOR.rgb). COLOR.rgb 는 base 서피스에만 곱한다(accent·glass 는 서피스별 머티리얼 = R-B).
+//   스파이크 군중은 MultiMesh 인스턴스 색이 COLOR 로 들어오므로 시안을 씌워도 색 분포가 plain 과 같다.
 //   emission = emissive_color.rgb × emissive_energy.
 // 셀 단계: 라이트마다 N·L × 감쇠(그림자 포함)를 cell_steps 단계로 양자화한다.
 //   어두운 단계는 검정 대신 shadow_tint(알파 = 세기)만큼 그 라이트 색을 받는다(감쇠 비례).
@@ -26,7 +26,7 @@ uniform vec4 rim_color : source_color = vec4(1.0);
 
 group_uniforms slots;
 uniform vec4 base_color : source_color = vec4(1.0);
-uniform vec4 accent_color : source_color = vec4(1.0);
+uniform vec4 accent_color : source_color = vec4(1.0); // R-B(SE-041 2차)에서 accent 서피스 색으로 씀 — 미사용이지만 .tres 3개 변경을 피하려 둔다.
 uniform vec4 emissive_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emissive_energy : hint_range(0.0, 16.0) = 0.0;
 group_uniforms;
@@ -37,9 +37,7 @@ float toon_band(float x) {
 }
 
 void fragment() {
-	float accent_w = 1.0 - COLOR.a;
-	vec3 slot = mix(vec3(1.0), accent_color.rgb, accent_w);
-	ALBEDO = base_color.rgb * COLOR.rgb * slot;
+	ALBEDO = base_color.rgb * COLOR.rgb;
 	EMISSION = emissive_color.rgb * emissive_energy;
 }
 

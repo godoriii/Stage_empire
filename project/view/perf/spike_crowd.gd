@@ -7,6 +7,7 @@ extends Node3D
 ##   ss(SE-021) = 외곽선을 next_pass 대신 화면 공간 포스트 패스 노드 1개로 그리는 비교 시안.
 ##   기본은 ShaderVariants.DEFAULT_ID(시안 B). plain = SE-004 이전 정점색 StandardMaterial3D(비교용).
 ##   없는 id(예전 "default" 포함)면 push_error 후 DEFAULT_ID 로 폴백.
+##   유효한 id 라도 시안 머티리얼(.tres) 로드가 실패하면 push_error 후 PLAIN_ID 로 떨어진다(SE-024: 라벨 = 실제 룩).
 ##   군중(MultiMesh)과 무대 프록시의 material_override 만 바꾼다. 메시·인스턴스 수·cast_shadow·라이트·구성 값은 그대로.
 ##
 ## 수치는 전부 spike_configs.tres(SpikeConfigSet)에 있다. 구성은 config_id(@export) 또는 명령줄로 고른다.
@@ -34,6 +35,8 @@ const FLOATS_PER_INSTANCE: int = FLOATS_PER_TRANSFORM + FLOATS_PER_COLOR
 @export var config_id: String = ""
 ## SE-004 셰이더 시안. 비워 두면 명령줄 --material=<id>, 그것도 없으면 ShaderVariants.DEFAULT_ID.
 @export var material_id: String = ""
+## 시안 머티리얼 경로 패턴. 기본값 외로 바꾸는 것은 로드 실패를 만드는 테스트뿐이다(SE-024).
+var material_path_pattern: String = ShaderVariants.MATERIAL_PATH_PATTERN
 
 @onready var iso_camera: IsoCamera = $IsoCamera
 @onready var grid: GridView = $GridView
@@ -138,7 +141,7 @@ func advance(delta: float) -> void:
 
 # --- 조회(테스트·측정기용) -------------------------------------------------
 
-## SE-004: 적용된 셰이더 시안 id(default/a/b/c).
+## SE-004: 적용된 셰이더 시안 id(plain/a/b/c/ss). 시안 머티리얼 로드가 실패했으면 plain(SE-024).
 func get_material_id() -> String:
 	return material_id
 
@@ -264,9 +267,15 @@ func _build() -> void:
 
 ## SE-004: 군중과 무대 프록시에 시안 머티리얼을 씌운다(plain 이면 null = 원래 머티리얼).
 ## a/b/c 는 노드를 추가하지 않는다. SE-021 ss 는 이 노드 직속에 포스트 패스 노드 1개(ShaderVariants.sync_post_pass).
+## SE-024: 시안 머티리얼 로드가 실패하면(apply_materials 가 -1, 경로 push_error 는 거기서) push_error 후 material_id 를
+## PLAIN_ID 로 떨어뜨리고 plain 을 적용한다 — 라벨·get_material_id() 가 실제 룩(원래 머티리얼)과 같다.
 func _apply_material() -> void:
-	ShaderVariants.apply_materials(crowd, material_id)
-	ShaderVariants.apply_materials(stage_props_root, material_id)
+	if ShaderVariants.apply_materials(crowd, material_id, [], material_path_pattern) < 0 \
+			or ShaderVariants.apply_materials(stage_props_root, material_id, [], material_path_pattern) < 0:
+		push_error("SpikeCrowd: 시안 '%s' 머티리얼을 적용할 수 없어 %s 로 떨어진다" % [material_id, ShaderVariants.PLAIN_ID])
+		material_id = ShaderVariants.PLAIN_ID
+		ShaderVariants.apply_materials(crowd, material_id)
+		ShaderVariants.apply_materials(stage_props_root, material_id)
 	ShaderVariants.sync_post_pass(self, material_id)
 
 

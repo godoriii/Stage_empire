@@ -72,6 +72,30 @@ func test_shader_files_declare_required_uniforms() -> void:
 	assert_true(_declares_uniform("uniform int cell_steps : hint_range(2, 8) = 2;", "cell_steps"), "대조군: 힌트 있는 선언")
 
 
+# --- SE-024 AC1 (materials.md R-A·C1) ---------------------------------------
+
+## 정점 알파(COLOR.a) 읽기. 슬롯 = 서피스(docs/gdd/materials.md 채택안 (b)) → toon.gdshader 는 정점 알파를 읽지 않는다.
+const VERTEX_ALPHA_PATTERN: String = "\\bCOLOR\\s*\\.\\s*a\\b"
+
+
+static func _vertex_alpha_reads(src: String) -> int:
+	return RegEx.create_from_string(VERTEX_ALPHA_PATTERN).search_all(src).size()
+
+
+func test_toon_shader_does_not_read_vertex_alpha() -> void:
+	var src: String = _src(TOON_SHADER)
+	assert_false(src.is_empty(), "toon.gdshader 읽기")
+	assert_eq(_vertex_alpha_reads(src), 0, "toon.gdshader 에 COLOR.a 읽기 0건(R-A)")
+	# 정점색 rgb 는 base 서피스 albedo 에 그대로 곱한다(accent 마스크 없음).
+	assert_true(src.contains("ALBEDO = base_color.rgb * COLOR.rgb;"), "ALBEDO = base_color.rgb * COLOR.rgb")
+	# accent_color uniform 은 R-B(SE-041 2차)까지 미사용으로 남긴다(.tres 3개 변경 회피).
+	assert_true(_declares_uniform(src, "accent_color"), "accent_color uniform 선언 유지")
+	# 대조군: 같은 정규식이 알파 읽기는 잡고 rgb·다른 식별자는 거른다.
+	assert_eq(_vertex_alpha_reads("x = COLOR.a;"), 1, "대조군: COLOR.a 1건")
+	assert_eq(_vertex_alpha_reads("float w = 1.0 - COLOR . a;"), 1, "대조군: 공백 있는 COLOR . a 1건")
+	assert_eq(_vertex_alpha_reads("ALBEDO = COLOR.rgb; float y = MY_COLOR.a + COLOR.ab;"), 0, "대조군: COLOR.rgb·MY_COLOR.a·COLOR.ab 는 0건")
+
+
 # --- AC2 ------------------------------------------------------------------
 
 func test_variant_params_match_table() -> void:
