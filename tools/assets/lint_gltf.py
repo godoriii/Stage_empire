@@ -11,6 +11,7 @@
 import argparse
 import hashlib
 import json
+import math
 import re
 import struct
 import sys
@@ -228,6 +229,9 @@ def check_vertex_color(gl, blob, cfg, rep, surfaces):
         acc = gl["accessors"][idx]
         scale = NORMALIZED_MAX.get(acc["componentType"], one)
         cols = [tuple(c / scale for c in row) for row in read_accessor(gl, blob, idx)]
+        if any(not math.isfinite(c) for row in cols for c in row):
+            rep.add("L5", REJECT, f"{where(s)} COLOR_0 에 NaN/Inf")
+            continue
         alphas = [c[len(white)] for c in cols if len(c) > len(white)]
         if alphas and any(abs(a - one) > tol for a in alphas):
             bad = max(alphas, key=lambda a: abs(a - one))
@@ -333,7 +337,7 @@ def node_identity_problems(node, cfg):
         if key in node:
             val = node[key]
             ref = ident[key]
-            if len(val) != len(ref) or any(abs(a - b) > t for a, b in zip(val, ref)):
+            if len(val) != len(ref) or any(not math.isfinite(a) or abs(a - b) > t for a, b in zip(val, ref)):
                 bad.append(key)
     return bad
 
@@ -346,14 +350,21 @@ def check_pivot(gl, blob, meta, cfg, rep, surfaces, mesh_nodes):
         if bad:
             rep.add("L9", REJECT, f"노드 '{node_label(gl, n)}' 변환이 항등이 아님 ({', '.join(bad)}; 스케일 1.0·원점 기준)")
     lo = hi = None
+    nonfinite = False
     for s in surfaces:
         idx = s["p"].get("attributes", {}).get("POSITION")
         if idx is None:
             rep.add("L9", REJECT, f"{where(s)} POSITION 없음")
             continue
         for v in read_accessor(gl, blob, idx):
+            if not all(math.isfinite(c) for c in v):
+                rep.add("L9", REJECT, f"{where(s)} POSITION 에 NaN/Inf")
+                nonfinite = True
+                break
             lo = list(v) if lo is None else [min(a, b) for a, b in zip(lo, v)]
             hi = list(v) if hi is None else [max(a, b) for a, b in zip(hi, v)]
+    if nonfinite:
+        return
     if lo is None:
         rep.add("L9", REJECT, "AABB 를 계산할 정점 없음")
         return

@@ -146,6 +146,8 @@ python3 -I tools/assets/lint_gltf.py <asset.glb> <META.json> [--out <lint.json>]
 
 덧붙임(SE-027 에서 채택, 항목 id 는 A1~A3): **A1** 모든 primitive 에 `NORMAL` 존재 — 거부(§1). **A2** 미사용 머티리얼 — 경고(§3). **A3** `extensionsRequired` 비어 있음 — 거부(§1).
 
+**NaN/Inf 가드:** `POSITION`·`COLOR_0`·노드 변환 값에 NaN/Inf 가 있으면 해당 검사가 거부한다(L9: POSITION·노드 변환, L5: COLOR_0). NaN 은 모든 비교가 거짓이라 허용 오차 검사를 그냥 통과하기 때문이다.
+
 L9 의 AABB 는 정점 데이터에서 직접 계산한다. 풋프린트는 `META.json` 의 `footprint` × 1 타일(`tile_size_m`) 이내, 높이는 AABB `max.y` 가 `height_m` 의 ±`height_ratio` 이내여야 한다. L10 은 `category` 또는 `poly_budget` 이 `character` 이면 적용한다.
 
 픽스처는 `tools/assets/fixtures/` (생성: `python3 -I tools/assets/q5_probe/make_probe_glb.py --out tools/assets/fixtures/`, 결정적이라 커밋본과 바이트 동일, 파일마다 10 KB 미만). `<이름>.glb` 와 `<이름>.META.json` 한 쌍이다. `slots4`(통과), `bad_names`(L1·L2·L3·L4), `no_base`(L2), `dup_two_materials`·`dup_shared_material`·`five_surfaces`(L3), `vertex_alpha`(L5 거부)·`vertex_color_rgb`(L5 경고), `with_texture`(L6), `two_nodes`·`child_node`·`with_animation`(L7), `over_budget`·`non_triangle`(L8), `pivot_offset`·`node_scaled`·`too_tall`·`too_wide`(L9), `character_glass`(L10), `no_normal`(A1), `unused_material`(A2 경고), `required_ext`(A3). 테스트는 `python3 -I tools/assets/test_lint_gltf.py`.
@@ -168,6 +170,8 @@ L9 의 AABB 는 정점 데이터에서 직접 계산한다. 풋프린트는 `MET
 ```json
 {"asset_id": "slots4", "category": "decor", "footprint": [1, 1], "height_m": 1.0, "poly_budget": "furniture_small", "ticket": "SE-027"}
 ```
+
+**제출 절차:** 검수 큐에 올리기 전에 `lint_gltf.py` 를 돌려 exit 0 을 확인한다. exit 2 는 입력 오류(파일·META.json·설정 문제)이고, 사유는 stderr 에 나오며 `lint.json` 은 만들어지지 않는다. exit 1(거부)은 `lint.json` 이 생기므로 `items` 를 보고 고친다.
 
 가구 에셋은 `project/data/furniture/` 의 행과 `footprint`·`height_m`·`category`·`poly_budget` 이 일치해야 한다(등록은 SE-041 몫, 린터는 테이블을 읽지 않는다).
 
@@ -198,3 +202,4 @@ one surface per slot, no vertex colors, origin at bottom center, fits <w>x<d> me
 |---|---|---|---|
 | 2026-10-09 | v0 | SE-019 | 신규. 슬롯 = 서피스 규약의 glTF 임포트 규약, Q5 Godot 4.7.2 확인(헤드리스), 린터 체크리스트 10항목 |
 | 2026-10-09 | v0.1 | SE-027 | 린터 구현(`lint_gltf.py`·`lint_config.json`·픽스처·테스트). `META.json` 절 추가(키는 SE-028 과 같은 이름), §7 수치 문구 정리(복사본, 기준은 style-guide 행), 허용 오차는 설정 파일 참조, 덧붙임 3건 채택(A1~A3), §10 "구현은 후속 티켓" → "SE-027 구현" |
+| 2026-10-09 | v0.2 | SE-027 (qa 후속) | NaN/Inf 가드(L5·L9) 한 줄, 제출 절차(exit 2 = 입력 오류, stderr, lint.json 미생성) 한 줄 |

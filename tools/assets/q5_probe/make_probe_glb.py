@@ -24,8 +24,9 @@ PNG_1X1 = base64.b64decode(
 
 
 def build(path, mats, prim_mats, colors=None, width=1.0, height=1.0, depth_step=0.25,
-          offset=(0.0, 0.0, 0.0), tris=2, normals=True, modes=None, tweak=None):
-    """tweak(gl, add) 로 glTF JSON 을 직접 고칠 수 있다(add(data, target, comp, typ, count) → accessor)."""
+          offset=(0.0, 0.0, 0.0), tris=2, normals=True, modes=None, tweak=None, bad_position=None):
+    """bad_position: 첫 primitive 첫 정점 x 를 이 값(nan·inf)으로 바꾼다(린터 NaN 가드 테스트용).
+    tweak(gl, add) 로 glTF JSON 을 직접 고칠 수 있다(add(data, target, comp, typ, count) → accessor)."""
     n = len(prim_mats)
     bin_ = bytearray()
     views, accs, prims = [], [], []
@@ -51,7 +52,7 @@ def build(path, mats, prim_mats, colors=None, width=1.0, height=1.0, depth_step=
         z = (i - (n - 1) / 2) * depth_step + offset[2]
         x0 = -width / 2 + offset[0]
         y0 = offset[1]
-        p = [(x0, y0, z), (x0 + width, y0, z), (x0 + width, y0 + height, z), (x0, y0 + height, z)]
+        p = [(x0 if (i or bad_position is None) else bad_position, y0, z), (x0 + width, y0, z), (x0 + width, y0 + height, z), (x0, y0 + height, z)]
         pa = add(b"".join(struct.pack("<3f", *v) for v in p), 34962, 5126, "VEC3", 4,
                  {"min": [min(v[k] for v in p) for k in range(3)],
                   "max": [max(v[k] for v in p) for k in range(3)]})
@@ -117,6 +118,13 @@ def tw_child_node(gl, add):
 
 def tw_animation(gl, add):
     gl["animations"] = [{"name": "Idle", "channels": [], "samplers": []}]
+
+
+def tw_node(**props):
+    """메시 노드(0번)에 translation·rotation·scale·matrix 등을 직접 쓴다."""
+    def tweak(gl, add):
+        gl["nodes"][0].update(props)
+    return tweak
 
 
 def tw_node_scaled(gl, add):

@@ -208,6 +208,166 @@ class ConfigDrivesVerdict(unittest.TestCase):
         self.assertEqual(nums, [cfg["furniture_small"], cfg["equipment_large"], cfg["character"], cfg["lod1"]])
 
 
+def real_cfg():
+    return json.loads(CONFIG.read_text(encoding="utf-8"))
+
+
+def dyadic_cfg():
+    """허용 오차를 2진 분수로 바꾼 설정. float32 로 정확히 표현되므로 '정확히 경계값' 케이스를 만들 수 있다."""
+    cfg = real_cfg()
+    cfg["tolerance"].update({"pivot_m": 0.125, "footprint_m": 0.125, "height_ratio": 0.25, "vertex_alpha": 0.25})
+    return cfg
+
+
+def ids(build_kwargs, cfg, meta_override=None):
+    """즉석에서 .glb 를 만들어 린트하고 (id, 수준) 집합을 돌려준다. 파일은 임시 디렉터리에만 쓴다."""
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "probe.glb"
+        make_probe_glb.build(path, **build_kwargs)
+        meta = make_probe_glb.meta_for("probe", meta_override or {})
+        return {(it["id"], it["level"]) for it in lint_gltf.lint(path, meta, cfg)}, \
+            [it["message"] for it in lint_gltf.lint(path, meta, cfg)]
+
+
+BASE = [make_probe_glb.m("base")]
+OK, L5R, L8R, L9R = set(), {("L5", R)}, {("L8", R)}, {("L9", R)}
+
+
+class Boundaries(unittest.TestCase):
+    """경계값: 허용 오차 안쪽/정확히 경계는 통과, 바깥은 거부. 수치는 설정 파일에서 읽는다."""
+
+    def kw(self, **extra):
+        return {"mats": BASE, "prim_mats": [0], **extra}
+
+    def test_triangle_budget_exact_passes_and_one_over_rejects(self):
+        cfg = real_cfg()
+        budget = cfg["tri_budget"]["furniture_small"]
+        self.assertEqual(ids(self.kw(tris=budget), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(tris=budget + 1), cfg)[0], L8R)
+
+    def test_pivot_exact_tolerance_passes_for_both_signs(self):
+        cfg = dyadic_cfg()
+        tol = cfg["tolerance"]["pivot_m"]
+        eps = tol / 128
+        for sign in (1, -1):
+            self.assertEqual(ids(self.kw(offset=(sign * tol, 0.0, 0.0)), cfg)[0], OK, sign)
+            self.assertEqual(ids(self.kw(offset=(0.0, 0.0, sign * tol)), cfg)[0], OK, sign)
+            self.assertEqual(ids(self.kw(offset=(sign * (tol + eps), 0.0, 0.0)), cfg)[0], L9R, sign)
+            self.assertEqual(ids(self.kw(offset=(0.0, 0.0, sign * (tol + eps))), cfg)[0], L9R, sign)
+        self.assertEqual(ids(self.kw(offset=(0.0, tol, 0.0), height=1.0 - tol), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(offset=(0.0, tol + eps, 0.0), height=1.0 - tol - eps), cfg)[0], L9R)
+
+    def test_pivot_floor_tolerance_with_real_config(self):
+        cfg = real_cfg()
+        tol = cfg["tolerance"]["pivot_m"]
+        self.assertEqual(ids(self.kw(offset=(tol * 0.9, 0.0, 0.0)), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(offset=(tol * 1.1, 0.0, 0.0)), cfg)[0], L9R)
+        self.assertEqual(ids(self.kw(offset=(0.0, tol * 0.9, 0.0), height=1.0 - tol * 0.9), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(offset=(0.0, tol * 1.1, 0.0), height=1.0 - tol * 1.1), cfg)[0], L9R)
+
+    def test_footprint_tolerance_inside_passes_outside_rejects(self):
+        cfg = real_cfg()
+        tol = cfg["tolerance"]["footprint_m"]
+        self.assertEqual(ids(self.kw(width=1.0 + tol / 2), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(width=1.0 + tol * 2), cfg)[0], L9R)
+
+    def test_footprint_exact_tolerance_for_width_and_depth(self):
+        cfg = dyadic_cfg()
+        tol = cfg["tolerance"]["footprint_m"]
+        self.assertEqual(ids(self.kw(width=1.0 + tol), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(width=1.0 + tol + tol / 128), cfg)[0], L9R)
+        # 깊이: 4 서피스를 z 로 벌린다(z 폭 = 3 * depth_step)
+        four = {"mats": make_probe_glb.slot_mats(), "prim_mats": [0, 1, 2, 3]}
+        self.assertEqual(ids({**four, "depth_step": (1.0 + tol) / 3}, cfg)[0], OK)
+        self.assertEqual(ids({**four, "depth_step": (1.0 + tol + tol / 16) / 3}, cfg)[0], L9R)
+
+    def test_height_ratio_boundary_both_sides(self):
+        cfg = dyadic_cfg()
+        ratio = cfg["tolerance"]["height_ratio"]
+        eps = ratio / 128
+        self.assertEqual(ids(self.kw(height=1.0 + ratio), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(height=1.0 - ratio), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(height=1.0 + ratio + eps), cfg)[0], L9R)
+        self.assertEqual(ids(self.kw(height=1.0 - ratio - eps), cfg)[0], L9R)
+
+    def test_height_ratio_with_real_config(self):
+        cfg = real_cfg()
+        ratio = cfg["tolerance"]["height_ratio"]
+        self.assertEqual(ids(self.kw(height=1.0 + ratio * 0.9), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(height=1.0 - ratio * 0.9), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(height=1.0 + ratio * 1.1), cfg)[0], L9R)
+        self.assertEqual(ids(self.kw(height=1.0 - ratio * 1.1), cfg)[0], L9R)
+
+    def test_vertex_alpha_boundary(self):
+        cfg = dyadic_cfg()
+        tol = cfg["tolerance"]["vertex_alpha"]
+        self.assertEqual(ids(self.kw(colors=(1, 1, 1, 1.0 - tol)), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(colors=(1, 1, 1, 1.0 - tol - tol / 64)), cfg)[0], L5R)
+        real = real_cfg()["tolerance"]["vertex_alpha"]
+        self.assertEqual(ids(self.kw(colors=(1, 1, 1, 1.0 - real / 2)), real_cfg())[0], OK)
+        self.assertEqual(ids(self.kw(colors=(1, 1, 1, 1.0 - real * 2)), real_cfg())[0], L5R)
+
+    def test_node_translation_tolerance(self):
+        cfg = real_cfg()
+        tol = cfg["tolerance"]["pivot_m"]
+        ok = [0.0, 0.0, 0.0]
+        self.assertEqual(ids(self.kw(tweak=make_probe_glb.tw_node(translation=[tol / 2, 0.0, 0.0])), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(tweak=make_probe_glb.tw_node(translation=ok)), cfg)[0], OK)
+        got, msgs = ids(self.kw(tweak=make_probe_glb.tw_node(translation=[0.0, 0.0, tol * 2])), cfg)
+        self.assertEqual(got, L9R)
+        self.assertIn("translation", msgs[0])
+
+    def test_node_rotation_and_matrix(self):
+        cfg = real_cfg()
+        ident = cfg["identity_transform"]
+        tol = cfg["tolerance"]["identity"]
+        near = list(ident["rotation"])
+        near[2] += tol / 2
+        far = list(ident["rotation"])
+        far[2] += tol * 2
+        self.assertEqual(ids(self.kw(tweak=make_probe_glb.tw_node(rotation=list(ident["rotation"]))), cfg)[0], OK)
+        self.assertEqual(ids(self.kw(tweak=make_probe_glb.tw_node(rotation=near)), cfg)[0], OK)
+        got, msgs = ids(self.kw(tweak=make_probe_glb.tw_node(rotation=far)), cfg)
+        self.assertEqual(got, L9R)
+        self.assertIn("rotation", msgs[0])
+        turned = [0.0, 0.7071068, 0.0, 0.7071068]
+        self.assertEqual(ids(self.kw(tweak=make_probe_glb.tw_node(rotation=turned)), cfg)[0], L9R)
+        self.assertEqual(ids(self.kw(tweak=make_probe_glb.tw_node(matrix=list(ident["matrix"]))), cfg)[0], OK)
+        moved = list(ident["matrix"])
+        moved[12] = 1.0
+        self.assertEqual(ids(self.kw(tweak=make_probe_glb.tw_node(matrix=moved)), cfg)[0], L9R)
+
+
+class NonFinite(unittest.TestCase):
+    """NaN/Inf 는 비교가 전부 False 라 허용 오차 검사를 빠져나간다. 명시적으로 거부한다."""
+
+    NAN, INF = float("nan"), float("inf")
+
+    def test_position_non_finite_rejected(self):
+        for bad in (self.NAN, self.INF, -self.INF):
+            got, msgs = ids({"mats": BASE, "prim_mats": [0], "bad_position": bad}, real_cfg())
+            self.assertEqual(got, L9R, bad)
+            self.assertTrue(any("POSITION 에 NaN/Inf" in m for m in msgs), msgs)
+
+    def test_vertex_color_non_finite_rejected(self):
+        for bad in (self.NAN, self.INF):
+            for colors in ((1, 1, 1, bad), (bad, 1, 1, 1)):
+                got, msgs = ids({"mats": BASE, "prim_mats": [0], "colors": colors}, real_cfg())
+                self.assertEqual(got, L5R, colors)
+                self.assertTrue(any("COLOR_0 에 NaN/Inf" in m for m in msgs), msgs)
+
+    def test_node_transform_non_finite_rejected(self):
+        ident = real_cfg()["identity_transform"]
+        for key in ("translation", "rotation", "scale"):
+            for bad in (self.NAN, self.INF):
+                val = list(ident[key])
+                val[0] = bad
+                got, msgs = ids({"mats": BASE, "prim_mats": [0], "tweak": make_probe_glb.tw_node(**{key: val})},
+                                real_cfg())
+                self.assertEqual(got, L9R, (key, bad))
+                self.assertIn(key, msgs[0])
+
+
 class Cli(unittest.TestCase):
     def test_pass_exit_0_and_lint_json_format(self):
         with tempfile.TemporaryDirectory() as td:
