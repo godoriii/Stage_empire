@@ -5,7 +5,7 @@
 | 상태 | v0 |
 | 스펙 티켓 | SE-006 (game-designer), SE-011 (시스템 스냅샷 훅 — #명령-큐와-틱-순서 "시스템 등록", #스냅샷) |
 | 구현 티켓 | SE-001 (sim-engineer) — `project/core/{sim_config,event_bus,rng,tick}.gd`. SE-012 (sim-engineer) — `tick.gd` 시스템 스냅샷 훅 |
-| 데이터 | [`project/data/sim/sim.json`](../../project/data/sim/sim.json) (version 2. SE-011 이 결정한 version 3 은 SE-012 에서 적용 — #수치표), 스키마 [`sim.schema.json`](../../project/data/schemas/sim.schema.json) |
+| 데이터 | [`project/data/sim/sim.json`](../../project/data/sim/sim.json) (version 3. SE-011 결정, 적용됨(SE-012) — #수치표), 스키마 [`sim.schema.json`](../../project/data/schemas/sim.schema.json) |
 | 이벤트 | [`docs/gdd/events.md`](events.md) — 이 문서에 나오는 이벤트 이름은 전부 거기 표에 있다 |
 | 근거 | PRD "핵심 게임플레이 루프"(세션 구조 표), "기술 요구사항"(아키텍처 원칙 2·4, 세이브), ADR-0002 |
 
@@ -331,7 +331,7 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 
 | 키 | 타입 | 값 |
 |---|---|---|
-| `schema_version` | int | `sim.json.snapshot_schema_version` (= 2. SE-011 결정, SE-012 적용. 적용 전 데이터 값은 1) |
+| `schema_version` | int | `sim.json.snapshot_schema_version` (= 2. SE-011 결정, 적용됨(SE-012)) |
 | `seed` | int | 마스터 시드 |
 | `tick` | int | 경계 상태 |
 | `day` | int | 경계 상태 |
@@ -388,7 +388,7 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 **결정성·리플레이 영향 (SE-011).**
 - (i) **리플레이 기준값은 불변이다.** AC11 의 이벤트 개수(`tick.advanced` 7,100, `time.phase_changed` 8, `time.day_started` 2, `time.speed_changed` 11, `time.speed_rejected` 2), 최종 상태(`tick 7100`, `day 3`, `phase "day"`, `tick_in_phase 500`, `speed 1`, `pending_commands []`), 뽑은 난수 열이 그대로다. 근거: 시스템 훅은 이벤트를 내지 않고 난수를 쓰지 않으며(SH4), `snapshot()`/`restore()` 안에서만 불려 한 틱의 단계 1~5 순서를 바꾸지 않는다. 리플레이 스크립트는 시스템을 등록하지 않으므로 그 스냅샷의 `systems`는 `{}`다.
 - (ii) **상태 해시 문자열은 바뀐다.** `JSON.stringify(snapshot(), "", true)`에 `"schema_version":2`와 `"systems":{}`(또는 시스템 항목)가 들어간다. 기준 해시 문자열을 저장해 둔 테스트는 없다. 해시 비교는 전부 같은 실행 안에서 두 루프(또는 복원 전후)를 비교하므로 영향이 없다.
-- (iii) **바뀌는 테스트 리터럴 3곳**(SE-012 가 `sim.json` v3 적용과 같은 PR 에서 고친다):
+- (iii) **바뀌는 테스트 리터럴 3곳**(SE-012 가 `sim.json` v3 적용과 같은 PR 에서 고친다. SE-012 구현 뒤 실제 위치는 4곳 — `test_tick.gd`의 새 케이스 `test_system_snapshot_hooks_included_in_order` 1곳 추가, 줄 번호는 docs/tickets/SE-012.md 결과 절):
   1. `project/tests/sim/test_sim_config.gd:38` — `assert_eq(cfg.snapshot_schema_version, 1)` → 2.
   2. `project/tests/sim/replay/test_replay_qa.gd:131-132` (`test_snapshot_keys_and_values_pinned_to_spec`) — 정렬 키 리터럴 9개 → `systems`를 더한 10개, 값 목록의 `schema_version` `1` → `2`.
   3. `project/tests/sim/test_tick.gd:450-451` (`test_snapshot_restore_equivalence`) — "9개 키만" 메시지와 `keys.size() == 9` → 10. 비교 대상 `TickLoop.SNAPSHOT_KEYS`(구현 상수)도 `systems`를 더한 10개가 된다.
@@ -413,8 +413,8 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 
 ## 수치표
 
-모든 수치는 [`project/data/sim/sim.json`](../../project/data/sim/sim.json)(version 2)에 있다. 이 문서의 수치는 그 사본이며 충돌하면 JSON 이 이긴다.
-예외 1건: `snapshot_schema_version` 행의 2 는 SE-011 이 결정하고 SE-012 가 적용할 값이다(사유: #스냅샷 "결정성·리플레이 영향" (iii)의 리터럴 테스트 3곳). SE-012 병합 전까지 실행 값은 JSON 의 1 이고, 병합 뒤 `sim.json`은 version 3 이 된다.
+모든 수치는 [`project/data/sim/sim.json`](../../project/data/sim/sim.json)(version 3)에 있다. 이 문서의 수치는 그 사본이며 충돌하면 JSON 이 이긴다.
+`snapshot_schema_version` 행의 2 는 SE-011 이 결정하고 SE-012 에서 적용됐다(적용됨(SE-012), `sim.json` version 3). 예외 없음.
 
 | 필드 | 값 | 의미 | 변경 |
 |---|---|---|---|
@@ -425,7 +425,7 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 | `phases[].default_speed` | 1 / 1 / 1 / 0 | 진입·새 게임 배속 (v2 신규) | designer |
 | `phases[].enter_speed_mode` | force / keep_if_allowed / keep_if_allowed / force | 진입 클램프 규칙 (v2 신규) | designer |
 | `max_ticks_per_step` | 30 | `step()` 1회 상한 (v2 신규) | designer |
-| `snapshot_schema_version` | 2 (적용 전 데이터 값 1) | 스냅샷 `schema_version` (v2 신규). 2 = 최상위 10개 키(`systems` 포함) 형식 | SE-011 결정, SE-012 적용(`sim.json` v3, 같은 PR). 이후 변경은 세이브 티켓과 함께(Q7) |
+| `snapshot_schema_version` | 2 | 스냅샷 `schema_version` (v2 신규). 2 = 최상위 10개 키(`systems` 포함) 형식 | SE-011 결정, 적용됨(SE-012, `sim.json` v3). 이후 변경은 세이브 티켓과 함께(Q7) |
 | `rng_streams` | audience, artist, events, economy, world | v0 스트림 (v2 신규) | 추가 자유, 변경·삭제는 리플레이 기준값 갱신 |
 | `system_order` | build, staff, artist, audience, show, crisis, economy, reputation | 단계 2 순서 (v2 신규) | designer + 리플레이 기준값 갱신 |
 
@@ -499,7 +499,7 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 
 ## 테스트 방법
 
-- 데이터: `python3 tools/validate_data.py --strict` — `sim.json` v2 가 스키마(version `enum [2]`)를 통과. SE-012 병합 뒤에는 v3 / `enum [3]`(#변경-이력 SE-011 행).
+- 데이터: `python3 tools/validate_data.py --strict` — `sim.json` v3 이 스키마(version `enum [3]`)를 통과(적용됨(SE-012), #변경-이력 SE-012 행).
 - 헤드리스(SE-001 이 작성): `tools/run_tests.sh project/tests/sim` — `test_sim_config.gd`, `test_event_bus.gd`, `test_rng.gd`, `test_tick.gd`, `test_core_boundary.gd`, `replay/test_replay_tick.gd`. 케이스는 위 수용 기준 표.
 - 헤드리스(SE-012 가 작성, SE-011 스펙): `test_tick.gd`에 새 케이스 5개(`test_register_system_rejects_half_hooks`, `test_system_snapshot_hooks_included_in_order`, `test_system_restore_rolls_back_on_failure`, `test_system_snapshot_rejects_invalid_hook_return`, `test_system_hooks_reject_reentry`)와 기존 케이스 갱신 2개(`test_snapshot_restore_equivalence` 10개 키, `test_restore_rejects_bad_snapshot` `systems` 불일치). 가짜 시스템은 테스트 파일 안의 `RefCounted` 내부 클래스로 만든다: 상태 `{n: int}`(필요하면 필드 추가), `update(ctx)`가 `n += 1`, `snapshot_hook()`이 상태의 깊은 복사본, `restore_hook(d)`가 검사·정수 정규화 뒤 교체하고(SH3) 공유 로그에 `[id, d.n]`을 남긴다. 실패 플래그와 반환값 덮어쓰기는 케이스가 필요한 만큼 둔다. 리플레이 기준값(`replay/test_replay_tick.gd`)은 바뀌지 않는다(#스냅샷 "결정성·리플레이 영향").
 - 로컬에 Godot 이 없으면 `SKIP` → PR 의 CI(`godot-tests`)로 대신한다.
@@ -533,6 +533,7 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | 2026-10-09 | tick.md v0 | SE-006 | 신규 작성 |
 | 2026-10-09 | `sim.json` v1 → v2, `sim.schema.json` version 2 | SE-006 | 필드 추가: `max_ticks_per_step`(30), `snapshot_schema_version`(1), `rng_streams`, `system_order`, `phases[].default_speed`, `phases[].enter_speed_mode`. 스키마: 새 필드 필수화, `version` `enum [2]`, `phases` `maxItems 4`, `speeds` `minItems 1`·`uniqueItems`. **기존 값(10 tick/s, 1,800/600/900/0, 허용 배속, pausable)은 변경 없음** |
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-008 (SE-001 리뷰 발견 1·2, SE-001 구현 결정 1·2) | E4 에 명령 페이로드 숫자 `int` 전용을 확정했다: 명령의 `float`는 정수값(`2.0`)이어도 `publish()`가 `push_error` + `false`, 큐잉 안 함. 상태 이벤트는 `float` 허용. 배속 요청 처리 1행에서 정수값인 `float` 인정을 지우고 "버스가 먼저 거부(핸들러 도달 없음)"로 바꿨다. restore 3단계에 I4·`seed` 0~2^31−1 검사를, 5단계에 `pending_commands` 재귀 정규화(정수가 아닌 `float`는 복원 실패, 상태 불변)를 확정하고 "검사 → 적용" 순서를 적었다. 수용 기준 표: `test_speed_rejected_keeps_state`의 `1.5`를 "publish false + push_error 1회, speed_rejected 없음, 상태 해시 불변"으로 바꾸고, AC8 에 `test_command_payload_numbers_int_only`, AC10 `test_restore_rejects_bad_snapshot`에 명령 `float` 케이스를 더했다. 이벤트 이름·페이로드 키·수치 변경 없음. SE-001 구현이 이미 이 규칙이라 코드 변경 없음 |
-| 2026-10-09 | tick.md v0 (후속 수정). `sim.json` v2 → v3, `sim.schema.json` version 3 **결정만**(적용은 SE-012) | SE-011 (economy.md Q7, 리뷰 SE-001 참고 4·SE-005 "tick.md v0 정합성"·SE-006 참고) | 시스템 상태 스냅샷 훅을 확정했다. (1) "시스템 등록": `register_system(id: String, update: Callable, snapshot_hook: Callable = Callable(), restore_hook: Callable = Callable()) -> bool`, 규칙 G1~G6(기존 4행 + `update` 유효성 명문화 + 훅 쌍 G5 + 훅 유효성 G6), 훅 규약 SH1~SH7, 공개 API 표 `TickLoop` 행을 같은 시그니처로 맞췄다. 인자 이름은 티켓 초안 `snapshot`/`restore`에서 `snapshot_hook`/`restore_hook`으로 바꿨다(메서드 가림 경고 회피, 위치 인자라 호출 형태 동일). (2) 스냅샷: 최상위 키 9 → 10(`systems`, 항상 존재, `system_order` 순, 훅 시스템만), `snapshot()` 절차 3단계(D3: 훅 반환 위반 시 `push_error` 후 `{}`). (3) restore 를 1~9단계로 다시 번호 매겼다: 1~3 그대로, 옛 5단계의 명령 큐 검사와 옛 4단계의 `rng` 형식 검사를 4단계(검사)로, 5단계 `systems` 불일치(D5), 6단계 사전 스냅샷, 7단계 시스템 적용·역순 롤백(D4), 8단계 `TickLoop` 필드 적용(옛 4·5단계의 적용 부분), 9단계 끝. E4 와 AC8 행의 "restore 5단계" 참조를 4단계로 고쳤다. "실패 시 상태 불변"을 시스템 상태까지 넓히고 복구 불능(롤백 실패) 예외를 적었다. (4) "결정성·리플레이 영향": AC11 기준값 불변, 상태 해시 문자열은 바뀌지만 저장된 기준 문자열 없음, 바뀌는 테스트 리터럴 3곳(`test_sim_config.gd:38`, `replay/test_replay_qa.gd:131-132`, `test_tick.gd:450-451`). (5) 수용 기준 표: AC7 `test_systems_updated_in_config_order`에 하위 호환 문구, AC10 `test_snapshot_restore_equivalence` 9 → 10개 키, `test_restore_rejects_bad_snapshot`에 `systems` 불일치 케이스, 새 케이스 5개(`test_register_system_rejects_half_hooks`, `test_system_snapshot_hooks_included_in_order`, `test_system_restore_rolls_back_on_failure`, `test_system_snapshot_rejects_invalid_hook_return`, `test_system_hooks_reject_reentry`). (6) 열린 질문 Q7(시스템 항목 버전 정책, 세이브 티켓). **데이터 diff(SE-012 의 game-designer 2차가 적용):** `sim.json`은 `version` 2 → 3, `snapshot_schema_version` 1 → 2 두 값만 바뀐다. `sim.schema.json`은 `version`의 `enum [2]` → `enum [3]`, `$comment`의 "schema version 2 (SE-006)" → "schema version 3 (SE-011)", `snapshot_schema_version`의 `description`에서 "(마이그레이션 티켓 동반)" → "(세이브 파일이 생긴 뒤에는 마이그레이션 티켓 동반)"만 바뀐다. 그 밖의 필드·값·`required`·제약(`snapshot_schema_version` `minimum: 1` 포함)은 불변이다. **적용은 SE-012 와 같은 PR**: 지금 `snapshot_schema_version`을 2 로 바꾸면 리터럴 테스트 3곳이 빨개져 이 티켓 단독으로 CI 녹색이 될 수 없다. 이벤트 추가 0, `events.md` 변경 0, 코드·테스트 변경 0 |
+| 2026-10-09 | tick.md v0 (후속 수정). `sim.json` v2 → v3, `sim.schema.json` version 3 **결정**(적용됨(SE-012) — 아래 SE-012 행) | SE-011 (economy.md Q7, 리뷰 SE-001 참고 4·SE-005 "tick.md v0 정합성"·SE-006 참고) | 시스템 상태 스냅샷 훅을 확정했다. (1) "시스템 등록": `register_system(id: String, update: Callable, snapshot_hook: Callable = Callable(), restore_hook: Callable = Callable()) -> bool`, 규칙 G1~G6(기존 4행 + `update` 유효성 명문화 + 훅 쌍 G5 + 훅 유효성 G6), 훅 규약 SH1~SH7, 공개 API 표 `TickLoop` 행을 같은 시그니처로 맞췄다. 인자 이름은 티켓 초안 `snapshot`/`restore`에서 `snapshot_hook`/`restore_hook`으로 바꿨다(메서드 가림 경고 회피, 위치 인자라 호출 형태 동일). (2) 스냅샷: 최상위 키 9 → 10(`systems`, 항상 존재, `system_order` 순, 훅 시스템만), `snapshot()` 절차 3단계(D3: 훅 반환 위반 시 `push_error` 후 `{}`). (3) restore 를 1~9단계로 다시 번호 매겼다: 1~3 그대로, 옛 5단계의 명령 큐 검사와 옛 4단계의 `rng` 형식 검사를 4단계(검사)로, 5단계 `systems` 불일치(D5), 6단계 사전 스냅샷, 7단계 시스템 적용·역순 롤백(D4), 8단계 `TickLoop` 필드 적용(옛 4·5단계의 적용 부분), 9단계 끝. E4 와 AC8 행의 "restore 5단계" 참조를 4단계로 고쳤다. "실패 시 상태 불변"을 시스템 상태까지 넓히고 복구 불능(롤백 실패) 예외를 적었다. (4) "결정성·리플레이 영향": AC11 기준값 불변, 상태 해시 문자열은 바뀌지만 저장된 기준 문자열 없음, 바뀌는 테스트 리터럴 3곳(`test_sim_config.gd:38`, `replay/test_replay_qa.gd:131-132`, `test_tick.gd:450-451`). (5) 수용 기준 표: AC7 `test_systems_updated_in_config_order`에 하위 호환 문구, AC10 `test_snapshot_restore_equivalence` 9 → 10개 키, `test_restore_rejects_bad_snapshot`에 `systems` 불일치 케이스, 새 케이스 5개(`test_register_system_rejects_half_hooks`, `test_system_snapshot_hooks_included_in_order`, `test_system_restore_rolls_back_on_failure`, `test_system_snapshot_rejects_invalid_hook_return`, `test_system_hooks_reject_reentry`). (6) 열린 질문 Q7(시스템 항목 버전 정책, 세이브 티켓). **데이터 diff(SE-012 의 game-designer 2차가 적용):** `sim.json`은 `version` 2 → 3, `snapshot_schema_version` 1 → 2 두 값만 바뀐다. `sim.schema.json`은 `version`의 `enum [2]` → `enum [3]`, `$comment`의 "schema version 2 (SE-006)" → "schema version 3 (SE-011)", `snapshot_schema_version`의 `description`에서 "(마이그레이션 티켓 동반)" → "(세이브 파일이 생긴 뒤에는 마이그레이션 티켓 동반)"만 바뀐다. 그 밖의 필드·값·`required`·제약(`snapshot_schema_version` `minimum: 1` 포함)은 불변이다. **적용은 SE-012 와 같은 PR**: 지금 `snapshot_schema_version`을 2 로 바꾸면 리터럴 테스트 3곳이 빨개져 이 티켓 단독으로 CI 녹색이 될 수 없다. 이벤트 추가 0, `events.md` 변경 0, 코드·테스트 변경 0 |
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-007 (docs/reviews/SE-007.md 발견 1. 누락분을 SE-009 에서 기록) | #배속 S4 포화를 확정했다: `k = s0 × ticks_per_second`, `sat_s = ⌈max_ticks_per_step ÷ k⌉`, `delta_s > sat_s` 이면 정수 초만 `sat_s` 로 자르고 소수부(`delta_s mod 1`)는 보존한다(int64 오버플로 방지, 잘린 뒤에도 S5 `budget`·잔여 `acc` 가 자르지 않은 계산과 같음). 수용 기준 표 AC6 에 `test_tick.gd::test_step_saturation_keeps_fraction`·`replay/test_replay_qa.gd::test_step_int64_overflow_known_bug` 행을 추가했다. `sim.json`·스키마 변경 없음, 이벤트 변경 없음 |
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-009 (docs/reviews/SE-008.md 발견 1, docs/tickets/SE-008.md 남은 질문 1, docs/reviews/SE-007.md 발견 1) | 수용 기준 표 AC10 `test_restore_rejects_bad_snapshot` 행에 restore 3단계 거부 케이스를 더했다: I4 위반(`show` 에서 `speed: 2`), `seed` 범위 밖(`-1`, `2147483648`) → 각각 `false`·`push_error` 1회·상태 해시 불변, 경계값 `seed: 2147483647` 은 통과(`master_seed`·`snapshot()["seed"]` 일치). SE-011 의 `systems` 불일치 케이스는 그대로 둔다. 위 SE-007 행(누락분)을 함께 기록했다. 규칙·수치표·restore 표 변경 없음. 코드·데이터 변경 없음(`project/core/tick.gd` 가 이미 두 검사를 한다), 이벤트 변경 없음 |
+| 2026-10-09 | `sim.json` v2 → v3, `sim.schema.json` version 3 (적용) | SE-012 (game-designer 2차) | SE-011 행의 데이터 diff 를 그대로 적용했다: `sim.json` `version` 2 → 3, `snapshot_schema_version` 1 → 2. `sim.schema.json` `version` `enum [2]` → `enum [3]`, `$comment` "schema version 2 (SE-006)" → "schema version 3 (SE-011/SE-012)", `snapshot_schema_version.description` "(마이그레이션 티켓 동반)" → "(세이브 파일이 생긴 뒤에는 마이그레이션 티켓 동반)". 그 밖의 필드·값·`required`·제약 불변. 이 문서의 "적용은 SE-012"·"적용 전 데이터 값 1" 표기(상단 데이터 행, 스냅샷 필드 표, 수치표 머리말·행, 테스트 방법, SE-011 행)를 "적용됨(SE-012)"로 바꿨고, #스냅샷 (iii)에 SE-012 구현 뒤 리터럴 위치가 4곳(`test_tick.gd` 새 케이스 1곳 추가)임을 적었다. 리터럴 교체(`test_sim_config.gd:39`, `replay/test_replay_qa.gd:134`, `test_tick.gd:460`·`:690` → 2)는 `project/tests/` 쓰기 범위라 같은 브랜치의 다음 단계(qa)가 한다. 규칙·이벤트·리플레이 기준값 변경 없음 |
