@@ -7,9 +7,18 @@ extends Node3D
 ## 실행: godot --path project res://view/scenes/grid_sandbox.tscn
 ## 스크린샷(사람 검수용): 위 명령 뒤에 -- --se-screenshot=<절대경로.png> [--se-hover=x,z]
 ##   (GPU/디스플레이가 있는 환경 필요. --headless 에서는 캡처가 안 된다.)
+##
+## SE-004 셰이더 시안: -- --material=<default|a|b|c> 면 ShaderPlaceholders(바·무대·캐릭터·벽·컬러 스포트)를
+##   그리드 중심에 만들고 시안을 적용한다(바닥·커서·HUD 제외). 키 1/2/3(shader_variant_1/2/3)으로 a/b/c 전환,
+##   HUD 에 "시안: <id>". 없는 id 면 push_error + 종료 코드 2. --material= 이 없으면 SE-002 와 동작·화면이 같다.
+##   -- --se-zoom=<0..3> 은 시작 줌 인덱스(0 = 최근접). 범위 밖이면 push_warning 후 기본 줌 유지.
 
 const SCREENSHOT_ARG: String = "--se-screenshot="
 const HOVER_ARG: String = "--se-hover="
+const ZOOM_ARG: String = "--se-zoom="
+const PLACEHOLDERS_SCENE: String = "res://view/scenes/shader_placeholders.tscn"
+## 종료 코드: 없는 시안 id(SpikeMeasure.EXIT_BAD_SETUP 과 같은 값).
+const EXIT_BAD_MATERIAL: int = 2
 ## 스크린샷 전 렌더가 안정될 때까지 기다리는 프레임 수(디버그 기능 전용).
 const SCREENSHOT_WARMUP_FRAMES: int = 10
 
@@ -18,14 +27,70 @@ const SCREENSHOT_WARMUP_FRAMES: int = 10
 @onready var iso_camera: IsoCamera = $IsoCamera
 @onready var hud: DebugHud = $DebugHud
 
+## SE-004: 비워 두면 명령줄 --material=<id>, 그것도 없으면 시안 없음(SE-002 그대로).
+@export var material_id: String = ""
+
+var _placeholders: ShaderPlaceholders
+var _material_id: String = ""
+
 
 func _ready() -> void:
 	InputActions.register()
+	InputActions.register_shader_variants()
 	iso_camera.set_bounds(grid.get_extent_m())
 	iso_camera.focus_on(grid.get_center_world())
 	cursor.setup(iso_camera.get_camera(), grid)
 	hud.bind(iso_camera, cursor)
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	apply_zoom_args(args)
+	var wanted: String = ShaderVariants.resolve_material_id(material_id, args, "")
+	if not wanted.is_empty() and not apply_material(wanted):
+		get_tree().quit(EXIT_BAD_MATERIAL)
+		return
 	_run_screenshot_if_requested()
+
+
+## SE-004: 시안을 적용한다. 처음 부르면 플레이스홀더 세트를 그리드 중심에 만든다.
+## 바닥(GridView)·커서(TileCursor)·HUD 는 제외. 없는 id 면 push_error 후 false(플레이스홀더를 만들지 않는다).
+func apply_material(id: String) -> bool:
+	var wanted: String = id.strip_edges().to_lower()
+	if not ShaderVariants.is_valid_id(wanted):
+		push_error("GridSandbox: 시안 '%s' 없음 (가능: %s)" % [id, ", ".join(ShaderVariants.IDS)])
+		return false
+	if _placeholders == null:
+		_placeholders = (load(PLACEHOLDERS_SCENE) as PackedScene).instantiate() as ShaderPlaceholders
+		_placeholders.position = grid.get_center_world()
+		add_child(_placeholders)
+	var excluded: Array[Node] = [grid, cursor, hud]
+	ShaderVariants.apply(self, wanted, excluded)
+	_material_id = wanted
+	hud.set_shader_variant(wanted)
+	return true
+
+
+## 현재 시안 id. --material= 없이 실행했으면 빈 문자열.
+func get_material_id() -> String:
+	return _material_id
+
+
+func get_placeholders() -> ShaderPlaceholders:
+	return _placeholders
+
+
+## SE-004: --se-zoom=<인덱스> 가 있으면 시작 줌을 바꾼다. 범위 밖·숫자 아님이면 push_warning 후 기본 줌 유지.
+## 적용했으면 true.
+func apply_zoom_args(user_args: PackedStringArray) -> bool:
+	for a: String in user_args:
+		if not a.begins_with(ZOOM_ARG):
+			continue
+		var raw: String = a.trim_prefix(ZOOM_ARG).strip_edges()
+		var count: int = iso_camera.get_zoom_level_count()
+		if not raw.is_valid_int() or raw.to_int() < 0 or raw.to_int() >= count:
+			push_warning("GridSandbox: %s%s 무시 (0..%d), 기본 줌 유지" % [ZOOM_ARG, raw, count - 1])
+			return false
+		iso_camera.set_zoom_index(raw.to_int())
+		return true
+	return false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -39,6 +104,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		iso_camera.zoom_out()
 	elif event is InputEventMouseMotion and Input.is_action_pressed(InputActions.CAMERA_PAN_DRAG):
 		_drag_pan(event as InputEventMouseMotion)
+	elif _placeholders != null:
+		# 시안 전환은 --material= 로 플레이스홀더가 있을 때만(없으면 SE-002 와 같은 동작).
+		for i: int in range(InputActions.SHADER_VARIANT_ACTIONS.size()):
+			if event.is_action_pressed(InputActions.SHADER_VARIANT_ACTIONS[i]):
+				apply_material(ShaderVariants.SELECTABLE_IDS[i])
+				break
 
 
 func _process(delta: float) -> void:

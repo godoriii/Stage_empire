@@ -3,6 +3,7 @@ extends GutTest
 ## 가시성(최대 줌아웃에서 전 인스턴스가 프러스텀 안), 인스턴스·라이트 애니메이션.
 ## 헤드리스라 RenderingServer 는 더미지만 MultiMesh.buffer 는 그대로 돌려준다 → 버퍼를 직접 해석해 검사한다.
 ## SE-013 AC1(군중 cast_shadow 가 구성을 따름, E = B 와 같은 수), AC2(무대 프록시 셰도우 캐스터).
+## SE-004 AC6(시안 머티리얼을 씌워도 메시·인스턴스 수·그림자·라이트·노드 수 불변).
 
 const SPIKE_SCENE: String = "res://view/perf/spike_crowd.tscn"
 const SETTINGS_PATH: String = "res://view/perf/spike_configs.tres"
@@ -332,3 +333,74 @@ func test_resolve_config_id() -> void:
 	assert_eq(SpikeCrowd.resolve_config_id("", PackedStringArray(), "B"), "B", "기본값")
 	assert_eq(SpikeCrowd.resolve_config_id("", PackedStringArray(["--measure", "--config=c"]), "B"), "C", "명령줄(대소문자 무시)")
 	assert_eq(SpikeCrowd.resolve_config_id("A", PackedStringArray(["--config=D"]), "B"), "A", "@export 우선")
+
+
+# --- SE-004 AC6 -------------------------------------------------------------
+
+func _spawn_with_material(config_id: String, material_id: String) -> SpikeCrowd:
+	var vp: SubViewport = ViewTestUtil.make_viewport(self)
+	autofree(vp)
+	var spike: SpikeCrowd = (load(SPIKE_SCENE) as PackedScene).instantiate() as SpikeCrowd
+	spike.config_id = config_id
+	spike.material_id = material_id
+	vp.add_child(spike)
+	return spike
+
+
+func _descendant_count(n: Node) -> int:
+	var c: int = 0
+	for child: Node in n.get_children():
+		c += 1 + _descendant_count(child)
+	return c
+
+
+## 버퍼의 인스턴스 색(RGBA) 전부.
+func _instance_colors(spike: SpikeCrowd) -> PackedFloat32Array:
+	var buf: PackedFloat32Array = spike.crowd.multimesh.buffer
+	var out: PackedFloat32Array = PackedFloat32Array()
+	for i: int in range(spike.get_instance_count()):
+		var o: int = i * SpikeCrowd.FLOATS_PER_INSTANCE + SpikeCrowd.FLOATS_PER_TRANSFORM
+		out.append_array(buf.slice(o, o + SpikeCrowd.FLOATS_PER_COLOR))
+	return out
+
+
+func test_material_variant_keeps_mesh_and_instance_counts() -> void:
+	var base: SpikeCrowd = _spawn_with_material("E", "")
+	var b: SpikeCrowd = _spawn_with_material("E", "b")
+	var toon_b: Material = load("res://view/shaders/params/toon_b.tres")
+	var outline_b: Material = load("res://view/shaders/params/outline_b.tres")
+	# default(빈 값) = SE-013 그대로.
+	assert_eq(base.get_material_id(), "default", "material_id 비면 default")
+	assert_null(base.crowd.material_override, "default: 군중 material_override == null")
+	for mi: MeshInstance3D in base.get_stage_prop_nodes():
+		assert_null(mi.material_override, "default: %s material_override == null" % mi.name)
+	# 시안 b 적용.
+	assert_eq(b.get_material_id(), "b")
+	assert_eq(b.crowd.material_override, toon_b, "$Crowd.material_override == toon_b.tres")
+	assert_eq(b.crowd.material_override.next_pass, outline_b, "외곽선은 next_pass")
+	assert_eq(b.get_stage_prop_nodes().size(), base.get_stage_prop_nodes().size(), "무대 프록시 개수 동일")
+	for mi: MeshInstance3D in b.get_stage_prop_nodes():
+		assert_eq(mi.material_override, toon_b, "$StageProps/%s == toon_b.tres" % mi.name)
+	# 메시·인스턴스·그림자·라이트 불변.
+	var mesh_b: Mesh = b.crowd.multimesh.mesh
+	assert_eq(b.get_instance_count(), 5000, "instance_count == 5000")
+	assert_eq(b.get_instance_count(), base.get_instance_count(), "인스턴스 수 = default")
+	assert_eq(b.get_instance_mesh_triangle_count(), base.get_instance_mesh_triangle_count(), "메시 삼각형 = default (708)")
+	assert_eq(mesh_b.get_faces(), base.crowd.multimesh.mesh.get_faces(), "메시 기하 = default")
+	assert_eq(mesh_b.get_surface_count(), 1, "서피스 1개(드로우 1회 + 외곽선 패스)")
+	assert_true(mesh_b.surface_get_material(0) is StandardMaterial3D, "메시 자체 머티리얼은 그대로(override 만 바뀜)")
+	assert_eq(b.crowd.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "E: 군중 cast_shadow OFF")
+	assert_eq(_lights_in_tree(b).size(), 32, "라이트 32")
+	assert_eq(b.get_shadow_light_count(), 8, "셰도우 라이트 8")
+	assert_eq(b.get_stage_prop_triangle_count(), base.get_stage_prop_triangle_count(), "무대 프록시 삼각형 동일")
+	assert_eq(_descendant_count(b), _descendant_count(base), "자손 노드 수 동일(외곽선 노드 없음)")
+	assert_eq(_instance_colors(b), _instance_colors(base), "인스턴스 색 분포 동일(정점색 × base_color)")
+	# 같은 씬에서 시안을 다시 바꿔도 메시 리소스는 같은 객체다.
+	ShaderVariants.apply(b.crowd, "c")
+	ShaderVariants.apply(b.crowd, "default")
+	assert_eq(b.crowd.multimesh.mesh, mesh_b, "재적용해도 메시 리소스 그대로")
+	assert_null(b.crowd.material_override, "default 로 되돌리면 null")
+	# 명령줄 상당: 대소문자 무시.
+	var c: SpikeCrowd = _spawn_with_material("E", "C")
+	assert_eq(c.get_material_id(), "c", "대소문자 무시")
+	assert_eq(c.crowd.material_override, load("res://view/shaders/params/toon_c.tres"))
