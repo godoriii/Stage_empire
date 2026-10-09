@@ -64,6 +64,8 @@
 | qa | `project/tests/`, `docs/reports/` | Sonnet 5.5 |
 | reviewer | 없음(읽기 전용), `docs/reviews/`만 | Fable 5.1 |
 
+모든 에이전트는 추가로 `docs/tickets/`에 쓸 수 있다(담당 티켓의 "결과" 절 기록용). 그 밖의 경로는 위 표가 전부다.
+
 처음 2주는 producer, reviewer, qa + 엔지니어 1명(최대 3개 동시)으로 제한해 규칙이 작동하는지 확인한다.
 
 ## 한 티켓의 흐름
