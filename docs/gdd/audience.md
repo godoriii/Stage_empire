@@ -273,7 +273,7 @@ LS4 에서 한 번 계산한다(저녁 진입 틱, tick.md 단계 4 의 `time.ph
 | R4 | 순회 순서: `types` 배열 순서, `agents`·`arrivals` id 오름차순, `entrances` z·x 오름차순, 자리 순위는 SP1~SP3 의 전순서 키. Dictionary 순회에 기대는 결과 없음(`by_type`은 `types` 순서로 만든다) |
 | R5 | 같은 시드·같은 명령 열·같은 입력 이벤트 열이면 같은 `audience.*`·`economy.sales_reported` 이벤트 열과 같은 스냅샷이 나온다 |
 
-tick.md #결정성과-rng 스트림 표는 `audience`의 사용 단계를 "단계 2"로 적고 있다. v0 는 입장 결정이 artist.md 계약상 `artist.lineup_set` 수신(단계 4) 때라 **단계 4 를 더 쓴다**(Q8, tick.md 표 1칸 갱신 요청 — 결과 절).
+tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계 4(`artist.lineup_set` 핸들러)를 적는다. v0 는 입장 결정이 artist.md 계약상 `artist.lineup_set` 수신(단계 4) 때라 **단계 4 를 더 쓴다**(Q8, tick.md 표 1칸 반영됨(4179397)).
 
 ### 스냅샷
 
@@ -430,7 +430,7 @@ tick.md #결정성과-rng 스트림 표는 `audience`의 사용 단계를 "단�
 
 - **다른 시드 범위** = `[min(⌊E × (10000 − J) ÷ 10⁶⌋, cap), min(⌊E × (10000 + J) ÷ 10⁶⌋, cap)]`(노이즈 양 끝). 시드 1~100 의 입장은 전부 이 안이다(qa 스크립트가 확인).
 - **평균 만족 범위** = `[손계산 − 300, 손계산]`. 손계산은 "대기 0, 모두 공연 시작 전에 자리에 섬"의 값이고, 실제 실행은 대기(SF4)만큼 낮을 수 있다. 상한을 넘으면 공식 구현이 틀린 것이다. 경로 동점 처리(`AStarGrid2D`)가 달라도 평균은 바뀌지 않는다(아래 B2 — 누가 어느 칸을 차지하든 합이 같다).
-- 시드 0 리터럴의 출처: Godot `RandomNumberGenerator`(PCG32, `inc = PCG_DEFAULT_INC_64`)를 Python 으로 다시 구현해 계산했다(참조 벡터 `pcg32_srandom_r(42, 54)` → `0xa15c02b7 …` 일치 확인). 이 작업 환경에서 Godot 스크립트를 직접 돌릴 수 없었으므로 **SE-034 의 첫 테스트가 `u == 3230427448`을 확인**한다. 다르면 sim-engineer 가 결과 절에 실제 값을 적고 game-designer 가 `first_draw`·`noise_bp`·`raw`·`admissions`를 고친다(공식은 그대로).
+- 시드 0 리터럴의 출처: Godot `RandomNumberGenerator`(PCG32, `inc = PCG_DEFAULT_INC_64`)를 Python 으로 다시 구현해 계산했다(참조 벡터 `pcg32_srandom_r(42, 54)` → `0xa15c02b7 …` 일치 확인). 메인 세션이 Godot 4.7.2 헤드리스로 `SeededRng` 를 직접 실행해 확인(파생 시드 1688486501, 첫 randi 3230427448). SE-034 첫 테스트도 같은 값을 단언한다.
 
 ### 부록 B. 손계산
 
@@ -604,7 +604,7 @@ PY
 | Q5 | `agent_moved` 원소 | (a) `[id, x, z, state]`(티켓 초안) (b) `[id, px, pz, state, type]` | **(b).** SE-038 은 유형 색이 필요하고 `session.loaded` 뒤 `agent_moved` 한 번으로 전체를 복구해야 한다(SE-038 AC5). 유형을 따로 알리는 이벤트로는 로드 직후 복구가 안 된다. 앞 4칸의 순서는 초안과 같고 5번째에 붙였다 | events.md·view 계약 |
 | Q6 | 화장실 방문 상태 | (a) v0 없음, 화장실은 `satisfaction_bonus_bp`로 (b) `at_toilet` 상태 | **(a).** 커버리지 페이로드에 화장실 위치가 없고(build.md), 위치를 받으려면 build 이벤트 개정이 필요하다. 화장실 칸 300 bp 가산이 이미 만족에 들어간다. (b)는 스태프·위생(버티컬 슬라이스)과 함께 | build.md 커버리지 출력 + 이 문서 상태 1개 |
 | Q7 | 공연 만족도의 진실의 출처 | (a) audience 평균이 최종(가중치는 audience.json) (b) show.md 가 따로 공식 | **(a)**(SE-030 티켓 추천과 같음). show.md 는 등급 임계만 정한다. 실력·장르 적합(라인업 궁합)도 SF2 에 들어 있다 | SE-030 이 (b)를 택하면 SF2 를 빼고 show.md 와 합치는 방법을 그쪽 문서에 적는다 |
-| Q8 | `audience` 스트림 사용 단계 | (a) 입장 결정은 `artist.lineup_set` 수신(단계 4) (b) 다음 틱 단계 2 로 미룸 | **(a).** artist.md 가 "저녁 진입 계산은 `artist.lineup_set` 수신 시"를 계약으로 넘겼고 SE-034 AC3 도 "저녁 진입에 1회"다. tick.md 스트림 표의 `audience` 행 "단계 2"에 "+ `artist.lineup_set` 핸들러(단계 4)"를 더하는 1칸 갱신을 producer 에게 요청(이 티켓 쓰기 범위 밖) | — |
+| Q8 | `audience` 스트림 사용 단계 | (a) 입장 결정은 `artist.lineup_set` 수신(단계 4) (b) 다음 틱 단계 2 로 미룸 | **(a).** artist.md 가 "저녁 진입 계산은 `artist.lineup_set` 수신 시"를 계약으로 넘겼고 SE-034 AC3 도 "저녁 진입에 1회"다. tick.md 스트림 표의 `audience` 행 "단계 2"에 "+ `artist.lineup_set` 핸들러(단계 4)"를 더하는 1칸 갱신 — 반영됨(4179397) | — |
 | Q9 | 혼잡 측정 | (a) 공통: 남은 관객 ÷ 수용(공연 끝 1회) (b) 에이전트별 이웃 수 | **(a).** 손계산이 되고 "수용을 꽉 채우면 대가가 있다"를 바로 보여 준다. 길목 혼잡은 대기(SF4)가 따로 잡는다. 혼잡 히트맵(PRD 출력)은 `agent_moved`의 위치로 오버레이가 그린다 | 데이터 필드 추가(스키마 version 2) |
 | Q10 | 조기 퇴장자의 집계 | (a) `admissions`(티켓값)에는 넣고 `audience`(바 매출 기준)에서는 뺀다 (b) 환불 | **(a).** 환불 규칙은 events_crisis.md(민원). 만족 평균에는 넣는다(낮은 점수로 끌어내린다) | — |
 | Q11 | 성능 예산 | 목표 ≤ 2 ms/틱(티켓), 단언 ≤ 5 ms(SE-034) | 그대로. 비용이 큰 곳은 자리 고르기(순위 앞에서부터 훑기)와 경로 질의(에이전트당 하루 2~3회)이고, 틱마다 하는 일은 에이전트당 상수 | — |
