@@ -1149,3 +1149,26 @@ func test_restore_rejects_out_of_range() -> void:
 		assert_eq(_lhash(loop_b), before_l, label + ": TickLoop 해시 불변")
 		assert_eq(_ehash(e_b), before_eb, label + ": Economy 해시 불변")
 		assert_eq(r_b.events, [], label + ": 이벤트 0개")
+
+
+## SE-044 AC5 (docs/reviews/SE-032.md 발견 4): time.phase_changed 의 to 가 구간 id(SimConfig.PHASE_IDS = sim.json phases)가
+## 아니면 push_error 1회, day·phase 를 포함해 상태 불변, 이벤트 0, 자기 스냅샷 왕복 true. close 정산도 일어나지 않는다.
+func test_unknown_phase_ignored() -> void:
+	var u: Array = _unit()
+	var bus: EventBus = u[0]
+	var econ: Economy = u[1]
+	var rec: EventRecorder = u[2]
+	_charge(bus, "build", 1)
+	assert_eq(econ.cash, _cfg.starting_cash - 1, "전제: 새 게임과 다른 상태")
+	var before: String = _ehash(econ)
+	rec.clear()
+	bus.publish("time.phase_changed", {"from": "show", "to": "nope", "day": 2, "tick": 0})
+	assert_push_error_count(1, "모르는 to → push_error 1회")
+	assert_eq([econ.day, econ.phase], [1, "day"], "day·phase 불변")
+	assert_eq(_ehash(econ), before, "상태 불변")
+	assert_eq(_econ_events(rec), [], "economy.* 이벤트 0(정산 없음)")
+	assert_true(econ.restore(_rt(econ.snapshot())), "자기 스냅샷 왕복 true")
+	assert_eq(_ehash(econ), before)
+	_close(bus, 1)
+	assert_eq(econ.phase, "close", "그 뒤 정상 구간은 따라간다")
+	assert_eq(rec.count("economy.day_settled"), 1, "정상 close 는 정산")

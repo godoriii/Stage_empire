@@ -405,7 +405,13 @@ func test_reference_layouts_expected_values_recomputed() -> void:
 		var exp: Dictionary = lay["expected"]
 		for key: String in exp:
 			assert_eq(_ints(got[key]), _ints(exp[key]), "%s.%s" % [lay["id"], key])
-	assert_eq(seen_ids, ["empty_room", "baseline_show"], "기준 배치 2개")
+	# id 목록은 리터럴로 고정하지 않는다(SE-044: 레이아웃이 추가돼도 깨지지 않게). 유일성 + 기준 배치 2종 포함만 단언.
+	var unique: Dictionary = {}
+	for lid: String in seen_ids:
+		unique[lid] = true
+	assert_eq(unique.size(), seen_ids.size(), "레이아웃 id 유일")
+	for lid: String in ["empty_room", "baseline_show"]:
+		assert_true(seen_ids.has(lid), "기준 배치 %s 포함" % lid)
 
 
 func test_baseline_literals_match_ticket_and_doc() -> void:

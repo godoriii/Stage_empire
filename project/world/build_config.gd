@@ -17,10 +17,10 @@ var capacity_max: int = 0
 
 
 static func load(furniture_path: String = FurnitureConfig.DEFAULT_PATH, map_path: String = MapConfig.DEFAULT_PATH) -> BuildConfig:
-	var f: Variant = MapConfig.read_json(furniture_path)
-	var m: Variant = MapConfig.read_json(map_path)
-	var t: Variant = MapConfig.read_json(MapConfig.TIERS_PATH)
-	var e: Variant = MapConfig.read_json(ECONOMY_PATH)
+	var f: Variant = JsonUtil.read_json(furniture_path, MapConfig.LOG_TAG)
+	var m: Variant = JsonUtil.read_json(map_path, MapConfig.LOG_TAG)
+	var t: Variant = JsonUtil.read_json(MapConfig.TIERS_PATH, MapConfig.LOG_TAG)
+	var e: Variant = JsonUtil.read_json(ECONOMY_PATH, MapConfig.LOG_TAG)
 	if f == null or m == null or t == null or e == null:
 		return null
 	return from_dicts(f, m, t, e)
@@ -29,12 +29,12 @@ static func load(furniture_path: String = FurnitureConfig.DEFAULT_PATH, map_path
 static func from_dicts(furniture: Dictionary, map_d: Dictionary, tiers: Dictionary, economy: Dictionary) -> BuildConfig:
 	var cfg: BuildConfig = BuildConfig.new()
 	for key: String in ["rate_scale", "demolish_refund_rate_bp", "starting_cash"]:
-		var v: Variant = MapConfig.as_int(economy.get(key))
+		var v: Variant = JsonUtil.as_int(economy.get(key))
 		if v == null or v < 0:
 			return _fail("economy.json %s 는 0 이상 정수여야 한다" % key)
-	cfg.rate_scale = MapConfig.as_int(economy["rate_scale"])
-	cfg.demolish_refund_rate_bp = MapConfig.as_int(economy["demolish_refund_rate_bp"])
-	cfg.starting_cash = MapConfig.as_int(economy["starting_cash"])
+	cfg.rate_scale = JsonUtil.as_int(economy["rate_scale"])
+	cfg.demolish_refund_rate_bp = JsonUtil.as_int(economy["demolish_refund_rate_bp"])
+	cfg.starting_cash = JsonUtil.as_int(economy["starting_cash"])
 	if cfg.rate_scale < 1:
 		return _fail("economy.json rate_scale 은 1 이상이어야 한다")
 	cfg.furniture_table = FurnitureConfig.from_dict(furniture, cfg.rate_scale, cfg.demolish_refund_rate_bp)
