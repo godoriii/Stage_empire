@@ -3,7 +3,8 @@ extends Node3D
 ## 성능 스파이크 씬(SE-003, SE-013): MultiMesh 캐릭터 프록시 N개 + 동적 라이트 M개(Omni/Spot 혼합) +
 ## 무대 프록시 박스(셰도우 캐스터)를 SE-002 의 IsoCamera(최대 줌아웃)·GridView 위에 전부 화면 안에 띄우고 매 프레임 움직인다.
 ## 표시 전용. sim/core 와 연결하지 않고 이벤트 버스를 쓰지 않는다.
-## SE-004/SE-018: 툰 셰이더 시안은 material_id(@export) 또는 --material=<plain|a|b|c> 로 고른다(ShaderVariants).
+## SE-004/SE-018: 툰 셰이더 시안은 material_id(@export) 또는 --material=<plain|a|b|c|ss> 로 고른다(ShaderVariants).
+##   ss(SE-021) = 외곽선을 next_pass 대신 화면 공간 포스트 패스 노드 1개로 그리는 비교 시안.
 ##   기본은 ShaderVariants.DEFAULT_ID(시안 B). plain = SE-004 이전 정점색 StandardMaterial3D(비교용).
 ##   없는 id(예전 "default" 포함)면 push_error 후 DEFAULT_ID 로 폴백.
 ##   군중(MultiMesh)과 무대 프록시의 material_override 만 바꾼다. 메시·인스턴스 수·cast_shadow·라이트·구성 값은 그대로.
@@ -11,7 +12,7 @@ extends Node3D
 ## 수치는 전부 spike_configs.tres(SpikeConfigSet)에 있다. 구성은 config_id(@export) 또는 명령줄로 고른다.
 ## 군중 그림자는 구성의 crowd_shadows 를 따른다(구성 E = off, style-guide 2026-10-09 결정).
 ##
-## 실행(구경):  godot --path project res://view/perf/spike_crowd.tscn -- --config=E [--material=plain|a|b|c]
+## 실행(구경):  godot --path project res://view/perf/spike_crowd.tscn -- --config=E [--material=plain|a|b|c|ss]
 ## 측정은 이 씬이 아니라 tests 쪽 진입점(tests/view/perf/measure_spike.tscn)이 이 씬을 인스턴스화해서 한다.
 ##   view/ 는 tests/ 를 참조하지 않는다(test_view_boundary.gd). 측정기가 measure_mode 를 켜고
 ##   set_process(false) 로 이 노드의 자체 진행을 멈춘 뒤 advance()·update_label() 을 직접 호출한다.
@@ -261,10 +262,12 @@ func _build() -> void:
 	update_label()
 
 
-## SE-004: 군중과 무대 프록시에 시안 머티리얼을 씌운다(default 면 null = 원래 머티리얼). 노드는 추가하지 않는다.
+## SE-004: 군중과 무대 프록시에 시안 머티리얼을 씌운다(plain 이면 null = 원래 머티리얼).
+## a/b/c 는 노드를 추가하지 않는다. SE-021 ss 는 이 노드 직속에 포스트 패스 노드 1개(ShaderVariants.sync_post_pass).
 func _apply_material() -> void:
-	ShaderVariants.apply(crowd, material_id)
-	ShaderVariants.apply(stage_props_root, material_id)
+	ShaderVariants.apply_materials(crowd, material_id)
+	ShaderVariants.apply_materials(stage_props_root, material_id)
+	ShaderVariants.sync_post_pass(self, material_id)
 
 
 func _build_crowd() -> void:

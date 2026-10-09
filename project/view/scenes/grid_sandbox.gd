@@ -10,7 +10,8 @@ extends Node3D
 ##
 ## 셰이더 시안(SE-004, SE-018): 시작 시 ShaderPlaceholders(바·무대·캐릭터·벽·컬러 스포트)를 그리드 중심에 만들고
 ##   시안을 적용한다(바닥·커서·HUD 제외). 기본은 ShaderVariants.DEFAULT_ID(시안 B), 비교용으로
-##   -- --material=<plain|a|b|c>(plain = SE-004 이전 정점색 룩). 키 1/2/3(shader_variant_1/2/3)으로 a/b/c 전환,
+##   -- --material=<plain|a|b|c|ss>(plain = SE-004 이전 정점색 룩, ss = SE-021 스크린스페이스 외곽선 비교 시안 —
+##   포스트 패스 노드 1개가 이 노드 직속에 붙는다). 키 1/2/3(shader_variant_1/2/3)으로 a/b/c 전환,
 ##   HUD 에 "시안: <id>". 없는 id(예전 "default" 포함)면 push_error + 종료 코드 2.
 ##   -- --se-zoom=<0..3> 은 시작 줌 인덱스(0 = 최근접). 범위 밖이면 push_warning 후 기본 줌 유지.
 

@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Material" path="res://view/shaders/params/outline_ss.tres" id="1_outline_ss"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_fullscreen"]
+size = Vector2(2, 2)
+
+[node name="ShaderVariantPostPass" type="MeshInstance3D" groups=["shader_variant_post_pass"]]
+material_override = ExtResource("1_outline_ss")
+cast_shadow = 0
+extra_cull_margin = 16384.0
+ignore_occlusion_culling = true
+gi_mode = 0
+mesh = SubResource("QuadMesh_fullscreen")

@@ -1,0 +1,17 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://view/shaders/toon.gdshader" id="1_toon"]
+
+[resource]
+resource_name = "toon_ss"
+shader = ExtResource("1_toon")
+shader_parameter/cell_steps = 3
+shader_parameter/shadow_tint = Color(0.32, 0.3, 0.45, 0.55)
+shader_parameter/rim_enabled = true
+shader_parameter/rim_strength = 0.9
+shader_parameter/rim_width = 0.35
+shader_parameter/rim_color = Color(1, 1, 1, 1)
+shader_parameter/base_color = Color(1, 1, 1, 1)
+shader_parameter/accent_color = Color(1, 1, 1, 1)
+shader_parameter/emissive_color = Color(0, 0, 0, 1)
+shader_parameter/emissive_energy = 0.0
