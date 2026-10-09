@@ -402,7 +402,7 @@ func test_top_level_keys_and_scalars() -> void:
 	var keys: Array = _a.keys()
 	keys.sort()
 	assert_eq(keys, ["admission", "checks", "flow", "max_agents", "pos_scale", "reference_scenarios", "satisfaction", "types", "version"])
-	assert_eq(int(_a["version"]), 1)
+	assert_eq(int(_a["version"]), 2, "version 2 (SE-029-bug: pass_override_ticks 추가)")
 	assert_eq(int(_a["max_agents"]), 150, "PRD MVP 관객 150")
 	assert_eq(int(_a["pos_scale"]), 100)
 	assert_lte(int(_a["max_agents"]), int(_sim["individual_agent_cap"]), "AL4")
@@ -418,7 +418,9 @@ func test_top_level_keys_and_scalars() -> void:
 func test_flow_values_and_phase_fit() -> void:
 	var fl: Dictionary = _a["flow"]
 	assert_eq(_ints(fl), {"arrival_window_ticks": 400, "entry_ticks": 4, "move_ticks_per_tile": 4, "spot_tile_cap": 1,
-		"pass_tile_cap": 2, "bar_ticks": 50, "bar_fail_wait_ticks": 30})
+		"pass_tile_cap": 2, "bar_ticks": 50, "bar_fail_wait_ticks": 30, "pass_override_ticks": 10})
+	assert_gte(int(fl["pass_override_ticks"]), 1, "T8: 연속 K 틱 막히면 cap 무시, K ≥ 1")
+	assert_lt(int(fl["pass_override_ticks"]), int(_types[2]["patience_ticks"]), "K 가 가장 짧은 인내보다 짧아야 교착이 조기 퇴장으로 번지지 않는다")
 	var ticks: Dictionary = {}
 	for p: Dictionary in _sim["phases"]:
 		ticks[p["id"]] = int(p["ticks"])

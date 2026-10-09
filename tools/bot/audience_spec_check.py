@@ -25,7 +25,7 @@ M64 = (1 << 64) - 1
 DIR_ORDERS = {"x": ((1, 0), (-1, 0), (0, 1), (0, -1)), "z": ((0, 1), (0, -1), (1, 0), (-1, 0)),
               "rev": ((-1, 0), (1, 0), (0, -1), (0, 1)), "revz": ((0, -1), (0, 1), (-1, 0), (1, 0))}
 DIRS = DIR_ORDERS["x"]
-PASS_OVERRIDE = 0   # 0 = audience.md 그대로. K > 0 = 연속 K 틱 막히면 pass_tile_cap 무시(권고안 실험, 스펙 밖)
+PASS_OVERRIDE = int(FL.get("pass_override_ticks", 0))   # T8: 연속 K 틱 막히면 pass_tile_cap 무시. 기본값은 audience.json flow.pass_override_ticks (0 = 규칙 없음)
 
 def pcg(seed32):
     st = 0; inc = ((1442695040888963407 << 1) | 1) & M64
@@ -247,7 +247,7 @@ def main():
     global DIRS, PASS_OVERRIDE
     ap = argparse.ArgumentParser(); ap.add_argument("--seeds", type=int, default=40)
     ap.add_argument("--bfs-order", choices=sorted(DIR_ORDERS), default="x", help="경로 동점 처리 변형")
-    ap.add_argument("--pass-override", type=int, default=0, help="권고안 실험: 연속 K 틱 막히면 pass_tile_cap 무시")
+    ap.add_argument("--pass-override", type=int, default=PASS_OVERRIDE, help="연속 K 틱 막히면 pass_tile_cap 무시 (기본: audience.json flow.pass_override_ticks, 0 = 규칙 없음)")
     args = ap.parse_args(); DIRS = DIR_ORDERS[args.bfs_order]; PASS_OVERRIDE = args.pass_override
     bad = []
     lay = {l["id"]: l["expected"] for l in MAP["reference_layouts"]}

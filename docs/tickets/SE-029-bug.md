@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 해결 (ff33a7d) — qa 후속 2건(테스트 단언 2곳·시뮬 기본값) 남음, 결과 절 |
+| 상태 | 해결 (ff33a7d, qa 재검증 2026-10-09) |
 | 담당 에이전트 | game-designer (규칙 + `audience.json` `flow` 필드 + 스키마), 이후 sim-engineer (SE-034 가 반영) |
 | 마일스톤 | MVP |
 | 의존 티켓 | SE-029 (같은 브랜치에서 병합 전에 고치거나, 병합 뒤 SE-034 시작 전 후속 티켓으로) |
@@ -70,3 +70,9 @@ game-designer, 2026-10-09. producer 결정 = 제안 (a) K = 10(audience.md Q12).
   - `tools/bot/audience_spec_check.py` 의 `--pass-override` 기본값을 `flow.pass_override_ticks`에서 읽게 갱신(qa 재검증 방법 문구대로).
 
 - qa 재검증 방법: 수정 후 `python3 tools/bot/audience_spec_check.py --bfs-order z`(과 `--bfs-order x`, `--bfs-order rev`, `--bfs-order revz`) 가 `MISMATCH: 없음`이고 150명 스트레스 두 시드 조기 퇴장 0 이면 닫는다. `--pass-override`는 권고안 실험 옵션이라 규칙이 바뀌면 스크립트를 같이 갱신한다.
+
+- qa 재검증(2026-10-09, HEAD f348386 + qa 후속 수정):
+  - 후속 2건 처리: `test_audience_data.gd` `version` 단언 1 → 2, `flow` 기대 사전에 `"pass_override_ticks": 10` 추가, `pass_override_ticks ≥ 1`·`< walk_in.patience_ticks` 단언 추가. `audience_spec_check.py` `--pass-override` 기본값을 `audience.json` `flow.pass_override_ticks`(10)에서 읽게 변경.
+  - `python3 tools/bot/audience_spec_check.py --bfs-order {x,z,rev,revz} --seeds 40` 네 변형 전부 `MISMATCH: 없음`. 기준 시나리오 시드 0~39 조기 퇴장 0·미착석 0. 시드 0 평균 x 계열 4,600 / 6,731 / 6,725 / 5,727, z 계열 4,599 / 6,703 / 6,695 / 5,715(전부 `avg_satisfaction_bp_range` 안). 최대 대기 x 계열 11 / z 계열 33틱(시드 0), 시드 0~39 x 18 / z 38.
+  - 150명 스트레스(수용 150·인기 100·명성 2,000) 시드 0~9 × 4변형: 조기 퇴장 합 0, 미착석 0, 최대 대기 x 16 / rev 20 / z·revz 46틱. 수정 전 z 우선 289명, x 우선 7명이던 조기 퇴장이 모두 0.
+  - `tools/run_tests.sh project/tests/sim` 14 스크립트 127 테스트 전부 통과(어서션 7,592). strict exit 0, audience.md qa 스크립트 `AU OK`.
