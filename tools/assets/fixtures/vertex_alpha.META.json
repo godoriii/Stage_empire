@@ -1,0 +1,11 @@
+{
+  "asset_id": "vertex_alpha",
+  "category": "decor",
+  "footprint": [
+    1,
+    1
+  ],
+  "height_m": 1.0,
+  "poly_budget": "furniture_small",
+  "ticket": "SE-027"
+}
