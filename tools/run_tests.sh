@@ -34,10 +34,8 @@ if [ ! -f project/addons/gut/gut_cmdln.gd ]; then
   echo "FAIL: project/addons/gut 없음 (docs/adr/0003-test-framework-gut.md)"; exit 1
 fi
 
-# 첫 실행 시 임포트 캐시 생성 (.godot/ 은 gitignore)
-if [ ! -d project/.godot ]; then
-  "$GODOT" --headless --path project --import >/dev/null 2>&1 || true
-fi
+# 임포트 + class_name 캐시 갱신 (.godot/ 은 gitignore). 새 class_name 이 등록되지 않으면 테스트가 실패하므로 매번 돈다.
+"$GODOT" --headless --path project --import >/dev/null 2>&1 || true
 
 STATUS=0
 for d in "${DIRS[@]}"; do
