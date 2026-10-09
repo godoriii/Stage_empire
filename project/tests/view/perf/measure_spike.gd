@@ -7,7 +7,8 @@ extends Node
 ##
 ## 구성 결정: @export config_id > 명령줄 --config= > settings.default_config_id. 없는 구성이면 종료 코드 2.
 ## SE-004/SE-018 시안: @export material_id > 명령줄 --material=<plain|a|b|c|ss> > ShaderVariants.DEFAULT_ID(시안 B).
-##   없는 시안(예전 "default" 포함)이면 종료 코드 2. JSON 에 material 키. ticket 값은 SE-013 그대로
+##   없는 시안(예전 "default" 포함)이면 종료 코드 2. 시안 머티리얼 로드가 실패해 스파이크가 plain 으로 떨어져도
+##   종료 코드 2(SE-024: "라벨은 b, 실제 룩은 plain" 인 JSON 을 만들지 않는다). JSON 에 material 키. ticket 값은 SE-013 그대로
 ##   (시안별 결과는 --out 파일명과 material 키로 구분). 기본 출력 파일명은 항상 SE-013_<config>_<material>.json
 ##   (plain 도 _plain. SE-018 에서 SE-013 파일명 호환 특례 제거).
 ## 절차: VSync 끄기 + max_fps 0 + 창 resolution(spike_configs.tres) → 예열(warmup_sec 이상 그리고 warmup_min_frames 이상)
@@ -31,7 +32,7 @@ const ARG_MEASURE_SEC: String = "--measure-sec="
 const DEFAULT_OUT_PATTERN_MATERIAL: String = "user://perf/SE-013_%s_%s.json"
 ## 티켓 측정 조건: forward_plus 렌더러.
 const REQUIRED_RENDERER: String = "forward_plus"
-## 종료 코드: 없는 구성(또는 스파이크 씬 없음).
+## 종료 코드: 없는 구성·없는 시안·시안 머티리얼 로드 실패(또는 스파이크 씬 없음).
 const EXIT_BAD_SETUP: int = 2
 const USEC_PER_MS: float = 1000.0
 const MS_PER_SEC: float = 1000.0
@@ -58,6 +59,10 @@ enum Phase { WARMUP, MEASURE, DONE }
 
 ## false 면 끝나도(또는 구성 오류여도) 종료하지 않는다(테스트용).
 var auto_quit: bool = true
+## 스파이크에 넘기는 시안 머티리얼 경로 패턴. 기본값 외로 바꾸는 것은 로드 실패를 만드는 테스트뿐이다(SE-024).
+var material_path_pattern: String = ShaderVariants.MATERIAL_PATH_PATTERN
+## _quit() 에 마지막으로 넘긴 종료 코드(auto_quit 이 false 여도 기록. 부르지 않았으면 -1). 테스트용.
+var exit_code: int = -1
 var out_path: String = ""
 var warmup_sec: float = 0.0
 var warmup_min_frames: int = 0
@@ -117,7 +122,9 @@ func _ready() -> void:
 	print("SpikeMeasure: 셰이더 시안 %s (SE-004)" % _spike.get_material_id())
 
 
-## spike_scene 을 자식으로 인스턴스화한다. 구성이 없으면 false(auto_quit 이면 종료 코드 2).
+## spike_scene 을 자식으로 인스턴스화한다. 구성·시안이 없거나 시안 머티리얼 로드가 실패하면 false(auto_quit 이면 종료 코드 2).
+## 로드 실패 판정(SE-024): 요청 시안이 plain 이 아닌데 스파이크가 실제로 그 시안을 씌우지 못했다
+## (군중 material_override 가 null 이거나 스파이크가 plain 으로 떨어졌다). 스파이크를 떼어 내고 JSON 은 만들지 않는다.
 func _spawn_spike() -> bool:
 	if spike_scene == null:
 		push_error("SpikeMeasure: spike_scene 이 비어 있다")
@@ -143,13 +150,23 @@ func _spawn_spike() -> bool:
 	material_id = wanted_material
 	spike.config_id = wanted
 	spike.material_id = wanted_material
+	spike.material_path_pattern = material_path_pattern
 	spike.measure_mode = true
 	add_child(spike)
+	if material_id != ShaderVariants.PLAIN_ID \
+			and (spike.crowd.material_override == null or spike.get_material_id() != material_id):
+		push_error("SpikeMeasure: 시안 '%s' 머티리얼 로드 실패 (스파이크 실제 시안 %s) — 측정하지 않는다" % [
+			material_id, spike.get_material_id()])
+		remove_child(spike)
+		spike.free()
+		_quit(EXIT_BAD_SETUP)
+		return false
 	setup(spike, settings, spike.config)
 	return true
 
 
 func _quit(code: int) -> void:
+	exit_code = code
 	if auto_quit:
 		get_tree().quit(code)
 
