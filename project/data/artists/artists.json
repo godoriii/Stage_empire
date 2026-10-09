@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "id": "gray_shutter",
+      "name": "회색 셔터",
+      "genre": "rock",
+      "grade": "local",
+      "popularity": 6,
+      "skill": 34,
+      "personality": [
+        "diligent",
+        "shy"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.gray_shutter"
+    },
+    {
+      "id": "makgeolli_amp",
+      "name": "막걸리 앰프",
+      "genre": "rock",
+      "grade": "local",
+      "popularity": 15,
+      "skill": 22,
+      "personality": [
+        "hothead",
+        "loyal"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.makgeolli_amp"
+    },
+    {
+      "id": "flipped_setlist",
+      "name": "뒤집힌 셋리스트",
+      "genre": "rock",
+      "grade": "local",
+      "popularity": 24,
+      "skill": 40,
+      "personality": [
+        "perfectionist",
+        "moody"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.flipped_setlist"
+    },
+    {
+      "id": "red_stairs",
+      "name": "붉은 계단",
+      "genre": "rock",
+      "grade": "rookie",
+      "popularity": 46,
+      "skill": 52,
+      "personality": [
+        "showman",
+        "ambitious"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.red_stairs"
+    },
+    {
+      "id": "blanket_tape",
+      "name": "이불 속 녹음",
+      "genre": "indie",
+      "grade": "local",
+      "popularity": 9,
+      "skill": 46,
+      "personality": [
+        "perfectionist",
+        "shy"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.blanket_tape"
+    },
+    {
+      "id": "window_seat",
+      "name": "창가 자리",
+      "genre": "indie",
+      "grade": "local",
+      "popularity": 18,
+      "skill": 28,
+      "personality": [
+        "easygoing",
+        "loyal"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.window_seat"
+    },
+    {
+      "id": "thumbnail_soda",
+      "name": "썸네일 소다",
+      "genre": "indie",
+      "grade": "local",
+      "popularity": 27,
+      "skill": 18,
+      "personality": [
+        "showman",
+        "free_spirit"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.thumbnail_soda"
+    },
+    {
+      "id": "slow_fog_garden",
+      "name": "느린 안개 정원",
+      "genre": "indie",
+      "grade": "rookie",
+      "popularity": 42,
+      "skill": 60,
+      "personality": [
+        "moody",
+        "diligent"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.slow_fog_garden"
+    },
+    {
+      "id": "found_synth",
+      "name": "주워온 신스",
+      "genre": "electronic",
+      "grade": "local",
+      "popularity": 12,
+      "skill": 30,
+      "personality": [
+        "free_spirit",
+        "easygoing"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.found_synth"
+    },
+    {
+      "id": "eight_opener",
+      "name": "여덟시 오프너",
+      "genre": "electronic",
+      "grade": "local",
+      "popularity": 21,
+      "skill": 38,
+      "personality": [
+        "ambitious",
+        "diligent"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.eight_opener"
+    },
+    {
+      "id": "gold_foil_mask",
+      "name": "금박 가면",
+      "genre": "electronic",
+      "grade": "rookie",
+      "popularity": 50,
+      "skill": 44,
+      "personality": [
+        "showman",
+        "hothead"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.gold_foil_mask"
+    },
+    {
+      "id": "hand_solder",
+      "name": "손땜 모듈러",
+      "genre": "electronic",
+      "grade": "rookie",
+      "popularity": 55,
+      "skill": 64,
+      "personality": [
+        "perfectionist",
+        "ambitious"
+      ],
+      "rider": [],
+      "bio_key": "artist.bio.hand_solder"
+    }
+  ]
+}
