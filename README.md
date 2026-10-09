@@ -14,7 +14,7 @@
 git lfs install
 python3 tools/validate_data.py            # 데이터 테이블 검증
 python3 tools/hooks/boundary.py --self-test
-tools/run_tests.sh                        # Godot 4.6 이 PATH/GODOT_BIN 에 있어야 함 (docs/adr/0003)
+tools/run_tests.sh                        # Godot 4.7.2 가 PATH/GODOT_BIN 에 있어야 함 (docs/adr/0003)
 ```
 
 사람은 Claude Code 메인 세션에서 **producer** 에이전트만 상대한다:

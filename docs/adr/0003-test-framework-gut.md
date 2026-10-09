@@ -1,11 +1,11 @@
 # ADR-0003 테스트 프레임워크는 GUT
 
 - 날짜: 2026-10-09
-- 상태: 결정 (에이전트 셋업 시점의 선택, 프리프로덕션 중 재검토 가능). 2026-10-09 GUT 9.6.1 + Godot 4.6 으로 설치 완료.
+- 상태: 결정 (에이전트 셋업 시점의 선택, 프리프로덕션 중 재검토 가능). 2026-10-09 GUT 9.6.1 + Godot 4.6 으로 설치 후, 같은 날 SE-010 으로 GUT 9.7.1 + Godot 4.7.2 로 상향(최신 안정판 기준, 테스트 68개 전부 통과 확인).
 
 ## 결정
 
-GUT 9.6.1(Godot Unit Test, `project/addons/gut`, MIT, Godot 4.6 대응)을 리포지토리에 포함해 쓴다. 실행은 `tools/run_tests.sh`가 `godot --headless -s addons/gut/gut_cmdln.gd`로 한다. 테스트 파일은 `project/tests/sim|view|e2e/**/test_*.gd` (Godot 은 `res://` 밖의 스크립트를 로드하지 못하므로 프로젝트 안에 둔다).
+GUT 9.7.1(Godot Unit Test, `project/addons/gut`, MIT, Godot 4.7.x 대응)을 리포지토리에 포함해 쓴다. 실행은 `tools/run_tests.sh`가 `godot --headless -s addons/gut/gut_cmdln.gd`로 한다. 테스트 파일은 `project/tests/sim|view|e2e/**/test_*.gd` (Godot 은 `res://` 밖의 스크립트를 로드하지 못하므로 프로젝트 안에 둔다).
 
 ## 이유
 
@@ -15,8 +15,8 @@ GUT 9.6.1(Godot Unit Test, `project/addons/gut`, MIT, Godot 4.6 대응)을 리�
 ## 설치
 
 ```bash
-# 이미 포함되어 있다: project/addons/gut (v9.6.1). 업그레이드는 Godot 버전과 짝을 맞춰 같은 PR에서 한다.
-# Godot 4.6 바이너리를 GODOT_BIN 또는 PATH 의 godot 으로 두면 tools/run_tests.sh 가 실행된다.
+# 이미 포함되어 있다: project/addons/gut (v9.7.1). 업그레이드는 Godot 버전과 짝을 맞춰 같은 PR에서 한다.
+# Godot 4.7.2 바이너리를 GODOT_BIN 또는 PATH 의 godot 으로 두면 tools/run_tests.sh 가 실행된다.
 tools/run_tests.sh
 ```
 
