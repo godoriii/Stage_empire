@@ -5,7 +5,7 @@
 | 상태 | v0 |
 | 티켓 | SE-019 2차 (art-pipeline). 1차 규약: [`docs/gdd/materials.md`](../../docs/gdd/materials.md) (채택안 (b) 슬롯 = 별도 서피스) |
 | 적용 대상 | 가구·설비·캐릭터 `.glb` 전부. 검수 큐(`project/assets/review-queue/<asset-id>/`)에 올리기 전에 이 규약을 통과해야 한다 |
-| 구현 | 이 문서는 규약과 린터 체크리스트만 정한다. 린터(`tools/assets/lint_gltf.py`)는 후속 art-pipeline 티켓 |
+| 구현 | 린터 `tools/assets/lint_gltf.py` + 설정 `tools/assets/lint_config.json` + 픽스처 `tools/assets/fixtures/` + 테스트 `tools/assets/test_lint_gltf.py` (SE-027) |
 | 근거 | `docs/style-guide.md` "포맷"·"폴리곤 예산"·"머티리얼 슬롯 이름"·"상태 변형" 행, `docs/gdd/materials.md` M1~M6·glass·Q5 |
 
 이 문서와 `materials.md` 가 어긋나면 `materials.md` 가 이긴다(슬롯 이름 4종, 표기 방식 = 서피스). 어긋남을 발견하면 이 문서를 고치는 티켓을 낸다.
@@ -15,8 +15,8 @@
 - **파일:** glTF 2.0 바이너리 `.glb` 한 파일. 외부 `.bin`·이미지 참조 금지. 압축 확장(Draco, meshopt)은 쓰지 않는다(린터가 버퍼를 직접 읽는다). `extensionsRequired` 는 비어 있어야 한다.
 - **단위:** 미터. 1 타일 = 1 m. 스케일은 1.0(노드 `scale` 없음).
 - **축:** +Y 업, -Z 전방(프로젝트 규약. glTF 2.0 기본 정면은 +Z 이므로 Blender 내보내기 '+Y Up' 설정만으로는 정면이 정해지지 않는다 — 모델을 -Z 를 향하게 두고 내보낸다).
-- **피벗(원점):** 바닥 중심. 타일 점유 영역(`w×d`)의 중앙, y = 0. 메시 노드의 변환(translation / rotation / scale)은 항등이고 정점이 이 원점 기준으로 놓인다. AABB 가 `min.y = 0`, x·z 범위의 중심이 원점이어야 한다(허용 오차 기본 0.01 m, 린터 옵션).
-- **풋프린트·높이:** 티켓의 `w×d`·높이를 `META.json` 에 적고, AABB 가 그 안(풋프린트 ± 허용 오차, 높이 ± 5%)이어야 한다.
+- **피벗(원점):** 바닥 중심. 타일 점유 영역(`w×d`)의 중앙, y = 0. 메시 노드의 변환(translation / rotation / scale)은 항등이고 정점이 이 원점 기준으로 놓인다. AABB 가 `min.y = 0`, x·z 범위의 중심이 원점이어야 한다(허용 오차는 `lint_config.json` 의 `tolerance.pivot_m`).
+- **풋프린트·높이:** 티켓의 `w×d`·높이를 `META.json` 에 적고, AABB 가 그 안(풋프린트 ± 허용 오차, 높이 ± 5%, `tolerance.footprint_m`·`tolerance.height_ratio`)이어야 한다.
 - **삼각형만:** primitive `mode` 는 4(TRIANGLES). 점·선·스트립 금지.
 - **노멀:** 모든 primitive 에 `NORMAL` 속성이 있어야 한다(외곽선 패스가 법선 방향 확장을 쓴다 — 시안 B, SE-018). 스무딩 방식(플랫/스무스)은 아트 디렉션 몫이라 여기서 정하지 않는다.
 
@@ -57,7 +57,7 @@
 ## 4. 정점 색
 
 - 기본: `COLOR_0` 를 넣지 않는다.
-- 있다면 **알파는 전부 1.0**(오차 1e-4). 아니면 거부(materials.md M1: 정점 알파는 의미 채널이 아니다).
+- 있다면 **알파는 전부 1.0**(오차 `tolerance.vertex_alpha`). 아니면 거부(materials.md M1: 정점 알파는 의미 채널이 아니다).
 - RGB 가 (1, 1, 1) 이 아니면 경고. RGB 는 `base` 서피스에만 곱해진다(M2)는 점을 메시지에 적는다.
 
 ## 5. 텍스처 0
@@ -72,7 +72,7 @@
 
 ## 7. 폴리곤 예산
 
-`docs/style-guide.md` "폴리곤 예산" 행이 기준이다. 이 문서에 수치를 복사하지 않는다(행이 바뀌면 린터 설정만 바뀐다). 현재 행의 값: 가구 소형 ≤ 300 tri, 대형 설비 ≤ 1,500 tri, 캐릭터 ≤ 800 tri, 임포스터용 LOD1 ≤ 150 tri. 삼각형 수는 **모든 서피스의 합**이고, 카테고리는 티켓(→ `META.json`)에서 읽는다. LOD1 파일의 이름·슬롯 요구는 v0 에서 정하지 않았다(임시: 같은 규칙 적용, 린터 티켓에서 확정).
+`docs/style-guide.md` "폴리곤 예산" 행이 기준이다. 린터는 `lint_config.json` 의 `tri_budget` 을 읽는다. 현재 값: 가구 소형 ≤ 300 tri, 대형 설비 ≤ 1,500 tri, 캐릭터 ≤ 800 tri, 임포스터용 LOD1 ≤ 150 tri (복사본, 기준은 style-guide 행; 린터는 `lint_config.json` 을 읽는다. 단위 테스트가 둘의 일치를 확인한다). 삼각형 수는 **모든 서피스의 합**이고, 칸은 `META.json` 의 `poly_budget` 에서 읽는다. LOD1 파일(`poly_budget: lod1`)은 v0 에서 이름·슬롯 요구를 따로 정하지 않고 같은 규칙을 적용한다(SE-027 린터가 그렇게 동작).
 
 ## 8. 캐릭터는 `glass` 금지
 
@@ -107,7 +107,7 @@
 **재현 방법:**
 
 ```bash
-python3 tools/assets/q5_probe/make_probe_glb.py <임시 디렉터리>/glb          # 5개 .glb 생성
+python3 tools/assets/q5_probe/make_probe_glb.py --out <임시 디렉터리>/glb      # 린터 픽스처 .glb + .META.json 생성 (slots4.glb 등)
 mkdir -p <임시 프로젝트> && printf 'config_version=5\n[application]\nconfig/name="q5"\n' > <임시 프로젝트>/project.godot
 # (1) 런타임 경로(GLTFDocument)
 godot --headless --path <임시 프로젝트> -s <절대경로>/tools/assets/q5_probe/probe_import.gd -- <임시 디렉터리>/glb/slots4.glb
@@ -118,9 +118,18 @@ godot --headless --path <임시 프로젝트> -s <절대경로>/tools/assets/q5_
 
 저장소의 `project/` 는 건드리지 않는다(임시 프로젝트는 저장소 밖에 둔다).
 
-## 10. 린터 체크리스트 (`tools/assets/lint_gltf.py`, 구현은 후속 티켓)
+## 10. 린터 체크리스트 (`tools/assets/lint_gltf.py`, SE-027 구현)
 
-입력은 `.glb` 한 파일 + `META.json`(카테고리, 타일 점유, 높이). 표준 라이브러리만으로 glTF JSON 과 버퍼를 읽는다(헤드리스, Godot 불필요). 판정 수준: **거부**(exit 1) / 경고(exit 0, `lint.json` 에 기록). 결과는 `project/assets/review-queue/<asset-id>/lint.json` 에 항목 id 별로 남긴다.
+입력은 `.glb` 한 파일 + `META.json`(아래 "META.json" 절). 표준 라이브러리만으로 glTF JSON 과 버퍼를 읽는다(헤드리스, Godot 불필요). 판정 수준: **거부**(exit 1) / 경고(exit 0, `lint.json` 에 기록). 결과는 `project/assets/review-queue/<asset-id>/lint.json` 에 항목 id 별로 남긴다.
+
+```bash
+python3 -I tools/assets/lint_gltf.py <asset.glb> <META.json> [--out <lint.json>] [--config tools/assets/lint_config.json]
+```
+
+- 종료 코드: 0 통과(경고 포함) / 1 거부 / 2 인자·파일 오류(glb 가 아님, META.json 형식 오류, 외부 buffer uri 등. 이때 `lint.json` 은 쓰지 않는다).
+- `--out` 을 생략하면 `project/assets/review-queue/<asset_id>/lint.json`. 거부일 때도 쓴다.
+- `lint.json`: `{asset_id, glb, meta, verdict: "pass"|"reject", items: [{id, level: "reject"|"warn", message}], config_sha256}`. `glb`·`meta` 는 파일 이름, `config_sha256` 은 쓴 설정 파일의 SHA-256, `items` 는 L1~L10, A1~A3 순. 메시지는 `<파일명>: ` 으로 시작한다.
+- 허용 오차·예산·슬롯 이름 등 수치는 전부 `tools/assets/lint_config.json` 에 있고 린터 코드에는 없다.
 
 | # | 항목 | 검사 | 수준 | 거부 규칙 |
 |---|---|---|---|---|
@@ -135,9 +144,32 @@ godot --headless --path <임시 프로젝트> -s <절대경로>/tools/assets/q5_
 | L9 | 피벗·스케일 | AABB `min.y` ≈ 0, x·z 중심 ≈ 0, 노드 변환 항등, AABB 가 `META.json` 풋프린트·높이 안(1 타일 = 1 m) | 거부 | §1 |
 | L10 | 캐릭터 `glass` 없음 | `META.json` 카테고리가 캐릭터이면 `glass` 서피스 0 | 거부 | §8 |
 
-덧붙임(10항목 밖, 린터 티켓이 채택 여부를 정한다): 모든 primitive 에 `NORMAL` 존재(§1), 미사용 머티리얼 경고(§3), `extensionsRequired` 비어 있음(§1).
+덧붙임(SE-027 에서 채택, 항목 id 는 A1~A3): **A1** 모든 primitive 에 `NORMAL` 존재 — 거부(§1). **A2** 미사용 머티리얼 — 경고(§3). **A3** `extensionsRequired` 비어 있음 — 거부(§1).
 
-픽스처(린터 티켓의 테스트 입력)는 `tools/assets/q5_probe/make_probe_glb.py` 가 만드는 `.glb` 로 시작할 수 있다: `slots4.glb`(통과), `bad_names.glb`(L1·L4), `dup_two_materials.glb`·`dup_shared_material.glb`(L3), `vertex_alpha.glb`(L5). 피벗·예산·텍스처·노드 수·캐릭터 glass 픽스처는 린터 티켓이 추가한다.
+L9 의 AABB 는 정점 데이터에서 직접 계산한다. 풋프린트는 `META.json` 의 `footprint` × 1 타일(`tile_size_m`) 이내, 높이는 AABB `max.y` 가 `height_m` 의 ±`height_ratio` 이내여야 한다. L10 은 `category` 또는 `poly_budget` 이 `character` 이면 적용한다.
+
+픽스처는 `tools/assets/fixtures/` (생성: `python3 -I tools/assets/q5_probe/make_probe_glb.py --out tools/assets/fixtures/`, 결정적이라 커밋본과 바이트 동일, 파일마다 10 KB 미만). `<이름>.glb` 와 `<이름>.META.json` 한 쌍이다. `slots4`(통과), `bad_names`(L1·L2·L3·L4), `no_base`(L2), `dup_two_materials`·`dup_shared_material`·`five_surfaces`(L3), `vertex_alpha`(L5 거부)·`vertex_color_rgb`(L5 경고), `with_texture`(L6), `two_nodes`·`child_node`·`with_animation`(L7), `over_budget`·`non_triangle`(L8), `pivot_offset`·`node_scaled`·`too_tall`·`too_wide`(L9), `character_glass`(L10), `no_normal`(A1), `unused_material`(A2 경고), `required_ext`(A3). 테스트는 `python3 -I tools/assets/test_lint_gltf.py`.
+
+### META.json
+
+에셋 한 개당 `.glb` 옆에 두는 입력 파일(검수 큐에서는 `project/assets/review-queue/<asset-id>/META.json`). 린터가 읽고, 키 이름 `category`·`footprint`·`height_m`·`poly_budget` 은 **SE-028 가구 테이블(`furniture.schema.json`)과 같다**(다르면 SE-028 이 이긴다). 키는 아래 6개가 전부이고 모두 필수이며, 모르는 키는 거부(exit 2)한다.
+
+| 키 | 타입 | 뜻 |
+|---|---|---|
+| `asset_id` | String `^[a-z][a-z0-9_]*$` | 에셋 id. 가구는 가구 테이블 `id` 와 같다. `lint.json` 기본 경로의 폴더 이름 |
+| `ticket` | String `^SE-[0-9]{3}$` | 요청 티켓 번호 |
+| `category` | enum | 가구 테이블 `category` 7종(`stage`, `sound`, `light`, `bar`, `amenity`, `safety`, `decor`) + 가구가 아닌 에셋용 `character`. 린터는 값 검증과 L10 판정에만 쓴다 |
+| `footprint` | `[w, d]` int 1~8 | 회전 0 에서의 타일 점유(x 방향, z 방향). L9 가 AABB 와 비교 |
+| `height_m` | number 0.05~6 | 모델 높이(m). L9 가 AABB `max.y` 와 비교(±5%) |
+| `poly_budget` | `furniture_small` \| `equipment_large` \| `character` \| `lod1` | style-guide "폴리곤 예산" 의 칸. SE-028 가구 테이블은 앞 두 값을 쓰고, `character`·`lod1` 은 린터가 더한 값(가구 테이블에는 안 나온다). L8 이 `lint_config.json` 의 `tri_budget` 에서 값을 찾는다 |
+
+예(`tools/assets/fixtures/slots4.META.json`):
+
+```json
+{"asset_id": "slots4", "category": "decor", "footprint": [1, 1], "height_m": 1.0, "poly_budget": "furniture_small", "ticket": "SE-027"}
+```
+
+가구 에셋은 `project/data/furniture/` 의 행과 `footprint`·`height_m`·`category`·`poly_budget` 이 일치해야 한다(등록은 SE-041 몫, 린터는 테이블을 읽지 않는다).
 
 ## 11. 생성 프롬프트 템플릿 수정안
 
@@ -165,3 +197,4 @@ one surface per slot, no vertex colors, origin at bottom center, fits <w>x<d> me
 | 날짜 | 버전 | 티켓 | 내용 |
 |---|---|---|---|
 | 2026-10-09 | v0 | SE-019 | 신규. 슬롯 = 서피스 규약의 glTF 임포트 규약, Q5 Godot 4.7.2 확인(헤드리스), 린터 체크리스트 10항목 |
+| 2026-10-09 | v0.1 | SE-027 | 린터 구현(`lint_gltf.py`·`lint_config.json`·픽스처·테스트). `META.json` 절 추가(키는 SE-028 과 같은 이름), §7 수치 문구 정리(복사본, 기준은 style-guide 행), 허용 오차는 설정 파일 참조, 덧붙임 3건 채택(A1~A3), §10 "구현은 후속 티켓" → "SE-027 구현" |
