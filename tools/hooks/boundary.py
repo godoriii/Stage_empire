@@ -264,7 +264,7 @@ def self_test() -> None:
         ({"tool_name": "Bash", "tool_input": {"command": "echo hi 2> project/ui/err.log"}}, ["project/sim"], False, False),
         ({"tool_name": "Bash", "tool_input": {"command": "cat <<EOF > project/ui/x.gd\nx > y\nEOF"}}, ["project/sim"], False, False),
         ({"tool_name": "Write", "tool_input": {"file_path": "/tmp/claude-0/-x/sess/scratchpad/patch.diff"}}, ["docs/reviews"], True, True),
-        ({"tool_name": "Bash", "tool_input": {"command": "cp a.gd /tmp/claude-0/-x/sess/scratchpad/a.gd"}}, ["project/sim"], False, True),
+        ({"tool_name": "Bash", "tool_input": {"command": "tee /tmp/claude-0/-x/sess/scratchpad/a.gd"}}, ["project/sim"], False, True),
         ({"tool_name": "Write", "tool_input": {"file_path": "/tmp/claude-0/-x/sess/other/x.md"}}, ["project/sim"], False, False),
         ({"tool_name": "Write", "tool_input": {"file_path": "/tmp/other/scratchpad/x.md"}}, ["project/sim"], False, False),
     ]
