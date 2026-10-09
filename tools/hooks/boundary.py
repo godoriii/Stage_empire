@@ -35,7 +35,7 @@ READONLY_BASH_ALLOW = re.compile(
     r"^\s*(git\s+(diff|log|show|status|blame|branch|rev-parse|ls-files|grep)\b"
     r"|cat\b|ls\b|head\b|tail\b|wc\b|grep\b|rg\b|find\b|tree\b|stat\b|file\b|diff\b"
     r"|python3?\s+(-I\s+)?tools/validate_data\.py\b"
-    r"|tools/run_tests\.sh\b|echo\b|pwd\b|which\b|env\b|true\b)"
+    r"|tools/run_tests\.sh\b|echo\b|pwd\b|cd\b|which\b|env\b|true\b)"
 )
 # 어떤 에이전트도 쓰면 안 되는 경로 (사람 전용)
 ALWAYS_PROTECTED = (
