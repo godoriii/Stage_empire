@@ -20,14 +20,18 @@ art-pipeline, render-engineer, audio 가 이 문서를 기준으로 일한다.
 | 셰이더 시안 | **B 확정(2026-10-09 프로덕트 오너)**: 셀 3단계, 외곽선 2px(색 (0.05, 0.04, 0.07)), 림라이트 on(`rim_strength 0.9`, `rim_width 0.35`, 역광 가중 — 무대 스포트 같은 역광에서만 보임), `shadow_tint (0.32, 0.3, 0.45, 0.55)`. 파일 `project/view/shaders/params/toon_b.tres`·`outline_b.tres`, 기본값은 `ShaderVariants.DEFAULT_ID`(SE-018). 비교 자료 `docs/reports/perf/SE-004-{default,a,b,c}.png`, 비용 구성 E M1 88.4 → 70.5 fps(docs/reports/SE-004.md). 박스 모서리 외곽선 가늘어짐은 SE-021 | 확정 |
 | 팔레트 | 장르별 강조색 8개 + 중립 톤 6개, 색약 팔레트 별도 | 미정 |
 | 폴리곤 예산 | 가구 소형 ≤ 300 tri, 대형 설비 ≤ 1,500 tri, 캐릭터 ≤ 800 tri (인스턴싱 대상), 임포스터용 LOD1 ≤ 150 tri | 초안 |
-| 머티리얼 슬롯 이름 | `base`, `accent`, `emissive`, `glass` 네 종으로 고정 — 색 변형은 슬롯 파라미터로 | 초안 |
+| 머티리얼 슬롯 이름 | `base`(필수), `accent`, `emissive`, `glass` 네 종으로 고정. **슬롯 = 메시 서피스**(glTF 머티리얼 이름 = 슬롯 이름, 서피스 하나에 슬롯 하나), 정점 알파는 의미 없음(1.0). `glass` 는 투명·외곽선 없음·그림자 없음. 색 변형은 슬롯 파라미터·오브젝트 단위 인스턴스 파라미터로(머티리얼 복제 금지). 상세 [gdd/materials.md](gdd/materials.md) (SE-019) | 확정 |
 | 타일 점유 표기 | `w×d`(x, z), 높이 m. 예: 바 카운터 3×1, 높이 1.1 | 초안 |
 | 상태 변형 | 기본/켜짐/고장/철거중 — 머티리얼 또는 이미시브 변화로, 별도 메시 금지 | 초안 |
 | 포맷 | glTF 2.0 (`.glb`), 단위 미터, +Y 업, -Z 전방 | 초안 |
 
-## 생성 프롬프트 템플릿 (art-pipeline 용, 확정 전 임시)
+## 생성 프롬프트 템플릿 (art-pipeline 용, SE-019 슬롯 규약 반영)
 
 ```
 low-poly <object>, flat colors, no texture, clean topology, game asset, isometric-friendly,
-single mesh, origin at bottom center, fits <w>x<d> meter footprint, height <h> m, <accent color> accent
+single mesh with material slots named exactly base, accent (optional), emissive (optional), glass (optional),
+one surface per slot, no vertex colors, origin at bottom center, fits <w>x<d> meter footprint, height <h> m,
+<accent color> accent on the accent slot only
 ```
+
+이미지→3D 생성 도구는 이름 있는 슬롯을 못 만드는 경우가 많다. 프롬프트의 슬롯 요구는 요청일 뿐이고 통과 여부는 린터(`tools/assets/GLTF_SPEC.md` §10)가 정한다. 실패하면 모델링 단계에서 슬롯을 나눈다.
