@@ -1,0 +1,79 @@
+[gd_resource type="Resource" script_class="SpikeConfigSet" format=3]
+
+[ext_resource type="Script" path="res://view/perf/spike_config.gd" id="1_nowse"]
+[ext_resource type="Script" path="res://view/perf/spike_config_set.gd" id="2_55jm0"]
+
+[sub_resource type="Resource" id="Resource_khmpg"]
+script = ExtResource("1_nowse")
+id = "A"
+instances = 5000
+lights = 32
+shadow_atlas_size = 2048
+note = "하한"
+
+[sub_resource type="Resource" id="Resource_rmjwt"]
+script = ExtResource("1_nowse")
+id = "B"
+instances = 5000
+lights = 32
+shadow_lights = 8
+shadow_atlas_size = 2048
+note = "관문 구성 (셰도우 아틀라스 ≤ 2048)"
+
+[sub_resource type="Resource" id="Resource_g7pps"]
+script = ExtResource("1_nowse")
+id = "C"
+instances = 5000
+lights = 32
+shadow_lights = 32
+shadow_atlas_size = 2048
+note = "상한"
+
+[sub_resource type="Resource" id="Resource_3mfmq"]
+script = ExtResource("1_nowse")
+id = "D"
+instances = 10000
+lights = 32
+shadow_lights = 8
+shadow_atlas_size = 2048
+note = "여유 확인"
+
+[resource]
+script = ExtResource("2_55jm0")
+configs = Array[ExtResource("1_nowse")]([SubResource("Resource_khmpg"), SubResource("Resource_rmjwt"), SubResource("Resource_g7pps"), SubResource("Resource_3mfmq")])
+default_config_id = "B"
+gate_config_id = "B"
+gate_min_avg_fps = 60.0
+warmup_sec = 10.0
+warmup_min_frames = 120
+measure_sec = 30.0
+resolution = Vector2i(1920, 1080)
+crowd_fill_ratio = 0.9
+crowd_jitter_ratio = 0.3
+crowd_seed = 3003
+body_radius_m = 0.22
+body_height_m = 1.45
+body_radial_segments = 16
+body_rings = 6
+head_size_m = 0.28
+arm_size_m = Vector3(0.1, 0.5, 0.1)
+crowd_palette = PackedColorArray(0.85, 0.3, 0.35, 1, 0.3, 0.55, 0.85, 1, 0.95, 0.8, 0.35, 1, 0.4, 0.75, 0.45, 1, 0.75, 0.45, 0.85, 1, 0.9, 0.9, 0.9, 1, 0.25, 0.25, 0.3, 1, 0.95, 0.55, 0.25, 1)
+interpolation_tick_hz = 10.0
+wander_radius_m = 0.35
+wander_speed_min = 0.5
+wander_speed_max = 1.2
+bob_height_m = 0.08
+bob_freq_hz = 2.0
+light_height_m = 6.0
+light_area_ratio = 0.85
+light_orbit_radius_m = 2.0
+light_orbit_speed = 0.6
+light_hue_speed = 0.1
+light_saturation = 0.85
+omni_range_m = 9.0
+omni_energy = 3.0
+spot_range_m = 14.0
+spot_angle_deg = 20.0
+spot_energy = 8.0
+spot_sweep_radius_m = 4.0
+spot_sweep_speed = 0.9

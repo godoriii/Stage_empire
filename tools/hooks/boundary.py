@@ -57,14 +57,26 @@ def repo_root(cwd: str) -> Path:
 
 
 def rel(path: str, root: Path, cwd: Path) -> str | None:
-    """경로를 리포지토리 상대 경로로. 리포지토리 밖이면 None."""
+    """경로를 리포지토리 상대 경로로. 리포지토리 밖이면 None.
+
+    git worktree 를 지원한다: 세션 cwd 의 리포지토리 밖이어도, 대상 경로에서 위로 올라가
+    CLAUDE.md + .claude/ 가 있는 다른 체크아웃(같은 리포지토리의 worktree) 안이면 그 루트 기준으로 본다.
+    """
     p = Path(path)
     if not p.is_absolute():
         p = cwd / p
+    p = p.resolve()
     try:
-        return p.resolve().relative_to(root).as_posix()
+        return p.relative_to(root).as_posix()
     except ValueError:
-        return None
+        pass
+    other = repo_root(str(p.parent))
+    if other != p.parent and (other / "CLAUDE.md").exists() and (other / ".claude").is_dir():
+        try:
+            return p.relative_to(other).as_posix()
+        except ValueError:
+            return None
+    return None
 
 
 def under(path: str, roots: list[str]) -> bool:
