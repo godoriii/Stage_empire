@@ -3,6 +3,7 @@ extends GutTest
 ## 필수 키 전부로 생성되는지, 측정기가 SpikeCrowd 를 타입으로 다루는지.
 ## 실제 fps 는 의미 없다(헤드리스 = 렌더 없음 → run_valid false, 관문 "무효"). GPU 측정은 사람 PC 에서 한다.
 ## SE-004 AC7: material_id(--material=) → JSON material 키, 기본 출력 파일명, 없는 시안 거부.
+## SE-018 AC6: 기본 시안 b, 기본 출력 파일명은 항상 SE-013_<config>_<material>.json, "default" 는 없는 시안.
 
 const ENTRY_SCENE: String = "res://tests/view/perf/measure_spike.tscn"
 const MEASURE_SCRIPT: String = "res://tests/view/perf/measure_spike.gd"
@@ -143,28 +144,51 @@ func test_material_arg_in_json_and_bad_id_rejected() -> void:
 		assert_true(d.has(k), "SE-013 키 %s" % k)
 	assert_eq(int(d["instance_count_actual"]), 5000, "시안을 씌워도 인스턴스 5000")
 	assert_eq(_default_out_path.get_file(), "SE-013_E_c.json", "기본 출력 파일명 SE-013_<config>_<material>.json")
-	assert_eq(SpikeMeasure.default_out_path("E", "default").get_file(), "SE-013_E.json", "default 시안은 SE-013 과 같은 파일명")
 	assert_eq(SpikeMeasure.default_out_path("B", "a").get_file(), "SE-013_B_a.json")
 
-	# 없는 시안: _spawn_spike() 가 false, push_error 1건, 스파이크 자식 없음(auto_quit 이면 종료 코드 2).
-	var bad: SpikeMeasure = (load(ENTRY_SCENE) as PackedScene).instantiate() as SpikeMeasure
-	autofree(bad)
-	bad.auto_quit = false
-	bad.config_id = "E"
-	bad.material_id = "zzz"
-	assert_false(bad._spawn_spike(), "_spawn_spike() == false")
-	assert_push_error_count(1, "push_error 1건")
-	assert_null(bad.get_spike(), "스파이크 없음")
-	assert_eq(bad.get_child_count(), 0, "스파이크 자식이 생기지 않는다")
+	# 없는 시안(SE-018: 예전 "default" 도 없는 시안): _spawn_spike() 가 false, push_error 1건, 스파이크 자식 없음
+	# (auto_quit 이면 종료 코드 2).
+	var expected_errors: int = 0
+	for bad_id: String in ["zzz", "default"]:
+		var bad: SpikeMeasure = (load(ENTRY_SCENE) as PackedScene).instantiate() as SpikeMeasure
+		autofree(bad)
+		bad.auto_quit = false
+		bad.config_id = "E"
+		bad.material_id = bad_id
+		assert_false(bad._spawn_spike(), "%s: _spawn_spike() == false" % bad_id)
+		expected_errors += 1
+		assert_push_error_count(expected_errors, "%s: push_error 1건(누적 %d)" % [bad_id, expected_errors])
+		assert_null(bad.get_spike(), "%s: 스파이크 없음" % bad_id)
+		assert_eq(bad.get_child_count(), 0, "%s: 스파이크 자식이 생기지 않는다" % bad_id)
 	assert_eq(SpikeMeasure.EXIT_BAD_SETUP, 2, "종료 코드 2(--config 오류와 같은 경로)")
 
 
-func test_default_material_report_matches_se013() -> void:
+## SE-018 AC6: --material 없이 돌리면 시안 b, 기본 파일명 SE-013_E_b.json. plain 도 접미사를 붙인다(특례 없음).
+func test_default_material_is_b_and_filename_has_suffix() -> void:
 	var data: Variant = await _run_entry("E")
 	assert_true(data is Dictionary, "JSON 파싱")
 	if not (data is Dictionary):
 		return
 	var d: Dictionary = data
-	assert_eq(d["material"], "default", "--material 없으면 default")
-	assert_eq(_default_out_path.get_file(), "SE-013_E.json", "--material 없으면 SE-013 과 같은 기본 파일명")
+	assert_eq(d["material"], "b", "--material 없으면 b")
+	assert_eq(d["material"], ShaderVariants.DEFAULT_ID, "기본값 출처 = ShaderVariants.DEFAULT_ID")
+	assert_eq(_default_out_path.get_file(), "SE-013_E_b.json", "--material 없으면 SE-013_E_b.json")
+	assert_eq(SpikeMeasure.default_out_path("E", "b"), "user://perf/SE-013_E_b.json")
+	assert_eq(SpikeMeasure.default_out_path("E", "plain"), "user://perf/SE-013_E_plain.json", "plain 도 _plain 접미사")
+	assert_false(bool(d["crowd_cast_shadow"]), "E: 군중 그림자 off")
+	assert_eq(int(d["instance_count_actual"]), 5000, "인스턴스 5000")
+	for k: String in SE003_KEYS:
+		assert_true(d.has(k), "SE-003 필수 키 %s" % k)
+	for k: String in SE013_KEYS:
+		assert_true(d.has(k), "SE-013 키 %s" % k)
+	# default_out_path 안에 DEFAULT_ID 특례 분기가 없다(소스 텍스트 검사).
+	var src: String = (load(MEASURE_SCRIPT) as GDScript).source_code
+	var body_start: int = src.find("static func default_out_path(")
+	assert_gt(body_start, -1, "default_out_path 정의")
+	var body_end: int = src.find("\nstatic func ", body_start + 1)
+	if body_end < 0:
+		body_end = src.find("\nfunc ", body_start + 1)
+	var body: String = src.substr(body_start, body_end - body_start if body_end > 0 else -1)
+	assert_false(body.contains("== ShaderVariants.DEFAULT_ID"), "default_out_path 에 DEFAULT_ID 특례 분기 0건")
+	assert_false(body.contains("DEFAULT_OUT_PATTERN %"), "구 SE-013 파일명 패턴을 쓰지 않는다")
 	assert_eq(d["ticket"], "SE-013")

@@ -6,14 +6,15 @@ extends Node
 ##   godot --path project res://tests/view/perf/measure_spike.tscn -- --config=E [--out=<경로.json>] [--commit=<해시>]
 ##
 ## 구성 결정: @export config_id > 명령줄 --config= > settings.default_config_id. 없는 구성이면 종료 코드 2.
-## SE-004 시안: @export material_id > 명령줄 --material= > "default"(ShaderVariants). 없는 시안이면 종료 코드 2.
-##   JSON 에 material 키. ticket 값은 SE-013 그대로(SE-004 결과는 --out 파일명과 material 키로 구분).
-##   기본 출력 파일명: default 면 SE-013 과 같은 user://perf/SE-013_<config>.json, 그 밖은 SE-013_<config>_<material>.json.
+## SE-004/SE-018 시안: @export material_id > 명령줄 --material=<plain|a|b|c> > ShaderVariants.DEFAULT_ID(시안 B).
+##   없는 시안(예전 "default" 포함)이면 종료 코드 2. JSON 에 material 키. ticket 값은 SE-013 그대로
+##   (시안별 결과는 --out 파일명과 material 키로 구분). 기본 출력 파일명은 항상 SE-013_<config>_<material>.json
+##   (plain 도 _plain. SE-018 에서 SE-013 파일명 호환 특례 제거).
 ## 절차: VSync 끄기 + max_fps 0 + 창 resolution(spike_configs.tres) → 예열(warmup_sec 이상 그리고 warmup_min_frames 이상)
 ## → measure_sec 동안 프레임마다 벽시계 프레임 시간(Time.get_ticks_usec 차이, delta 스무딩 영향 없음)과
 ## Performance/RenderingServer 수치 수집 → PerfStats → JSON 저장 + 콘솔 표 → 종료.
 ## 스파이크 씬의 진행(advance)은 측정기가 직접 호출하고 그 CPU 시간을 avg_crowd_update_ms 로 잰다.
-## 기본 출력: user://perf/SE-013_<config>.json (Linux: ~/.local/share/godot/app_userdata/Stage Empire/perf/).
+## 기본 출력: user://perf/SE-013_<config>_<material>.json (Linux: ~/.local/share/godot/app_userdata/Stage Empire/perf/).
 ## --warmup-sec= / --warmup-frames= / --measure-sec= 는 동작 확인용 단축 실행 전용이다.
 ## 설정값보다 짧으면 run_issues 에 잡혀 run_valid=false, 관문 "무효"가 된다(SE-013).
 ## project.godot 은 바꾸지 않는다. 창·VSync 는 런타임에만 설정한다.
@@ -26,8 +27,7 @@ const ARG_COMMIT: String = "--commit="
 const ARG_WARMUP_SEC: String = "--warmup-sec="
 const ARG_WARMUP_FRAMES: String = "--warmup-frames="
 const ARG_MEASURE_SEC: String = "--measure-sec="
-const DEFAULT_OUT_PATTERN: String = "user://perf/SE-013_%s.json"
-## SE-004: default 가 아닌 시안의 기본 출력 파일명(구성, 시안).
+## SE-004/SE-018: 기본 출력 파일명(구성, 시안). 모든 시안에 쓴다.
 const DEFAULT_OUT_PATTERN_MATERIAL: String = "user://perf/SE-013_%s_%s.json"
 ## 티켓 측정 조건: forward_plus 렌더러.
 const REQUIRED_RENDERER: String = "forward_plus"
@@ -53,7 +53,7 @@ enum Phase { WARMUP, MEASURE, DONE }
 @export var spike_scene: PackedScene
 ## 비워 두면 명령줄 --config=<id>, 그것도 없으면 settings.default_config_id.
 @export var config_id: String = ""
-## SE-004 셰이더 시안. 비워 두면 명령줄 --material=<id>, 그것도 없으면 "default".
+## SE-004 셰이더 시안. 비워 두면 명령줄 --material=<id>, 그것도 없으면 ShaderVariants.DEFAULT_ID.
 @export var material_id: String = ""
 
 ## false 면 끝나도(또는 구성 오류여도) 종료하지 않는다(테스트용).
@@ -114,8 +114,7 @@ func _ready() -> void:
 	_last_usec = Time.get_ticks_usec()
 	print("SpikeMeasure: 구성 %s, 예열 %.1fs/%d프레임, 측정 %.1fs → %s" % [
 		_config.id, warmup_sec, warmup_min_frames, measure_sec, ProjectSettings.globalize_path(out_path)])
-	if _spike.get_material_id() != ShaderVariants.DEFAULT_ID:
-		print("SpikeMeasure: 셰이더 시안 %s (SE-004)" % _spike.get_material_id())
+	print("SpikeMeasure: 셰이더 시안 %s (SE-004)" % _spike.get_material_id())
 
 
 ## spike_scene 을 자식으로 인스턴스화한다. 구성이 없으면 false(auto_quit 이면 종료 코드 2).
@@ -358,10 +357,8 @@ static func bound_hint(gpu_ms: float, script_ms: float, render_cpu_ms: float) ->
 	return "gpu" if gpu_ms > script_ms + render_cpu_ms else "cpu"
 
 
-## SE-004: 기본 출력 경로. default 시안은 SE-013 과 같은 이름, 그 밖은 시안 id 를 붙인다.
+## SE-004/SE-018: 기본 출력 경로. 항상 시안 id 를 붙인다(plain 도 SE-013_<config>_plain.json).
 static func default_out_path(config_id_value: String, material: String) -> String:
-	if material == ShaderVariants.DEFAULT_ID:
-		return DEFAULT_OUT_PATTERN % config_id_value
 	return DEFAULT_OUT_PATTERN_MATERIAL % [config_id_value, material]
 
 
