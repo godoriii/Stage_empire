@@ -158,7 +158,7 @@
 | S1 | 재진입이면(`advance`/`step` 실행 중이거나 버스가 디스패치 중) `push_error`, 0 반환 |
 | S2 | 경계 처리(명령 적용, #명령-큐와-틱-순서의 B) |
 | S3 | `s0 = speed`. `s0 == 0`이거나 홀드 구간이면 `acc = 0`, 0 반환(일시정지 중 실시간은 쌓이지 않는다) |
-| S4 | `us = max(0, roundi(delta_s × 1,000,000))`, `acc += us × s0 × ticks_per_second` |
+| S4 | 포화(SE-007): `k = s0 × ticks_per_second`, `sat_s = ⌈max_ticks_per_step ÷ k⌉` 일 때 `delta_s > sat_s` 이면 `delta_s = sat_s + (delta_s mod 1)` (정수 초만 잘라 int64 오버플로를 막고, 소수부를 남겨 S5 의 `budget`·잔여 `acc` 가 자르지 않은 계산과 같다). 그 뒤 `us = max(0, roundi(delta_s × 1,000,000))`, `acc += us × k` |
 | S5 | `q = acc ÷ 1,000,000`(정수 나눗셈), `acc −= q × 1,000,000`, `budget = min(q, max_ticks_per_step)` (상한 초과분은 버림, 따라잡기 없음) |
 | S6 | 최대 `budget`틱을 처리. 두 번째 틱부터는 처리 직전에: 홀드 구간이거나 `speed ≠ s0`면 `acc = 0` 후 중단 → 아니면 경계 처리 → 다시 `speed ≠ s0`면 `acc = 0` 후 중단 |
 | S7 | 처리한 틱 수 반환 |
@@ -384,6 +384,7 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | AC5 | `test_tick.gd::test_speed_rejected_keeps_state` | show 에서 0/2/3 → `time.speed_rejected {reason:"not_allowed", phase:"show"}`, `"fast"`·키 없음 → `reason:"invalid"`. 요청 전후 상태 해시 동일. `{speed: 1.5}` → `publish()` `false` + `push_error` 1회, 경계 처리(`advance(0)`) 뒤 `time.speed_rejected` 없음(이벤트 0개), 상태 해시 불변 (#배속 요청 처리 1행, E4) |
 | AC5 | `test_tick.gd::test_speed_clamped_on_phase_enter` | 클램프 표 전 행: day 3배속 → evening 진입 시 1(`cause:"phase_enter"`), day 2 → 1, show 진입 1 유지(이벤트 없음), close 진입 → 0, 다음 날 → 1 (#배속 클램프 표) |
 | AC6 | `test_tick.gd::test_step_accumulator_by_speed` | day 에서 배속 1: `step(0.1)`×100 → 100틱. 배속 3 → 300틱. 배속 0 → 0틱. 새 루프 둘에서 `step(0.05)`×2 와 `step(0.1)`×1 의 상태 해시 동일 (#배속 누적기) |
+| AC6 | `test_tick.gd::test_step_saturation_keeps_fraction` (SE-007 추가) | 배속 1에서 `step(10.05)`·`step(1e13 + 0.25)` 각각 30틱 → `step(0.04)` 0틱 → `step(0.01)` 1틱 (소수부 잔여 보존). `replay/test_replay_qa.gd::test_step_int64_overflow_known_bug`: 배속 1·2·3 × delta {3e11…1e300} 에서 `step` = `max_ticks_per_step`, 이어진 `step(0.1)` = 배속 (#배속 S4) |
 | AC6 | `test_tick.gd::test_step_caps_and_discards` (SE-006 추가) | 배속 1에서 `step(10.0)` → 30틱(`max_ticks_per_step`) 그리고 이어진 `step(0.0)` → 0틱. day 끝 3배속에서 큰 `step`이 evening 진입(3→1)에서 멈추고 남은 몫을 버림. close 진입 시 멈춤 (#배속 S5·S6) |
 | AC7 | `test_tick.gd::test_commands_applied_at_tick_boundary` | 틱 5 의 `tick.advanced` 핸들러가 `time.speed_requested {speed:2}` 발행. (a) `advance(10)`: 핸들러 안에서 `speed` 아직 1, 이벤트 열에서 `time.speed_changed`가 `tick.advanced {tick:5}` 뒤·`tick.advanced {tick:6}` 앞. (b) 새 루프 `advance(5)`: 반환 뒤 `speed` 1, `bus.get_pending_commands()` 1개 → `advance(0)` 뒤 `speed` 2, 0개 (#명령-큐와-틱-순서) |
 | AC7 | `test_tick.gd::test_systems_updated_in_config_order` (SE-006 추가) | 가짜 시스템을 `reputation`, `build`, `audience` 순서로 등록 → 매 틱 호출 순서 `build, audience, reputation`, 모두 해당 틱의 `tick.advanced` 이전, `ctx`가 틱 시작 시점 값. `system_order`에 없는 id·중복 등록은 `false` (#명령-큐와-틱-순서) |

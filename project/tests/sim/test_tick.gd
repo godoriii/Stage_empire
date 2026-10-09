@@ -33,12 +33,23 @@ func _next_day(loop: TickLoop) -> void:
 	loop.bus.publish("time.next_day_requested", {})
 
 
+## I2 기대값을 getter(phase_start 사용)와 독립으로 계산한다: phases 배열을 앞에서부터 돌며 현재 구간 앞의
+## 구간 길이(ticks)를 누적하고 tick_in_phase 를 더한다(docs/reviews/SE-001.md 발견 4-i).
+func _tick_in_day_independent(loop: TickLoop) -> int:
+	var before: int = 0
+	for p: Dictionary in _cfg.phases:
+		if p["id"] == loop.phase:
+			return before + loop.tick_in_phase
+		before += int(p["ticks"])
+	return -1
+
+
 ## 경계 상태 불변식 I1~I4. 어긋나면 설명 문자열, 아니면 "".
 func _invariants(loop: TickLoop) -> String:
 	var d: int = _cfg.day_ticks
 	if loop.tick != (loop.day - 1) * d + loop.tick_in_day:
 		return "I1 tick %d" % loop.tick
-	if loop.tick_in_day != _cfg.phase_start(loop.phase) + loop.tick_in_phase:
+	if loop.tick_in_day != _tick_in_day_independent(loop):
 		return "I2 tick %d" % loop.tick
 	var len_p: int = _cfg.phase_ticks(loop.phase)
 	if len_p > 0 and not (loop.tick_in_phase >= 0 and loop.tick_in_phase < len_p):
@@ -299,6 +310,18 @@ func test_step_caps_and_discards() -> void:
 	assert_eq(loop.step(10.0), 10, "close 진입에서 멈춤")
 	assert_eq([loop.phase, loop.tick], ["close", 3300])
 	assert_eq(loop.step(1.0), 0)
+
+
+## SE-007-bug: S4 포화는 정수 초만 자르고 소수부는 남긴다. S5 의 잔여 acc 는 포화 전 계산과 같아야 한다.
+## 배속 1, step(10.05): acc = 100.5틱분 → 30틱 처리, 잔여 0.5틱분. 이어서 0.04초(0.4틱분) → 0틱, 0.01초 → 1틱.
+## 1e13 + 0.25초(부동소수 정확값)도 같은 규칙: 잔여 0.5틱분.
+func test_step_saturation_keeps_fraction() -> void:
+	for d: float in [10.05, 1.0e13 + 0.25]:
+		var loop: TickLoop = _new_loop()
+		assert_eq(loop.step(d), _cfg.max_ticks_per_step, "step(%s) → 상한" % d)
+		assert_eq(loop.step(0.04), 0, "%s 뒤: 잔여 0.5 + 0.4틱분 → 0틱" % d)
+		assert_eq(loop.step(0.01), 1, "%s 뒤: 잔여 0.9 + 0.1틱분 → 1틱" % d)
+		assert_eq(loop.step(0.0), 0, "%s 뒤: 잔여 0" % d)
 
 
 # --- AC7 ---------------------------------------------------------------------

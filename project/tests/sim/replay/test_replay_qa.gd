@@ -173,15 +173,21 @@ func test_step_extreme_delta() -> void:
 	assert_eq(l3.step(0.08), 1, "잔여 0.02 + 0.08 = 0.1초 → 1틱")
 
 
-## 알려진 결함(docs/tickets/SE-007-bug.md): 배속 3 에서 delta ≥ ~3.1e11 초(배속 1 은 ~9.2e11 초)면
-## `us * s0 * ticks_per_second` 가 int64 를 넘쳐 step() 이 0틱을 돌려주고 누적기가 깨진다.
-## 실사용 도달 불가(약 1만 년)라 심각도 낮음. 수정되면 아래 pending 을 지우고 단언을 켠다.
-## 단언을 켜 두면 스위트가 빨개지므로 pending 으로 기록만 한다(리포트의 Pending 수에 계상).
+## SE-007-bug 회귀(docs/tickets/SE-007-bug.md 재현 표 + AC1): 수정 전에는 배속 3 에서 delta ≥ ~3.1e11 초,
+## 배속 1 에서 ≥ ~9.2e11 초면 `us * s0 * ticks_per_second` 가 int64 를 넘쳐 step() 이 0틱을 돌려주고 누적기가 깨졌다.
+## 수정 후: 어떤 큰 delta 에서도 step(d) == max_ticks_per_step, 이어진 step(0.0) == 0(잔여 정상 범위),
+## 이어진 step(0.1) == 배속 틱 수. 표의 모든 값 + 그보다 큰 1e300 을 배속 1·2·3 에서 확인한다.
 func test_step_int64_overflow_known_bug() -> void:
-	var loop: TickLoop = TickLoop.new(_cfg, 42)
-	loop.bus.publish("time.speed_requested", {"speed": 3})
-	var n: int = loop.step(4.0e11)
-	if n == _cfg.max_ticks_per_step:
-		pass_test("SE-007-bug 수정됨 — 이 pending 케이스를 단언으로 바꿀 것")
-	else:
-		pending("SE-007-bug: step(4e11) @배속3 → %d틱(기대 %d). 누적기 int64 오버플로" % [n, _cfg.max_ticks_per_step])
+	var deltas: Array[float] = [3.0e11, 4.0e11, 9.0e11, 1.0e12, 1.0e13, 1.0e300]
+	for s: int in [1, 2, 3]:
+		for d: float in deltas:
+			var loop: TickLoop = TickLoop.new(_cfg, 42)
+			loop.bus.publish("time.speed_requested", {"speed": s})
+			assert_eq(loop.step(d), _cfg.max_ticks_per_step, "배속 %d: step(%s) → 상한" % [s, d])
+			assert_eq(loop.step(0.0), 0, "배속 %d, %s 뒤: step(0) 은 0틱(누적기 잔여 정상)" % [s, d])
+			assert_eq(loop.step(0.1), s, "배속 %d, %s 뒤: step(0.1) 은 %d틱" % [s, d, s])
+			assert_eq(loop.tick, _cfg.max_ticks_per_step + s, "배속 %d, %s: tick 합계" % [s, d])
+	# 재현 절차 그대로(시드 42, 배속 3, step(4e11) → step(0.1)).
+	var r: TickLoop = TickLoop.new(_cfg, 42)
+	r.bus.publish("time.speed_requested", {"speed": 3})
+	assert_eq([r.step(4.0e11), r.step(0.1)], [30, 3], "재현 절차: 30 / 3")

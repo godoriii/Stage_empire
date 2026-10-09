@@ -98,8 +98,15 @@ func step(delta_s: float) -> int:
 		_running = false
 		return 0
 	var d: float = delta_s if is_finite(delta_s) else 0.0
+	var k: int = s0 * config.ticks_per_second
+	# S4 포화(SE-007-bug): sat_s 초분이면 이미 max_ticks_per_step 틱 이상이라 그보다 긴 정수 초는 S5 에서
+	# 어차피 버려진다. 정수 초만 sat_s 로 자르고 소수부는 보존해 S5 의 잔여 acc 가 자르지 않은 계산과
+	# 같게 한다. 이로써 roundi(d × 10^6) 과 us × k 가 int64 를 넘지 않는다. d ≤ sat_s 는 기존 경로 그대로.
+	var sat_s: int = (config.max_ticks_per_step + k - 1) / k
+	if d > sat_s:
+		d = sat_s + fposmod(d, 1.0)
 	var us: int = maxi(0, roundi(d * US_PER_S))   # S4
-	_acc += us * s0 * config.ticks_per_second
+	_acc += us * k
 	var q: int = _acc / US_PER_S                  # S5
 	_acc -= q * US_PER_S
 	var budget: int = mini(q, config.max_ticks_per_step)

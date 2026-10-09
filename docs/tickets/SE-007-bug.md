@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 배정(sim-engineer, 2026-10-09). 추가 요구: test_replay_qa.gd 의 pending 분기 제거(Pending 0), test_tick.gd I2 불변식을 독립 계산으로 바꾸거나 삭제(docs/reviews/SE-001.md 발견 4) |
+| 상태 | 구현 완료(리뷰 대기) — sim-engineer 2026-10-09, tick.md S4 문장은 메인 세션이 반영 |
 | 담당 에이전트 | sim-engineer (수정), game-designer (스펙 문구 확인) |
 | 마일스톤 | 프리프로덕션 |
 | 의존 티켓 | SE-001 (구현), SE-006 (스펙 tick.md#배속 S4~S5) |
@@ -65,3 +65,40 @@
 ## QA / 리뷰
 
 - QA 리포트: docs/reports/SE-001.md
+
+## 결과 (sim-engineer, 2026-10-09)
+
+상태: 구현 완료(qa 대기). 커밋·푸시는 하지 않았다(브랜치 `claude/agent-setup-mqfxoy` 작업 트리, producer/메인 세션이 커밋).
+
+### 수정 내용
+
+- `project/core/tick.gd` `step()` S4: `k = s0 × ticks_per_second`, `sat_s = ceil(max_ticks_per_step / k)`(정수 올림 나눗셈, config 값만 사용, 리터럴 없음)를 구하고, `d > sat_s` 이면 `d = sat_s + fposmod(d, 1.0)` 로 포화시킨 뒤 기존대로 `us = max(0, roundi(d × 10^6))`, `acc += us × k`.
+  - `sat_s` 초분이면 이미 `max_ticks_per_step` 틱 이상(`sat_s × k ≥ max_ticks_per_step`)이므로 S5 의 `budget` 은 자르지 않은 계산과 같다(항상 상한).
+  - 수정 제안의 단순 포화(`us = min(us, cap)`)와 다른 점: **정수 초만 자르고 소수부는 보존**한다. `acc` 잔여 = `(acc + us×k) mod 10^6` 은 `us mod 10^6` 에만 의존하므로 잔여도 자르지 않은 계산과 같다. 단순 포화는 `step(10.05)`@배속1 처럼 실사용 범위(프레임 정지 3초 이상)에서 잔여 0.5틱분을 지워 기존 동작을 바꾸므로 택하지 않았다.
+  - `d ≤ sat_s`(배속 1: 3초, 2: 2초, 3: 1초 이하)는 코드 경로가 그대로라 기존 결과와 비트 단위로 같다. 상태 해시·리플레이 기대값 변화 없음.
+  - 포화 후 최대 `us ≈ (sat_s + 1) × 10^6`, `acc < 10^6 + us × k` 라 현재 데이터에서 `acc` 는 10^9 미만. `roundi()` 의 float→int 변환도 범위 안(수정 전에는 `delta_s ≥ ~9.2e12` 에서 `roundi` 자체가 넘쳤다 — 1e13 행이 0틱이던 원인).
+- `project/tests/sim/replay/test_replay_qa.gd::test_step_int64_overflow_known_bug`: pending 분기 제거, 실제 단언으로 교체(이름 유지). 배속 1·2·3 × delta {3e11, 4e11, 9e11, 1e12, 1e13, 1e300} 각각 `step(d) == max_ticks_per_step`, 이어진 `step(0.0) == 0`, 이어진 `step(0.1) == 배속`, `tick == max_ticks_per_step + 배속`. 재현 절차(시드 42, 배속 3, `step(4e11)` → `step(0.1)`) = `[30, 3]` 리터럴.
+- `project/tests/sim/test_tick.gd`
+  - I2(리뷰 발견 4-i): `_invariants()` 의 I2 를 getter 정의와 같은 식(`phase_start + tick_in_phase`)에서 독립 계산 `_tick_in_day_independent()` 로 교체 — `_cfg.phases` 를 앞에서부터 돌며 현재 구간 앞의 `ticks` 를 누적하고 `tick_in_phase` 를 더한다(`phase_start` 를 쓰지 않음). 이 헬퍼를 쓰는 기존 테스트 이름·단언은 그대로.
+  - 신규 `test_step_saturation_keeps_fraction`: 배속 1, `step(10.05)` 와 `step(1e13 + 0.25)` 각각 → 30틱, 이어서 `step(0.04)` → 0, `step(0.01)` → 1, `step(0.0)` → 0(잔여 0.5틱분 보존). 단순 포화였다면 실패하는 케이스.
+
+### 발행하는 이벤트
+
+- 변경 없음(새 이벤트·페이로드 없음). 데이터 필드 추가 없음(`project/data/` 변경 0).
+
+### tick.md S4 에 추가할 문장 (game-designer 반영 요청)
+
+> S4 포화: `k = s0 × ticks_per_second`, `sat_s = ⌈max_ticks_per_step ÷ k⌉` 일 때 `delta_s > sat_s` 이면 `delta_s = sat_s + (delta_s mod 1)` 로 바꾼 뒤 `us` 를 계산한다(정수 초만 잘라 int64 오버플로를 막고, 소수부를 남겨 S5 의 `budget`·잔여 `acc` 가 자르지 않은 계산과 같다).
+
+(수용 기준 표에 `test_tick.gd::test_step_saturation_keeps_fraction` 행 추가도 함께 요청.)
+
+### 테스트 결과
+
+- `tools/run_tests.sh project/tests/sim` (Godot 4.6.stable 헤드리스): Scripts 8, Tests 43, Passing 43, Failing 0, Pending 0, Asserts 505. (수정 전: Tests 42, Passing 41, Pending 1, Asserts 424.) 출력의 `ERROR:` 줄은 기존 테스트가 의도적으로 유발하는 `push_error`(개수 단언됨).
+- AC2 회귀: `test_tick.gd::test_step_accumulator_by_speed`, `::test_step_caps_and_discards`, `replay/test_replay_tick.gd`, `replay/test_replay_qa.gd::test_step_extreme_delta` 녹색.
+- `python3 tools/validate_data.py --strict`: 4개 테이블, 실패 0.
+
+### 남은 질문
+
+1. tick.md S4 문구(위 인용)는 game-designer 반영 대기. 반영 전까지 구현이 스펙보다 한 줄 앞서 있다(동작은 S5 "상한 초과분은 버림"의 결과와 동일).
+2. 현재 작업 트리의 `docs/gdd/{tick,events,economy}.md` 변경은 game-designer 가 동시에 수정 중인 것으로 이 티켓의 산출물이 아니다. SE-007-bug 커밋에는 `project/core/tick.gd`, `project/tests/sim/replay/test_replay_qa.gd`, `project/tests/sim/test_tick.gd`, `docs/tickets/SE-007-bug.md` 만 넣을 것.
