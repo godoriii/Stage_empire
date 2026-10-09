@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "tiers",
+  "description": "성장 티어 정의. 출처: docs/PRD.md '성장 티어(진행 구조)'. 수치 변경은 game-designer 만.",
+  "type": "object",
+  "required": ["version", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "rows": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["id", "tier", "name", "capacity_min", "capacity_max", "unlock_reputation", "unlock_cash", "grid_size", "outdoor"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^tier_[1-6]$" },
+          "tier": { "type": "integer", "minimum": 1, "maximum": 6 },
+          "name": { "type": "string" },
+          "capacity_min": { "type": "integer", "minimum": 1 },
+          "capacity_max": { "type": "integer", "minimum": 1 },
+          "unlock_reputation": { "type": "integer", "minimum": 0 },
+          "unlock_cash": { "type": "integer", "minimum": 0 },
+          "grid_size": { "type": "integer", "minimum": 8, "maximum": 400 },
+          "outdoor": { "type": "boolean" },
+          "new_systems": { "type": "array", "items": { "type": "string" } },
+          "pressures": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

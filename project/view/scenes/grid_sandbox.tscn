@@ -1,0 +1,37 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://view/scenes/grid_sandbox.gd" id="1_sandbox"]
+[ext_resource type="Script" path="res://view/grid/grid_view.gd" id="2_grid"]
+[ext_resource type="Resource" path="res://view/grid/grid_view_params.tres" id="3_gridparams"]
+[ext_resource type="Script" path="res://view/grid/tile_cursor.gd" id="4_cursor"]
+[ext_resource type="PackedScene" path="res://view/camera/iso_camera.tscn" id="5_camera"]
+[ext_resource type="PackedScene" path="res://ui/hud/debug_hud.tscn" id="6_hud"]
+
+[sub_resource type="Environment" id="Environment_sandbox"]
+background_mode = 1
+background_color = Color(0.05, 0.05, 0.07, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.55, 0.55, 0.65, 1)
+ambient_light_energy = 0.6
+
+[node name="GridSandbox" type="Node3D"]
+script = ExtResource("1_sandbox")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_sandbox")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.96, 0.52, 0)
+light_energy = 0.8
+
+[node name="GridView" type="Node3D" parent="."]
+script = ExtResource("2_grid")
+params = ExtResource("3_gridparams")
+
+[node name="TileCursor" type="Node3D" parent="."]
+script = ExtResource("4_cursor")
+params = ExtResource("3_gridparams")
+
+[node name="IsoCamera" parent="." instance=ExtResource("5_camera")]
+
+[node name="DebugHud" parent="." instance=ExtResource("6_hud")]

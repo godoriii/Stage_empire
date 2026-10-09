@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-005). 변경 이력: docs/gdd/economy.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 economy.md 변경 이력에 적는다.",
+  "title": "economy",
+  "description": "경제 수치(수익·비용·세금·파산 구제·시작 자금). 규칙: docs/gdd/economy.md. 모든 금액은 정수(게임 화폐 1 단위), 모든 비율은 rate_scale(=10,000) 분의 정수(bp). 수치 변경은 game-designer 만.",
+  "type": "object",
+  "required": ["version", "rate_scale", "starting_cash", "bailout_count", "demolish_refund_rate_bp", "guarantee_by_grade", "charge_reasons", "rows", "reference_scenarios"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "rate_scale": {
+      "description": "비율 필드(*_bp)의 분모. 10,000 = 100%. 단위 정의라 고정. economy.md#반올림",
+      "type": "integer", "enum": [10000]
+    },
+    "starting_cash": {
+      "description": "새 게임 시작 현금(티어 1). economy.md#시작-자금",
+      "type": "integer", "minimum": 0
+    },
+    "bailout_count": {
+      "description": "게임 전체에서 받을 수 있는 구제 횟수 N. PRD '파산 전 구제 N회(밸런스 시트)'. economy.md#파산과-구제",
+      "type": "integer", "minimum": 0
+    },
+    "demolish_refund_rate_bp": {
+      "description": "철거 환불률. PRD '철거 환불 70%' 결정 값이라 고정(변경은 ADR). economy.md#즉시-반영-항목",
+      "type": "integer", "enum": [7000]
+    },
+    "guarantee_by_grade": {
+      "description": "v0 아티스트 개런티 고정표(등급 → 금액). 동적 공식은 artist.md 가 대체한다. v0 필수 키는 local·rookie. 표에 없는 등급의 EconomyConfig.guarantee() 는 push_error 후 -1. economy.md#개런티",
+      "type": "object",
+      "required": ["local", "rookie"],
+      "additionalProperties": false,
+      "properties": {
+        "local": { "type": "integer", "minimum": 0 },
+        "rookie": { "type": "integer", "minimum": 0 },
+        "midlevel": { "type": "integer", "minimum": 0 },
+        "headliner": { "type": "integer", "minimum": 0 },
+        "legend": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "charge_reasons": {
+      "description": "즉시 지출 사유 → 회계 분류. operating 은 그날 손익(세전 순이익)에 들어가고 capital 은 들어가지 않는다. economy.md#즉시-반영-항목",
+      "type": "object",
+      "required": ["build", "guarantee"],
+      "additionalProperties": false,
+      "properties": {
+        "build": { "type": "string", "enum": ["capital", "operating"] },
+        "guarantee": { "type": "string", "enum": ["capital", "operating"] }
+      }
+    },
+    "rows": {
+      "description": "티어별 경제 수치. id 는 tiers.json 의 id 와 같다. v0 는 tier_1 만.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "tier", "rent_per_day", "tax_rate_bp", "ticket_price_default", "ticket_price_min", "ticket_price_max", "bar_purchase_rate_bp", "bar_avg_spend", "bar_cost_rate_bp", "bailout_loan_amount", "bailout_interest_bp", "bailout_repay_days"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^tier_[1-6]$" },
+          "tier": { "type": "integer", "minimum": 1, "maximum": 6 },
+          "rent_per_day": { "description": "일일 임대료. 정산 때 차감", "type": "integer", "minimum": 0 },
+          "tax_rate_bp": { "description": "세율. 0 허용(세금 없음)", "type": "integer", "minimum": 0, "maximum": 10000 },
+          "ticket_price_default": { "description": "새 게임(또는 티어 진입) 시 티켓 가격", "type": "integer", "minimum": 0 },
+          "ticket_price_min": { "description": "플레이어가 정할 수 있는 최저가(포함)", "type": "integer", "minimum": 0 },
+          "ticket_price_max": { "description": "플레이어가 정할 수 있는 최고가(포함)", "type": "integer", "minimum": 0 },
+          "bar_purchase_rate_bp": { "description": "관객 중 바 구매자 비율", "type": "integer", "minimum": 0, "maximum": 10000 },
+          "bar_avg_spend": { "description": "바 구매자 1명당 평균 매출(객단가)", "type": "integer", "minimum": 0 },
+          "bar_cost_rate_bp": { "description": "바 매출 대비 원가율", "type": "integer", "minimum": 0, "maximum": 10000 },
+          "bailout_loan_amount": { "description": "긴급 대출의 운영 자금분. 대출 원금 = 부족액 + 이 값", "type": "integer", "minimum": 0 },
+          "bailout_interest_bp": { "description": "긴급 대출 이자율(원금에 1회 부과하는 단리)", "type": "integer", "minimum": 0, "maximum": 10000 },
+          "bailout_repay_days": { "description": "상환 일수(정산 횟수)", "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "reference_scenarios": {
+      "description": "손계산·회귀 테스트용 기준 시나리오. 입력과 기대값. 수치를 바꾸면 expected 도 같은 PR 에서 갱신한다(test_economy.gd 가 읽는다). economy.md#수치표",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "tier", "admissions", "audience", "guarantee_grade", "booking_policy", "upkeep_per_day", "initial_build_spend", "expected"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "tier": { "type": "integer", "minimum": 1, "maximum": 6 },
+          "admissions": { "description": "공연이 열린 날의 유료 입장 수(입력)", "type": "integer", "minimum": 0 },
+          "audience": { "description": "공연이 열린 날의 관객 수(입력, 바 계산용)", "type": "integer", "minimum": 0 },
+          "ticket_price": { "description": "없으면 해당 티어 ticket_price_default", "type": "integer", "minimum": 0 },
+          "guarantee_grade": {
+            "description": "개런티 등급. enum 은 artist.md 가 쓸 등급 이름 목록(5종)이고, 값이 guarantee_by_grade 의 키여야 한다는 조건은 JSON Schema 로 표현할 수 없어 EconomyConfig.load() 의 K4 가 검사한다(v0 는 local·rookie 만 통과). economy.md#설정-로드와-공개-api",
+            "type": "string", "enum": ["local", "rookie", "midlevel", "headliner", "legend"]
+          },
+          "booking_policy": {
+            "description": "book_if_affordable: 매일 낮에 개런티를 제안해 승인되면 공연(admissions·audience 적용), 거절되면 그날 공연 없음(0명)",
+            "type": "string", "enum": ["book_if_affordable"]
+          },
+          "upkeep_per_day": { "description": "가구 유지비 합(가정값, 입력)", "type": "integer", "minimum": 0 },
+          "initial_build_spend": { "description": "1일차 낮에 쓰는 건설비(가정값, capital)", "type": "integer", "minimum": 0 },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ticket_revenue": { "type": "integer" },
+              "bar_buyers": { "type": "integer" },
+              "bar_revenue": { "type": "integer" },
+              "bar_cost": { "type": "integer" },
+              "revenue": { "type": "integer" },
+              "rent": { "type": "integer" },
+              "upkeep": { "type": "integer" },
+              "guarantee": { "type": "integer" },
+              "operating_costs": { "type": "integer" },
+              "pretax": { "type": "integer" },
+              "tax": { "type": "integer" },
+              "net": { "type": "integer" },
+              "loan_repayment": { "type": "integer" },
+              "settlement_delta": { "type": "integer" },
+              "day_cash_delta": { "type": "integer" },
+              "days_to_tier2_cash": { "type": "integer", "minimum": 1 },
+              "bailout_offered_days": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+              "bailout_amounts": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+              "bankrupt_day": { "type": "integer", "minimum": 1 },
+              "cash_by_day": { "type": "array", "items": { "type": "integer" } }
+            }
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "net_to_rent_min_bp": { "type": "integer", "minimum": 0 },
+              "net_to_rent_max_bp": { "type": "integer", "minimum": 0 },
+              "tier2_max_days": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

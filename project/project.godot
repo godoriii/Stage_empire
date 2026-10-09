@@ -1,0 +1,34 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Stage Empire"
+config/description="지하 라이브클럽에서 글로벌 페스티벌까지 키우는 2.5D 아이소메트릭 건설·경영 시뮬레이션"
+config/features=PackedStringArray("4.6", "Forward Plus")
+run/main_scene=""
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+
+[physics]
+
+common/physics_ticks_per_second=10
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "genres",
+  "description": "8장르 정의. 출처: docs/PRD.md '장르 매트릭스'. 유사도 행렬 수치는 game-designer 가 채운다.",
+  "type": "object",
+  "required": ["version", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "rows": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "accent_color"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z_]+$" },
+          "name": { "type": "string" },
+          "accent_color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+          "affinity": {
+            "type": "object",
+            "description": "다른 장르 id → 0.0~1.0 유사도. 비어 있으면 미정.",
+            "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

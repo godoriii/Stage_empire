@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 2 (SE-006). 변경 이력: docs/gdd/tick.md#변경-이력. 스키마 구조를 바꾸면 version enum 을 올리고 tick.md 변경 이력에 적는다.",
+  "title": "sim",
+  "description": "시뮬레이션 전역 상수. 출처: docs/PRD.md '아키텍처 원칙', 규칙: docs/gdd/tick.md. 틱 수·구간 길이·허용 배속 변경은 ADR 필요. 스키마로 표현 못 하는 교차 불변식(구간 순서, 마지막 구간만 ticks 0, default_speed ∈ speeds, pausable ⇔ 0 ∈ speeds)은 SimConfig.load() 가 검사한다(tick.md#틱).",
+  "type": "object",
+  "required": ["version", "ticks_per_second", "tile_size_m", "chunk_size", "max_ticks_per_step", "snapshot_schema_version", "rng_streams", "system_order", "phases"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "enum": [2] },
+    "ticks_per_second": { "type": "integer", "enum": [10] },
+    "tile_size_m": { "type": "number", "enum": [1.0] },
+    "chunk_size": { "type": "integer", "enum": [32] },
+    "individual_agent_max_tier": { "type": "integer", "minimum": 1, "maximum": 6 },
+    "individual_agent_cap": { "type": "integer", "minimum": 1 },
+    "max_ticks_per_step": {
+      "description": "TickLoop.step() 1회가 처리하는 최대 틱 수. 초과분은 버린다(따라잡기 없음). tick.md#배속",
+      "type": "integer", "minimum": 1
+    },
+    "snapshot_schema_version": {
+      "description": "TickLoop.snapshot() 의 schema_version 값. 스냅샷 필드가 바뀔 때만 올린다(마이그레이션 티켓 동반). tick.md#스냅샷",
+      "type": "integer", "minimum": 1
+    },
+    "rng_streams": {
+      "description": "SeededRng 이 허용하는 스트림 이름. 순서는 의미 없다(파생 시드는 이름 기반). 추가는 자유, 이름 변경·삭제는 리플레이 기준값이 바뀐다. tick.md#결정성과-rng",
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+    },
+    "system_order": {
+      "description": "한 틱 안의 시스템 업데이트 순서(등록 순서와 무관). tick.md#명령-큐와-틱-순서",
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "ticks", "pausable", "speeds", "default_speed", "enter_speed_mode"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "enum": ["day", "evening", "show", "close"] },
+          "name": { "type": "string" },
+          "ticks": { "type": "integer", "minimum": 0 },
+          "pausable": { "type": "boolean" },
+          "speeds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 0, "maximum": 3 } },
+          "default_speed": {
+            "description": "새 게임 시작(첫 구간) 또는 구간 진입 시 쓰는 배속. speeds 안에 있어야 한다.",
+            "type": "integer", "minimum": 0, "maximum": 3
+          },
+          "enter_speed_mode": {
+            "description": "force: 진입 시 항상 default_speed. keep_if_allowed: 현재 배속이 speeds 에 있으면 유지, 없으면 default_speed.",
+            "type": "string", "enum": ["force", "keep_if_allowed"]
+          }
+        }
+      }
+    }
+  }
+}
