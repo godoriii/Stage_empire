@@ -37,3 +37,56 @@ jobs:
           SE_REQUIRE_GODOT: "1"
           GODOT_BIN: godot
         run: tools/run_tests.sh
+
+  screenshots:
+    name: Xvfb 스크린샷 재캡처 + 셰이더 컴파일 확인 (SE-020)
+    runs-on: ubuntu-latest
+    needs: data
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Xvfb·Mesa(llvmpipe) 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri
+      - name: Godot 설치
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: false
+      - name: 프로젝트 임포트
+        run: godot --headless --path project --import
+      - name: 5장 재캡처 (opengl3 = gl_compatibility, 셰이더 컴파일 오류가 있으면 여기서 실패)
+        env:
+          GODOT_BIN: godot
+        run: project/tests/view/screenshots/recapture.sh "$RUNNER_TEMP/shots"
+      - name: 기준 PNG 와 픽셀 차 (지금은 보고만 — strict 전환 규칙은 SE-020 티켓)
+        env:
+          # 3회 연속 diff_pixels=0 이 확인되면 이 값을 "--strict" 로 바꾼다(1줄).
+          STRICT_FLAG: ""
+        run: |
+          set -u +e
+          base=project/tests/view/screenshots
+          rc_all=0
+          for pair in SE-002/grid_yaw45_zoom2 SE-004/a_yaw45_zoom2 SE-004/b_yaw45_zoom2 SE-004/c_yaw45_zoom2 SE-004/b_yaw45_zoom0; do
+            name="${pair#*/}"
+            echo "== $name"
+            # shellcheck disable=SC2086
+            godot --headless --path project -s res://tests/view/screenshots/compare_png.gd -- \
+              "$GITHUB_WORKSPACE/$base/$pair.png" "$RUNNER_TEMP/shots/$name.png" $STRICT_FLAG \
+              | tee "$RUNNER_TEMP/shots/$name.diff.txt"
+            rc=${PIPESTATUS[0]}
+            if [ "$rc" -ne 0 ]; then rc_all=$rc; fi
+          done
+          exit $rc_all
+      - name: 캡처·diff 로그 업로드 (러너 vs 로컬 차이 진단용 — 항상)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: warn
+          overwrite: true
