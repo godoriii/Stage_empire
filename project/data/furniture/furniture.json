@@ -1,0 +1,223 @@
+{
+  "version": 1,
+  "build_rules": {
+    "allowed_phases": ["day"],
+    "allowed_rotations": [0, 90, 180, 270],
+    "category_max_count": { "stage": 1 },
+    "satisfaction_bonus_cap_bp": 1500
+  },
+  "reference_sets": [
+    {
+      "id": "economy_tier1_baseline",
+      "description": "economy.json reference_scenarios[tier1_baseline] 의 '가구 v0 가정 목록'(소형 무대 1, 바 카운터 1, 스피커 2, 조명 4, 화장실 2, 비상구 1). 합이 그 시나리오의 upkeep_per_day·initial_build_spend 와 같아야 한다(build.md FC6).",
+      "items": [
+        { "furniture_id": "stage_small", "count": 1 },
+        { "furniture_id": "bar_counter", "count": 1 },
+        { "furniture_id": "speaker_floor", "count": 2 },
+        { "furniture_id": "light_spot", "count": 4 },
+        { "furniture_id": "toilet_booth", "count": 2 },
+        { "furniture_id": "exit_door", "count": 1 }
+      ],
+      "expected": { "upkeep_per_day": 200, "build_cost": 3000, "affordable_with_starting_cash": true }
+    },
+    {
+      "id": "starter_max_trio",
+      "description": "가장 비싼 무대 + 바닥 스피커 1 + 바 카운터 1. 시작 자금으로 살 수 있어야 한다(build.md FC7).",
+      "items": [
+        { "furniture_id": "stage_medium", "count": 1 },
+        { "furniture_id": "speaker_floor", "count": 1 },
+        { "furniture_id": "bar_counter", "count": 1 }
+      ],
+      "expected": { "upkeep_per_day": 135, "build_cost": 2900, "affordable_with_starting_cash": true }
+    },
+    {
+      "id": "all_rows_once",
+      "description": "20종을 1개씩. 시작 자금으로는 다 살 수 없어야 한다(build.md FC7). 무대 한도(stage 1)는 무시한 합계.",
+      "items": [
+        { "furniture_id": "stage_small", "count": 1 },
+        { "furniture_id": "stage_medium", "count": 1 },
+        { "furniture_id": "speaker_floor", "count": 1 },
+        { "furniture_id": "speaker_stack", "count": 1 },
+        { "furniture_id": "stage_monitor", "count": 1 },
+        { "furniture_id": "light_spot", "count": 1 },
+        { "furniture_id": "light_moving_head", "count": 1 },
+        { "furniture_id": "fog_machine", "count": 1 },
+        { "furniture_id": "led_panel", "count": 1 },
+        { "furniture_id": "bar_counter", "count": 1 },
+        { "furniture_id": "bar_fridge", "count": 1 },
+        { "furniture_id": "toilet_booth", "count": 1 },
+        { "furniture_id": "locker", "count": 1 },
+        { "furniture_id": "bench", "count": 1 },
+        { "furniture_id": "standing_table", "count": 1 },
+        { "furniture_id": "fire_extinguisher", "count": 1 },
+        { "furniture_id": "exit_sign", "count": 1 },
+        { "furniture_id": "exit_door", "count": 1 },
+        { "furniture_id": "poster_board", "count": 1 },
+        { "furniture_id": "neon_sign", "count": 1 }
+      ],
+      "expected": { "upkeep_per_day": 350, "build_cost": 7700, "affordable_with_starting_cash": false }
+    }
+  ],
+  "rows": [
+    {
+      "id": "stage_small", "name": "소형 무대", "category": "stage",
+      "footprint": [4, 3], "height_m": 0.6,
+      "build_cost": 1000, "upkeep_per_day": 45,
+      "rotatable": true, "wall_required": false, "poly_budget": "equipment_large",
+      "slots": { "base": "#3A3340", "accent": "#C8423A" },
+      "effects": { "sound_radius": 5, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "stage_medium", "name": "중형 무대", "category": "stage",
+      "footprint": [6, 4], "height_m": 0.8,
+      "build_cost": 2200, "upkeep_per_day": 80,
+      "rotatable": true, "wall_required": false, "poly_budget": "equipment_large",
+      "slots": { "base": "#3A3340", "accent": "#C8423A", "emissive": "#FFD27A" },
+      "effects": { "sound_radius": 6, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 200, "light_grade": 1 }
+    },
+    {
+      "id": "speaker_floor", "name": "바닥 스피커", "category": "sound",
+      "footprint": [1, 1], "height_m": 1.2,
+      "build_cost": 200, "upkeep_per_day": 15,
+      "rotatable": true, "wall_required": false, "poly_budget": "furniture_small",
+      "slots": { "base": "#22252B", "accent": "#5A6270" },
+      "effects": { "sound_radius": 7, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "speaker_stack", "name": "스피커 스택", "category": "sound",
+      "footprint": [2, 1], "height_m": 2.2,
+      "build_cost": 550, "upkeep_per_day": 25,
+      "rotatable": true, "wall_required": false, "poly_budget": "equipment_large",
+      "slots": { "base": "#22252B", "accent": "#5A6270" },
+      "effects": { "sound_radius": 10, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "stage_monitor", "name": "모니터 스피커", "category": "sound",
+      "footprint": [1, 1], "height_m": 0.4,
+      "build_cost": 120, "upkeep_per_day": 5,
+      "rotatable": true, "wall_required": false, "poly_budget": "furniture_small",
+      "slots": { "base": "#22252B" },
+      "effects": { "sound_radius": 2, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 100, "light_grade": 0 }
+    },
+    {
+      "id": "light_spot", "name": "스포트 조명", "category": "light",
+      "footprint": [1, 1], "height_m": 2.4,
+      "build_cost": 100, "upkeep_per_day": 10,
+      "rotatable": true, "wall_required": false, "poly_budget": "furniture_small",
+      "slots": { "base": "#2E2E33", "emissive": "#FFF1C2" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 1 }
+    },
+    {
+      "id": "light_moving_head", "name": "무빙 헤드", "category": "light",
+      "footprint": [1, 1], "height_m": 2.4,
+      "build_cost": 400, "upkeep_per_day": 20,
+      "rotatable": true, "wall_required": false, "poly_budget": "furniture_small",
+      "slots": { "base": "#2E2E33", "accent": "#7A4FD6", "emissive": "#B9A6FF" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 3 }
+    },
+    {
+      "id": "fog_machine", "name": "포그 머신", "category": "light",
+      "footprint": [1, 1], "height_m": 0.5,
+      "build_cost": 180, "upkeep_per_day": 8,
+      "rotatable": false, "wall_required": false, "poly_budget": "furniture_small",
+      "slots": { "base": "#4A4F57" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 1 }
+    },
+    {
+      "id": "led_panel", "name": "LED 패널", "category": "light",
+      "footprint": [2, 1], "height_m": 2.4,
+      "build_cost": 900, "upkeep_per_day": 35,
+      "rotatable": true, "wall_required": false, "poly_budget": "equipment_large",
+      "slots": { "base": "#1C1D22", "emissive": "#5FD3FF" },
+      "effects": { "sound_radius": 0, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 2 }
+    },
+    {
+      "id": "bar_counter", "name": "바 카운터", "category": "bar",
+      "footprint": [3, 1], "height_m": 1.1,
+      "build_cost": 500, "upkeep_per_day": 40,
+      "rotatable": true, "wall_required": false, "poly_budget": "equipment_large",
+      "slots": { "base": "#6B4A35", "accent": "#D9A441" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 8, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "bar_fridge", "name": "음료 냉장고", "category": "bar",
+      "footprint": [1, 1], "height_m": 1.9,
+      "build_cost": 300, "upkeep_per_day": 12,
+      "rotatable": true, "wall_required": true, "poly_budget": "furniture_small",
+      "slots": { "base": "#D8DCE0", "accent": "#C8423A", "glass": "#A8D8EA" },
+      "effects": { "sound_radius": 0, "sight_block": true, "bar_service_radius": 3, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "toilet_booth", "name": "화장실 칸", "category": "amenity",
+      "footprint": [1, 2], "height_m": 2.2,
+      "build_cost": 250, "upkeep_per_day": 15,
+      "rotatable": true, "wall_required": true, "poly_budget": "equipment_large",
+      "slots": { "base": "#9AA3AD", "accent": "#3E7CB1" },
+      "effects": { "sound_radius": 0, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 300, "light_grade": 0 }
+    },
+    {
+      "id": "locker", "name": "물품보관함", "category": "amenity",
+      "footprint": [2, 1], "height_m": 1.8,
+      "build_cost": 220, "upkeep_per_day": 6,
+      "rotatable": true, "wall_required": true, "poly_budget": "furniture_small",
+      "slots": { "base": "#5C6B73", "accent": "#E0B341" },
+      "effects": { "sound_radius": 0, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 150, "light_grade": 0 }
+    },
+    {
+      "id": "bench", "name": "벤치", "category": "amenity",
+      "footprint": [2, 1], "height_m": 0.45,
+      "build_cost": 120, "upkeep_per_day": 4,
+      "rotatable": true, "wall_required": false, "poly_budget": "furniture_small",
+      "slots": { "base": "#7A5A40" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 4, "evac_capacity": 0, "satisfaction_bonus_bp": 50, "light_grade": 0 }
+    },
+    {
+      "id": "standing_table", "name": "스탠딩 테이블", "category": "amenity",
+      "footprint": [1, 1], "height_m": 1.1,
+      "build_cost": 80, "upkeep_per_day": 3,
+      "rotatable": false, "wall_required": false, "poly_budget": "furniture_small",
+      "slots": { "base": "#3B3B3B", "accent": "#D9A441" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 2, "evac_capacity": 0, "satisfaction_bonus_bp": 50, "light_grade": 0 }
+    },
+    {
+      "id": "fire_extinguisher", "name": "소화기", "category": "safety",
+      "footprint": [1, 1], "height_m": 0.6,
+      "build_cost": 60, "upkeep_per_day": 2,
+      "rotatable": true, "wall_required": true, "poly_budget": "furniture_small",
+      "slots": { "base": "#C0302B" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 5, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "exit_sign", "name": "비상구 표지", "category": "safety",
+      "footprint": [1, 1], "height_m": 2.2,
+      "build_cost": 80, "upkeep_per_day": 3,
+      "rotatable": true, "wall_required": true, "poly_budget": "furniture_small",
+      "slots": { "base": "#E8E8E8", "emissive": "#2FD36B" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 20, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "exit_door", "name": "비상 출구", "category": "safety",
+      "footprint": [2, 1], "height_m": 2.2,
+      "build_cost": 200, "upkeep_per_day": 15,
+      "rotatable": true, "wall_required": true, "poly_budget": "equipment_large",
+      "slots": { "base": "#4F7A5A", "accent": "#E8E8E8" },
+      "effects": { "sound_radius": 0, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 60, "satisfaction_bonus_bp": 0, "light_grade": 0 }
+    },
+    {
+      "id": "poster_board", "name": "포스터 보드", "category": "decor",
+      "footprint": [1, 1], "height_m": 1.6,
+      "build_cost": 40, "upkeep_per_day": 1,
+      "rotatable": true, "wall_required": true, "poly_budget": "furniture_small",
+      "slots": { "base": "#2B2B2B", "accent": "#E86A92" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 50, "light_grade": 0 }
+    },
+    {
+      "id": "neon_sign", "name": "네온 사인", "category": "decor",
+      "footprint": [1, 1], "height_m": 1.8,
+      "build_cost": 200, "upkeep_per_day": 6,
+      "rotatable": true, "wall_required": true, "poly_budget": "furniture_small",
+      "slots": { "base": "#1F1F24", "emissive": "#FF4FA3" },
+      "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 100, "light_grade": 0 }
+    }
+  ]
+}

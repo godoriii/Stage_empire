@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-028). 변경 이력: docs/gdd/build.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 build.md 변경 이력에 적는다.",
+  "title": "furniture",
+  "description": "가구·설비 정의와 배치 공통 규칙. 규칙: docs/gdd/build.md. 금액은 정수(게임 화폐 1 단위), 비율은 economy.json rate_scale(=10,000) 분의 정수(bp). 수치 변경은 game-designer 만. 이름 footprint·height_m·category 는 에셋 META.json(art-pipeline)과 공유한다.",
+  "type": "object",
+  "required": ["version", "build_rules", "reference_sets", "rows"],
+  "additionalProperties": false,
+  "$defs": {
+    "category": {
+      "description": "가구 카테고리 7종. build.md#가구-카테고리와-필드",
+      "type": "string",
+      "enum": ["stage", "sound", "light", "bar", "amenity", "safety", "decor"]
+    },
+    "color": {
+      "description": "슬롯 색. 팔레트 확정 전에는 임시 hex(#RRGGBB), 확정 뒤에는 팔레트 id(pal_<이름>). materials.md Q1 (a)",
+      "type": "string",
+      "pattern": "^(#[0-9A-Fa-f]{6}|pal_[a-z0-9_]+)$"
+    },
+    "furniture_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    }
+  },
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "build_rules": {
+      "description": "배치 공통 규칙. build.md#배치-규칙",
+      "type": "object",
+      "required": ["allowed_phases", "allowed_rotations", "category_max_count", "satisfaction_bonus_cap_bp"],
+      "additionalProperties": false,
+      "properties": {
+        "allowed_phases": {
+          "description": "배치·철거 명령을 받는 구간 id(sim.json phases). v0 는 day 만(economy P2 와 같은 규칙)",
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "enum": ["day", "evening", "show", "close"] }
+        },
+        "allowed_rotations": {
+          "description": "회전 값(도). Godot rotation_degrees.y 와 같은 방향(위에서 볼 때 반시계). 0 은 반드시 포함",
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "integer", "enum": [0, 90, 180, 270] }
+        },
+        "category_max_count": {
+          "description": "카테고리별 맵당 최대 설치 수. 키가 없는 카테고리는 무제한. v0: stage 1",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stage": { "type": "integer", "minimum": 1 },
+            "sound": { "type": "integer", "minimum": 1 },
+            "light": { "type": "integer", "minimum": 1 },
+            "bar": { "type": "integer", "minimum": 1 },
+            "amenity": { "type": "integer", "minimum": 1 },
+            "safety": { "type": "integer", "minimum": 1 },
+            "decor": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "satisfaction_bonus_cap_bp": {
+          "description": "설치 가구 satisfaction_bonus_bp 합의 상한. build.md#커버리지",
+          "type": "integer", "minimum": 0, "maximum": 10000
+        }
+      }
+    },
+    "reference_sets": {
+      "description": "위치 없는 가구 묶음과 합계 기대값(건설비·유지비). 테스트 픽스처. build.md FC6·FC7",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "items", "expected"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "description": { "type": "string" },
+          "items": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["furniture_id", "count"],
+              "additionalProperties": false,
+              "properties": {
+                "furniture_id": { "$ref": "#/$defs/furniture_id" },
+                "count": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": ["upkeep_per_day", "build_cost"],
+            "additionalProperties": false,
+            "properties": {
+              "upkeep_per_day": { "type": "integer", "minimum": 0 },
+              "build_cost": { "type": "integer", "minimum": 0 },
+              "affordable_with_starting_cash": {
+                "description": "true 면 build_cost ≤ economy.json starting_cash, false 면 build_cost > starting_cash",
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "rows": {
+      "description": "가구 정의. MVP 20종(PRD 콘텐츠 범위).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "category", "footprint", "height_m", "build_cost", "upkeep_per_day", "rotatable", "wall_required", "poly_budget", "slots", "effects"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/furniture_id" },
+          "name": { "description": "표시 이름(한국어, v0). 로컬라이즈 키 분리는 후속", "type": "string", "minLength": 1 },
+          "category": { "$ref": "#/$defs/category" },
+          "footprint": {
+            "description": "회전 0 에서의 타일 점유 [w, d] = (x 방향, z 방향). style-guide '타일 점유 표기' w×d",
+            "type": "array", "minItems": 2, "maxItems": 2,
+            "items": { "type": "integer", "minimum": 1, "maximum": 8 }
+          },
+          "height_m": {
+            "description": "모델 높이(m). 에셋 AABB 검사(GLTF_SPEC §1)·렌더 전용, 시뮬레이션은 쓰지 않는다(시야 차단은 effects.sight_block)",
+            "type": "number", "minimum": 0.05, "maximum": 6
+          },
+          "build_cost": {
+            "description": "건설비. economy.charge_proposed {reason:'build'} amount. 철거 시 이 금액(설치 때 승인된 값)이 refund_proposed base_amount",
+            "type": "integer", "minimum": 1
+          },
+          "upkeep_per_day": {
+            "description": "1일 유지비. economy.upkeep_reported total 의 항. ⌊build_cost × 3000 ÷ 10000⌋ > upkeep_per_day (build.md FC2)",
+            "type": "integer", "minimum": 0
+          },
+          "rotatable": { "description": "false 면 rotation 0 만 허용", "type": "boolean" },
+          "wall_required": { "description": "true 면 등면(정면 반대) 바로 뒤 타일이 전부 mountable(벽)이어야 한다. build.md B8", "type": "boolean" },
+          "poly_budget": {
+            "description": "style-guide '폴리곤 예산' 행의 카테고리. 값(tri 수)은 style-guide 에만 둔다(GLTF_SPEC §7)",
+            "type": "string", "enum": ["furniture_small", "equipment_large"]
+          },
+          "slots": {
+            "description": "머티리얼 슬롯 색(materials.md). base 필수, 나머지는 그 서피스가 있는 가구만",
+            "type": "object",
+            "required": ["base"],
+            "additionalProperties": false,
+            "properties": {
+              "base": { "$ref": "#/$defs/color" },
+              "accent": { "$ref": "#/$defs/color" },
+              "emissive": { "$ref": "#/$defs/color" },
+              "glass": { "$ref": "#/$defs/color" }
+            }
+          },
+          "effects": {
+            "description": "커버리지 입력. 전부 필수(0 = 효과 없음). build.md#커버리지",
+            "type": "object",
+            "required": ["sound_radius", "sight_block", "bar_service_radius", "capacity_add", "evac_capacity", "satisfaction_bonus_bp", "light_grade"],
+            "additionalProperties": false,
+            "properties": {
+              "sound_radius": { "description": "음향 반경(타일). 0 = 음향원 아님", "type": "integer", "minimum": 0, "maximum": 32 },
+              "sight_block": { "description": "점유 타일이 시야 레이를 막는가(무대 자신은 제외)", "type": "boolean" },
+              "bar_service_radius": { "description": "바 서비스 반경(타일). 0 = 서비스 지점 아님", "type": "integer", "minimum": 0, "maximum": 32 },
+              "capacity_add": { "description": "수용 인원 가산(명)", "type": "integer", "minimum": 0 },
+              "evac_capacity": { "description": "피난 용량 가산(명)", "type": "integer", "minimum": 0 },
+              "satisfaction_bonus_bp": { "description": "편의·장식 만족도 가산(bp). 합은 build_rules.satisfaction_bonus_cap_bp 로 자른다", "type": "integer", "minimum": 0, "maximum": 10000 },
+              "light_grade": { "description": "무대 연출 등급 점수", "type": "integer", "minimum": 0 }
+            }
+          },
+          "model": {
+            "description": "예약(SE-041 에셋 등록용). res://assets/models/<id>.glb. 없거나 빈 문자열이면 플레이스홀더. v0 는 전부 비움",
+            "type": "string",
+            "pattern": "^(res://assets/models/[a-z][a-z0-9_]*\\.glb)?$"
+          }
+        }
+      }
+    }
+  }
+}
