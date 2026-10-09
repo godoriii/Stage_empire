@@ -548,6 +548,14 @@ func test_restore_rejects_bad_snapshot() -> void:
 	assert_eq(target.snapshot()["seed"], 2147483647, "seed max passes: snapshot seed")
 	# SE-011: restore 5단계 systems 불일치(D5). 훅 없는 target.
 	var before_sys: String = _hash(target)
+	# SE-017: restore 4(b) rng 상태 오류. push_error 는 SeededRng.set_state 1 + TickLoop 1 = 2회(tick.md#스냅샷 "push_error 횟수").
+	assert_true(good["rng"].has("audience"), "전제: good.rng 에 audience 스트림")
+	s = good.duplicate(true)
+	s["rng"]["audience"] = "x"
+	assert_false(target.restore(s), "rng audience x → false")
+	errs += 2
+	assert_push_error_count(errs, "rng audience x: push_error 2회(SeededRng.set_state 1 + TickLoop 1)")
+	assert_eq(_hash(target), before_sys, "rng audience x: 상태 불변")
 	var sys_bads: Dictionary = {}
 	s = good.duplicate(true)
 	s.erase("systems")
