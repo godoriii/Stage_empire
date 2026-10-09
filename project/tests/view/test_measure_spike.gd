@@ -192,3 +192,40 @@ func test_default_material_is_b_and_filename_has_suffix() -> void:
 	assert_false(body.contains("== ShaderVariants.DEFAULT_ID"), "default_out_path 에 DEFAULT_ID 특례 분기 0건")
 	assert_false(body.contains("DEFAULT_OUT_PATTERN %"), "구 SE-013 파일명 패턴을 쓰지 않는다")
 	assert_eq(d["ticket"], "SE-013")
+
+
+# --- SE-021 AC6 -------------------------------------------------------------
+
+## --material=ss: JSON material == ss, 인스턴스 5000, 군중 그림자 off. 스파이크 직속에 포스트 패스 노드 정확히 1개,
+## 군중·무대 프록시는 toon_ss(next_pass 없음 → 군중을 두 번 그리지 않는다). primitives 비율은 GPU 실행에서만 의미가
+## 있어 results/SE-021.md 표(Xvfb 무효 측정)로 확인한다(헤드리스는 더미 렌더러).
+func test_ss_material_json() -> void:
+	var data: Variant = await _run_entry("E", "ss")
+	assert_true(data is Dictionary, "JSON 파싱")
+	if not (data is Dictionary):
+		return
+	var d: Dictionary = data
+	assert_eq(d["material"], "ss", "JSON material == ss")
+	assert_eq(int(d["instance_count_actual"]), 5000, "인스턴스 5000")
+	assert_false(bool(d["crowd_cast_shadow"]), "E: 군중 그림자 off")
+	for k: String in SE003_KEYS:
+		assert_true(d.has(k), "SE-003 필수 키 %s" % k)
+	assert_eq(_default_out_path.get_file(), "SE-013_E_ss.json", "기본 출력 파일명")
+
+
+func test_ss_spike_has_one_post_pass_and_no_next_pass() -> void:
+	var vp: SubViewport = ViewTestUtil.make_viewport(self)
+	autofree(vp)
+	var spike: SpikeCrowd = (load("res://view/perf/spike_crowd.tscn") as PackedScene).instantiate() as SpikeCrowd
+	spike.config_id = "E"
+	spike.material_id = "ss"
+	vp.add_child(spike)
+	var toon_ss: Material = load("res://view/shaders/params/toon_ss.tres")
+	assert_eq(spike.crowd.material_override, toon_ss, "군중 toon_ss")
+	assert_null(spike.crowd.material_override.next_pass, "next_pass 없음")
+	for mi: MeshInstance3D in spike.get_stage_prop_nodes():
+		assert_eq(mi.material_override, toon_ss, "%s toon_ss" % mi.name)
+	var passes: Array[Node] = spike.find_children("*", "MeshInstance3D", true, false).filter(
+		func(n: Node) -> bool: return n.is_in_group(ShaderVariants.POST_PASS_GROUP))
+	assert_eq(passes.size(), 1, "포스트 패스 노드 정확히 1개")
+	assert_eq(ShaderVariants.get_post_pass(spike), passes[0] if passes.size() == 1 else null, "스파이크 직속")
