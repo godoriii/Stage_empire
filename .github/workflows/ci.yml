@@ -19,6 +19,7 @@ jobs:
       - run: python3 tools/validate_data.py --strict
       - run: python3 tools/hooks/boundary.py --self-test
       - run: python3 tools/hooks/test_check_commit.py
+      - run: python3 -I tools/assets/test_lint_gltf.py
 
   godot-tests:
     name: Godot 헤드리스 테스트
