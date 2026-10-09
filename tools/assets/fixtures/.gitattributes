@@ -1,0 +1,3 @@
+# SE-027: 린터 픽스처는 10 KB 미만의 결정적 생성물이라 LFS 를 쓰지 않는다(CI data job 은 lfs 없이 체크아웃).
+# 루트 .gitattributes 의 *.glb LFS 규칙을 이 디렉터리에서만 해제한다.
+*.glb -filter -diff -merge binary

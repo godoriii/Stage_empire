@@ -1,0 +1,188 @@
+{
+  "version": 2,
+  "max_agents": 150,
+  "pos_scale": 100,
+  "admission": {
+    "price_ref": 20,
+    "reputation_cap": 2000,
+    "noise_bp": 1000,
+    "price_factor_min_bp": 0,
+    "price_factor_max_bp": 20000
+  },
+  "flow": {
+    "arrival_window_ticks": 400,
+    "entry_ticks": 4,
+    "move_ticks_per_tile": 4,
+    "spot_tile_cap": 1,
+    "pass_tile_cap": 2,
+    "bar_ticks": 50,
+    "bar_fail_wait_ticks": 30,
+    "pass_override_ticks": 10
+  },
+  "satisfaction": {
+    "weights_bp": { "lineup": 4000, "sound": 1500, "sight": 1500, "value": 3000 },
+    "penalty_weights_bp": { "crowd": 500, "wait": 2000 },
+    "skill_base_bp": 5000,
+    "skill_bp_per_point": 50,
+    "no_lineup_bp": 0,
+    "price_value_mid_bp": 5000,
+    "crowd_comfort_bp": 8000
+  },
+  "types": [
+    {
+      "id": "regular",
+      "name": "로컬 단골",
+      "color": "#e0a458",
+      "needs_lineup": false,
+      "base_centi": 1200,
+      "popularity_centi": 0,
+      "reputation_centi": 2,
+      "genre_fit_bp": { "rock": 10000, "indie": 8000, "electronic": 6000 },
+      "price_sensitivity_bp": 200,
+      "bar_visit_bp": 7000,
+      "patience_ticks": 400,
+      "spot_weights_bp": { "sound": 5000, "sight": 5000, "bar": 2000 }
+    },
+    {
+      "id": "genre_fan",
+      "name": "장르 팬",
+      "color": "#4f7cff",
+      "needs_lineup": true,
+      "base_centi": 0,
+      "popularity_centi": 160,
+      "reputation_centi": 0,
+      "genre_fit_bp": { "rock": 10000, "indie": 10000, "electronic": 10000 },
+      "price_sensitivity_bp": 300,
+      "bar_visit_bp": 4000,
+      "patience_ticks": 300,
+      "spot_weights_bp": { "sound": 6000, "sight": 4000, "bar": 0 }
+    },
+    {
+      "id": "walk_in",
+      "name": "뜨내기",
+      "color": "#c2c7d0",
+      "needs_lineup": true,
+      "base_centi": 3000,
+      "popularity_centi": 30,
+      "reputation_centi": 6,
+      "genre_fit_bp": { "rock": 7000, "indie": 8000, "electronic": 10000 },
+      "price_sensitivity_bp": 500,
+      "bar_visit_bp": 7500,
+      "patience_ticks": 150,
+      "spot_weights_bp": { "sound": 4000, "sight": 3000, "bar": 3000 }
+    }
+  ],
+  "checks": {
+    "reference_reputation": 150,
+    "rookie_over_local_top_min": 17,
+    "rookie_over_local_top_target": [25, 40],
+    "local_top_slots": ["s03", "s07", "s10"],
+    "rookie_slots": ["s04", "s08", "s11", "s12"]
+  },
+  "reference_scenarios": [
+    {
+      "id": "no_lineup",
+      "description": "아티스트 없음. 기준 배치, 명성 0, 티켓 20, 시드 0, 1일차. 단골만 온다",
+      "layout": "baseline_show",
+      "seed": 0,
+      "day": 1,
+      "reputation_total": 0,
+      "ticket_price": 20,
+      "lineup": null,
+      "expected": {
+        "e_centi": { "regular": 1200, "genre_fan": 0, "walk_in": 0 },
+        "expected_centi": 1200,
+        "first_draw": 3230427448,
+        "noise_bp": 42,
+        "raw": 12,
+        "admissions": 12,
+        "capped_by": "none",
+        "by_type": { "regular": 12, "genre_fan": 0, "walk_in": 0 },
+        "admissions_range_other_seeds": [10, 13],
+        "audience": 12,
+        "left_early": 0,
+        "crowd_bp": 0,
+        "avg_satisfaction_bp_hand": 4600,
+        "avg_satisfaction_bp_range": [4300, 4600]
+      }
+    },
+    {
+      "id": "local_top_baseline",
+      "description": "로컬 상위(roster_plan s07: indie, 인기 27, 실력 18). 기준 배치, 명성 0, 티켓 20, 시드 0, 1일차",
+      "layout": "baseline_show",
+      "seed": 0,
+      "day": 1,
+      "reputation_total": 0,
+      "ticket_price": 20,
+      "lineup": { "slot": "s07", "genre": "indie", "grade": "local", "popularity": 27, "skill": 18 },
+      "expected": {
+        "e_centi": { "regular": 960, "genre_fan": 4320, "walk_in": 3048 },
+        "expected_centi": 8328,
+        "first_draw": 3230427448,
+        "noise_bp": 42,
+        "raw": 83,
+        "admissions": 83,
+        "capped_by": "none",
+        "by_type": { "regular": 10, "genre_fan": 43, "walk_in": 30 },
+        "admissions_range_other_seeds": [74, 91],
+        "audience": 83,
+        "left_early": 0,
+        "crowd_bp": 0,
+        "avg_satisfaction_bp_hand": 6732,
+        "avg_satisfaction_bp_range": [6432, 6732]
+      }
+    },
+    {
+      "id": "rookie_baseline",
+      "description": "신인(roster_plan s08: indie, 인기 42, 실력 60). 기준 배치, 명성 150(신인 해금 임계), 티켓 20, 시드 0, 1일차",
+      "layout": "baseline_show",
+      "seed": 0,
+      "day": 1,
+      "reputation_total": 150,
+      "ticket_price": 20,
+      "lineup": { "slot": "s08", "genre": "indie", "grade": "rookie", "popularity": 42, "skill": 60 },
+      "expected": {
+        "e_centi": { "regular": 1200, "genre_fan": 6720, "walk_in": 4128 },
+        "expected_centi": 12048,
+        "first_draw": 3230427448,
+        "noise_bp": 42,
+        "raw": 120,
+        "admissions": 120,
+        "capped_by": "none",
+        "by_type": { "regular": 12, "genre_fan": 67, "walk_in": 41 },
+        "admissions_range_other_seeds": [108, 122],
+        "audience": 120,
+        "left_early": 0,
+        "crowd_bp": 9180,
+        "avg_satisfaction_bp_hand": 6733,
+        "avg_satisfaction_bp_range": [6433, 6733]
+      }
+    },
+    {
+      "id": "local_top_price30",
+      "description": "local_top_baseline 과 같고 티켓만 30. 입장 감소 방향 확인(AU5)",
+      "layout": "baseline_show",
+      "seed": 0,
+      "day": 1,
+      "reputation_total": 0,
+      "ticket_price": 30,
+      "lineup": { "slot": "s07", "genre": "indie", "grade": "local", "popularity": 27, "skill": 18 },
+      "expected": {
+        "e_centi": { "regular": 768, "genre_fan": 3024, "walk_in": 1524 },
+        "expected_centi": 5316,
+        "first_draw": 3230427448,
+        "noise_bp": 42,
+        "raw": 53,
+        "admissions": 53,
+        "capped_by": "none",
+        "by_type": { "regular": 8, "genre_fan": 30, "walk_in": 15 },
+        "admissions_range_other_seeds": [47, 58],
+        "audience": 53,
+        "left_early": 0,
+        "crowd_bp": 0,
+        "avg_satisfaction_bp_hand": 5730,
+        "avg_satisfaction_bp_range": [5430, 5730]
+      }
+    }
+  ]
+}
