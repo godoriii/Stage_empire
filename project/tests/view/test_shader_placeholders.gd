@@ -222,3 +222,66 @@ func test_bad_material_id_rejected() -> void:
 		for mi: MeshInstance3D in meshes_before:
 			assert_eq(mi.material_override, toon_b, "%s: %s 머티리얼 그대로" % [bad, mi.name])
 	assert_eq(GridSandbox.EXIT_BAD_MATERIAL, 2, "없는 시안 종료 코드 2")
+
+
+# --- SE-024 AC6 (SE-018 후속 A) ----------------------------------------------
+
+## 리소스 캐시에서 경로를 잠시 가로챈 원래 리소스(after_each 가 되돌린다).
+var _hijacked: Resource = null
+var _hijacked_path: String = ""
+## 가로채는 동안 캐시에 앉힌 빈 Resource. 참조를 쥐고 있어야 한다(해제되면 캐시 항목이 사라져 디스크에서 다시 로드된다).
+var _fake: Resource = null
+
+
+func after_each() -> void:
+	_restore_hijacked()
+
+
+## path 의 캐시 항목을 ShaderMaterial 이 아닌 빈 Resource 로 바꾼다 → ShaderVariants.load_material 이 null(로드 실패).
+## grid_sandbox.gd 를 고치지 않고(경로 패턴을 노출하지 않음) apply_material() 의 `apply < 0 → false` 분기를 탄다.
+func _hijack(path: String) -> void:
+	_hijacked = load(path)
+	_hijacked_path = path
+	_fake = Resource.new()
+	_fake.take_over_path(path)
+
+
+func _restore_hijacked() -> void:
+	if _hijacked != null:
+		_hijacked.take_over_path(_hijacked_path)
+	_hijacked = null
+	_fake = null
+	_hijacked_path = ""
+
+
+## 유효한 시안 id 의 머티리얼 로드가 실패하면 apply_material() 은 false. 플레이스홀더·머티리얼·시안 id·HUD 그대로.
+func test_material_load_failure_returns_false_and_keeps_state() -> void:
+	var path_a: String = TOON_TRES_PATTERN % "a"
+	var toon_a: Material = load(path_a)
+	var toon_b: Material = load(TOON_TRES_PATTERN % "b")
+	var ph: ShaderPlaceholders = _sandbox.get_placeholders()
+	var meshes_before: Array[MeshInstance3D] = _meshes_under(ph)
+	assert_gt(meshes_before.size(), 0, "플레이스홀더 메시가 있다")
+	var excluded: Dictionary = _excluded_snapshot()
+	var children_before: int = _sandbox.get_child_count()
+	_hijack(path_a)
+	assert_false(load(path_a) is ShaderMaterial, "가로챈 동안 toon_a.tres 는 ShaderMaterial 이 아니다")
+	assert_false(_sandbox.apply_material("a"), "로드 실패 → apply_material false")
+	assert_push_error("시안 'a' 머티리얼 로드 실패: %s" % path_a)
+	assert_push_error_count(1, "push_error 1건(ShaderVariants)")
+	assert_eq(_placeholder_nodes().size(), 1, "플레이스홀더 1개 그대로")
+	assert_eq(_sandbox.get_placeholders(), ph, "같은 플레이스홀더 노드")
+	assert_eq(_sandbox.get_child_count(), children_before, "샌드박스 자식 수 그대로(포스트 패스 없음)")
+	assert_eq(_sandbox.get_material_id(), "b", "시안 id 그대로(b)")
+	assert_string_contains(_sandbox.hud.get_text(), "시안: b", "HUD 그대로")
+	for mi: MeshInstance3D in meshes_before:
+		assert_eq(mi.material_override, toon_b, "%s: 머티리얼 그대로(toon_b)" % mi.name)
+	_assert_excluded_untouched(excluded, "로드 실패")
+	# 대조군: 캐시를 되돌리면 같은 호출이 성공한다(분기를 가른 것은 로드 실패뿐).
+	_restore_hijacked()
+	assert_eq(load(path_a), toon_a, "되돌린 뒤 같은 리소스")
+	assert_true(_sandbox.apply_material("a"), "대조군: apply_material(a) true")
+	assert_eq(_sandbox.get_material_id(), "a", "대조군: 시안 a")
+	for mi: MeshInstance3D in meshes_before:
+		assert_eq(mi.material_override, toon_a, "대조군: %s toon_a" % mi.name)
+	assert_push_error_count(1, "대조군은 push_error 를 더하지 않는다")
