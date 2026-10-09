@@ -255,11 +255,10 @@ func _check_rules(fid: String, cell: Array, rot: int) -> String:
 	var row: Dictionary = ft.row_ref(fid)
 	if not ft.allowed_rotations.has(rot) or (not row["rotatable"] and rot != GridOccupancy.ROT_0):  # B4
 		return R_BAD_ROTATION
+	if not GridOccupancy.rect_in_bounds(row["footprint"], cell, rot, m.width, m.depth):        # B5 (64비트 비교, Rect2i 전)
+		return R_OUT_OF_BOUNDS
 	var r: Rect2i = GridOccupancy.rect_of(row["footprint"], cell, rot)
 	var cells: Array = GridOccupancy.rect_cells(r)
-	for c: Array in cells:                                                                     # B5
-		if not m.in_bounds(c[0], c[1]):
-			return R_OUT_OF_BOUNDS
 	for c: Array in cells:                                                                     # B6
 		if not m.is_buildable(c[0], c[1]):
 			return R_BLOCKED_TILE
@@ -425,6 +424,8 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 		var row: Dictionary = ft.row_ref(fid)
 		if not ft.allowed_rotations.has(rot) or (not row["rotatable"] and rot != GridOccupancy.ROT_0):
 			return "RS3 %s 의 rotation %d 가 허용되지 않는다" % [eid, rot]
+		if not GridOccupancy.rect_in_bounds(row["footprint"], cell, rot, m.width, m.depth):     # RS4 (64비트 비교, 변환 전)
+			return "RS4 %s 의 cell %s 점유 사각형이 맵 밖이다" % [eid, cell]
 		var cells: Array = GridOccupancy.cells_of(row["footprint"], cell, rot)
 		for c: Array in cells:                                                                 # RS4
 			if not m.is_buildable(c[0], c[1]):

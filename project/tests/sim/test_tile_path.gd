@@ -96,3 +96,14 @@ func test_sync_with_occupancy_and_build_system() -> void:
 	bus.dispatch_commands()
 	assert_eq(build.path_from_entrance([11, 12]).size(), 13, "철거 뒤 직선 경로")
 	assert_eq(build.find_path([11, 0], [11, 2]).size(), 3)
+
+
+## SE-032-bug: int32 로 잘리면 통과 가능한 셀이 되는 64비트 좌표는 맵 밖이다.
+func test_64bit_endpoints_rejected() -> void:
+	var tp: TilePath = TilePath.new(_map)
+	var p32: int = 1 << 32
+	assert_eq(tp.find_path([11, 0], [p32 + 5, 5]), [], "도착 x 2^32+5")
+	assert_eq(tp.find_path([p32 + 11, 0], [5, 5]), [], "출발 x 2^32+11")
+	assert_eq(tp.find_path([11, 0], [5, p32 + 5]), [], "도착 z 2^32+5")
+	assert_false(tp.is_passable(p32 + 5, 5))
+	assert_eq(tp.path_from_entrance([-p32 + 5, 5]), [])

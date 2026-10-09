@@ -66,3 +66,21 @@ func test_occupancy_table() -> void:
 	assert_true(o.is_occupied(5, 0), "다른 entity 셀은 안 지운다")
 	o.clear()
 	assert_eq(o.size(), 0)
+
+
+## SE-032-bug: 64비트 비교(Rect2i 변환 전), 오버플로 없음.
+func test_rect_in_bounds_64bit() -> void:
+	var p32: int = 1 << 32
+	assert_true(GridOccupancy.rect_in_bounds([4, 3], [20, 21], 0, 24, 24), "x 20..23, z 21..23")
+	assert_false(GridOccupancy.rect_in_bounds([4, 3], [21, 21], 0, 24, 24), "x 24 밖")
+	assert_true(GridOccupancy.rect_in_bounds([4, 3], [21, 20], 90, 24, 24), "회전 후 3×4")
+	assert_false(GridOccupancy.rect_in_bounds([4, 3], [21, 21], 90, 24, 24))
+	assert_false(GridOccupancy.rect_in_bounds([1, 1], [-1, 0], 0, 24, 24))
+	for cell: Array in [[p32 + 5, 5], [5, p32 + 5], [-p32 + 5, 5], [9223372036854775807, 5], [-9223372036854775807 - 1, 0]]:
+		assert_false(GridOccupancy.rect_in_bounds([4, 3], cell, 0, 24, 24), "%s" % [cell])
+	var o: GridOccupancy = GridOccupancy.new()
+	o.add("f1", [[5, 5]])
+	assert_false(GridOccupancy.fits_cell(p32 + 5, 5))
+	assert_true(GridOccupancy.fits_cell(5, 5))
+	assert_false(o.is_occupied(p32 + 5, 5), "잘린 좌표로 [5,5] 를 보지 않는다")
+	assert_eq(o.owner_of(p32 + 5, 5), "")

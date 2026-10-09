@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 대기 (QA 발견, 수정 미착수) |
+| 상태 | 해결 (<sha>) |
 | 담당 에이전트 | sim-engineer (수정), game-designer (스펙 문구 확인: 좌표 범위 한 줄) |
 | 마일스톤 | MVP |
 | 의존 티켓 | SE-032 (구현), SE-028 (스펙 build.md B1·B5·RS4) |
@@ -64,7 +64,23 @@
 
 ## 결과
 
-(수정 담당자가 작성)
+sim-engineer, 2026-10-09.
+
+- 원인: `GridOccupancy.rect_of`/`cells_of` 의 `Rect2i`·`Vector2i` 가 int32 라 64비트 `cell` 이 잘린 뒤 B5~B7·RS4 가 잘린 좌표로 판정했다.
+- 수정:
+  - `GridOccupancy.rect_in_bounds(footprint, cell, rotation, width, depth)`(신규)는 회전 후 사각형이 `[0, width) × [0, depth)` 안인지 64비트 `int` 그대로 비교한다(`x ≤ width − W'` 꼴이라 덧셈 오버플로 없음, 리터럴 없음).
+  - `BuildSystem._check_rules` 의 B5 를 이 검사로 바꿔 `Rect2i` 변환보다 먼저 둔다(명령 핸들러·`check_place` 공통 경로). `_parse_snapshot` 의 RS4 도 `cells_of` 전에 같은 검사를 한다.
+- 같은 패턴 점검:
+  - `TilePath.find_path` 는 `Vector2i` 로 바꾼 뒤 `is_passable(a.x, a.y)` 를 불러 같은 잘림이 있었다. 리포트의 "안전"과 달리 `[2^32+5, 5]` 를 `[5,5]` 로 봤다. 원래 `int` 로 먼저 검사하도록 고쳤다.
+  - `GridOccupancy.is_occupied`/`owner_of` 는 `fits_cell`(Vector2i 왕복 비교)로 표현 불가 좌표를 "셀 아님"으로 본다.
+  - 나머지 `Vector2i(...)` 생성은 검사를 통과한 셀이나 맵 루프 좌표만 받는다.
+- 테스트(+4):
+  - `test_build_system.gd` `test_bug_64bit_cells_out_of_bounds`: 표의 5좌표 + int64 최솟값, `speaker_floor`·`stage_small` 두 가구. `[5,5]` 를 미리 점유해 둔 상태에서 `check_place`·명령 모두 `out_of_bounds`, 받은 `cell` 그대로 거절, `charge_proposed` 0, 상태 불변.
+  - `test_bug_64bit_cells_restore_rs4`: 같은 좌표가 든 스냅샷 → `false`·`push_error` 1회("RS4")·상태 불변·이벤트 0. 2^53 미만 좌표는 JSON 왕복 경로도 같다.
+  - `test_tile_path.gd` `test_64bit_endpoints_rejected`, `test_grid_occupancy.gd` `test_rect_in_bounds_64bit`.
+  - 수정 전 코드로 돌리면 세 동작 테스트가 실패한다(grid 스크립트는 새 함수가 없어 로드 실패). 수정 후 녹색.
+- 보너스(qa 발견 3): `test_map_config.gd::test_load_ok` 의 JSON float 비교 3곳을 `int()` 로 접어 GUT "Float/Int comparison" 경고 0.
+- 결과: `tools/run_tests.sh project/tests/sim` 23 스크립트 / 175 통과(기존 171 + 4), `validate_data.py --strict` exit 0. 스펙 문구 변경 없음(B5 가 이미 그렇게 읽힌다).
 
 ## QA / 리뷰
 

@@ -29,7 +29,17 @@ static func rotated_size(footprint: Array, rotation: int) -> Array:
 	return [w, d]
 
 
-## G3: cell = 회전 후 점유 사각형의 최소 모서리.
+## B5·RS4: 회전 후 점유 사각형이 맵 [0, width) × [0, depth) 안에 있는가. cell 성분을 GDScript 64비트 int 그대로
+## 비교한다(Rect2i/Vector2i 는 int32 라 큰 좌표가 잘린다, SE-032-bug). 덧셈 없이 비교해 int64 오버플로도 없다.
+## rect_of/cells_of 에 외부 좌표를 넣기 전에 반드시 이 검사를 먼저 한다.
+static func rect_in_bounds(footprint: Array, cell: Array, rotation: int, width: int, depth: int) -> bool:
+	var size: Array = rotated_size(footprint, rotation)
+	var x: int = cell[0]
+	var z: int = cell[1]
+	return x >= 0 and z >= 0 and x <= width - int(size[0]) and z <= depth - int(size[1])
+
+
+## G3: cell = 회전 후 점유 사각형의 최소 모서리. 성분이 int32 로 잘리므로 rect_in_bounds 를 통과한 cell 만 넣는다.
 static func rect_of(footprint: Array, cell: Array, rotation: int) -> Rect2i:
 	var size: Array = rotated_size(footprint, rotation)
 	return Rect2i(int(cell[0]), int(cell[1]), int(size[0]), int(size[1]))
@@ -157,12 +167,20 @@ func remove(entity_id: String, cells: Array) -> void:
 			_owner.erase(k)
 
 
+## Vector2i(int32)로 잘리지 않고 표현되는 좌표인가(SE-032-bug). 잘리는 좌표는 어떤 셀도 아니다.
+static func fits_cell(x: int, z: int) -> bool:
+	var v: Vector2i = Vector2i(x, z)
+	return v.x == x and v.y == z
+
+
 func is_occupied(x: int, z: int) -> bool:
-	return _owner.has(Vector2i(x, z))
+	return fits_cell(x, z) and _owner.has(Vector2i(x, z))
 
 
-## 셀을 점유한 entity_id. 비었으면 "".
+## 셀을 점유한 entity_id. 비었거나 표현 불가 좌표면 "".
 func owner_of(x: int, z: int) -> String:
+	if not fits_cell(x, z):
+		return ""
 	return _owner.get(Vector2i(x, z), "")
 
 

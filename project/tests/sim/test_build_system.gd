@@ -212,6 +212,58 @@ func test_bc06_out_of_bounds() -> void:
 	assert_eq(_outcome(u[3]), "out_of_bounds", "x -1")
 
 
+## SE-032-bug: 64비트 cell 좌표(int32 로 잘리면 맵 안 셀이 되는 값). 버그 티켓 표의 좌표 + int64 경계.
+func _big_cells() -> Array:
+	var p32: int = 1 << 32
+	return [[p32 + 5, 5], [5, p32 + 5], [-p32 + 5, 5], [p32 + 11, 0], [9223372036854775807, 5], [-9223372036854775807 - 1, 5]]
+
+
+func test_bug_64bit_cells_out_of_bounds() -> void:
+	var u: Array = _unit()
+	var build: BuildSystem = u[1]
+	var rec: EventRecorder = u[3]
+	# [5,5]·[11,0] 을 미리 차지해 두면, 잘린 좌표는 overlap·blocked_tile 이 되어 버그가 드러난다.
+	_place(u[0], "speaker_floor", [5, 5], 0)
+	assert_eq(_outcome(rec), "placed")
+	var before: String = _bhash(build)
+	rec.clear()
+	for cell: Array in _big_cells():
+		for fid: String in ["speaker_floor", "stage_small"]:
+			assert_eq(build.check_place(fid, cell, 0), "out_of_bounds", "check_place %s %s" % [fid, cell])
+			_place(u[0], fid, cell, 0)
+			assert_eq(_last(rec, "build.rejected"), {"action": "place", "reason": "out_of_bounds", "furniture_id": fid, "cell": cell, "rotation": 0, "entity_id": null}, "명령 %s %s" % [fid, cell])
+	assert_eq(rec.count("build.placed"), 0)
+	assert_eq(rec.count("economy.charge_proposed"), 0, "지출 제안 0")
+	assert_eq(_bhash(build), before, "instances 불변")
+
+
+func test_bug_64bit_cells_restore_rs4() -> void:
+	var u: Array = _unit()
+	var build: BuildSystem = u[1]
+	_place(u[0], "stage_small", [10, 20], 0)
+	_place(u[0], "speaker_floor", [5, 5], 0)
+	var good: Dictionary = build.snapshot()
+	var before: String = _bhash(build)
+	var rec: EventRecorder = u[3]
+	rec.clear()
+	var errs: int = 0
+	var p53: int = 1 << 53
+	for cell: Array in _big_cells():
+		var s: Dictionary = good.duplicate(true)
+		s["instances"][1]["cell"] = cell
+		assert_false(build.restore(s), "RS4 %s → false" % [cell])
+		errs += 1
+		assert_push_error("RS4", "RS4 %s: 의도한 검사" % [cell])
+		assert_push_error_count(errs, "RS4 %s: push_error 1회" % [cell])
+		assert_eq(_bhash(build), before, "RS4 %s: 상태 불변" % [cell])
+		if absi(int(cell[0])) < p53 and absi(int(cell[1])) < p53:
+			assert_false(build.restore(_rt(s)), "RS4 %s JSON 왕복 → false" % [cell])
+			errs += 1
+			assert_push_error("RS4", "RS4 %s JSON 왕복" % [cell])
+			assert_push_error_count(errs)
+	assert_eq(rec.events.size(), 0, "이벤트 0")
+
+
 func test_bc07_blocked_tile() -> void:
 	var u: Array = _unit()
 	for c: Array in [[7, 8], [11, 1], [0, 5], [11, 0]]:

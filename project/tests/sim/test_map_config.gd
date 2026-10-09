@@ -22,8 +22,8 @@ func _set_char(d: Dictionary, x: int, z: int, c: String) -> void:
 func test_load_ok() -> void:
 	var m: MapConfig = MapConfig.load()
 	assert_not_null(m)
-	assert_eq(m.width, _raw["width"])
-	assert_eq(m.depth, _raw["depth"])
+	assert_eq(m.width, int(_raw["width"]))
+	assert_eq(m.depth, int(_raw["depth"]))
 	assert_eq(m.entrances(), [[11, 0], [12, 0]])
 	var evac: int = 0
 	var walkable: int = 0
@@ -35,7 +35,7 @@ func test_load_ok() -> void:
 			walkable += 1 if k["walkable"] else 0
 			floor_n += 1 if k["id"] == "floor" else 0
 	assert_eq(m.evac_total, evac)
-	assert_eq(m.evac_total, _raw["reference_layouts"][0]["expected"]["evac_capacity"], "빈 방 피난 80")
+	assert_eq(m.evac_total, int(_raw["reference_layouts"][0]["expected"]["evac_capacity"]), "빈 방 피난 80")
 	assert_eq(floor_n, int(_raw["reference_layouts"][0]["expected"]["floor_free"]), "floor 478")
 	assert_eq(m.reachable({}).size(), walkable, "MK6: 걷기 가능 482 전부 연결")
 	assert_eq(walkable, floor_n + 4, "바닥 + 완충 2 + 입구 2")

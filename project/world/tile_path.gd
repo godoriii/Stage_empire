@@ -42,10 +42,11 @@ func is_passable(x: int, z: int) -> bool:
 
 ## from → to 경로. 도달 불가·맵 밖·끝점이 막힘이면 [].
 func find_path(from: Array, to: Array) -> Array:
+	# 64비트 int 로 먼저 판정한다(Vector2i 는 int32 라 큰 좌표가 잘린다, SE-032-bug).
+	if not is_passable(int(from[0]), int(from[1])) or not is_passable(int(to[0]), int(to[1])):
+		return []
 	var a: Vector2i = Vector2i(int(from[0]), int(from[1]))
 	var b: Vector2i = Vector2i(int(to[0]), int(to[1]))
-	if not is_passable(a.x, a.y) or not is_passable(b.x, b.y):
-		return []
 	var out: Array = []
 	for v: Vector2i in _astar.get_id_path(a, b):
 		out.append([v.x, v.y])
