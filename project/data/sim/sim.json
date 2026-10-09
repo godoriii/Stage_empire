@@ -1,14 +1,18 @@
 {
-  "version": 1,
+  "version": 2,
   "ticks_per_second": 10,
   "tile_size_m": 1.0,
   "chunk_size": 32,
   "individual_agent_max_tier": 3,
   "individual_agent_cap": 3000,
+  "max_ticks_per_step": 30,
+  "snapshot_schema_version": 1,
+  "rng_streams": ["audience", "artist", "events", "economy", "world"],
+  "system_order": ["build", "staff", "artist", "audience", "show", "crisis", "economy", "reputation"],
   "phases": [
-    { "id": "day",     "name": "낮(준비)",   "ticks": 1800, "pausable": true,  "speeds": [0, 1, 2, 3] },
-    { "id": "evening", "name": "저녁(개장)", "ticks": 600,  "pausable": true,  "speeds": [0, 1] },
-    { "id": "show",    "name": "공연",       "ticks": 900,  "pausable": false, "speeds": [1] },
-    { "id": "close",   "name": "마감(정산)", "ticks": 0,    "pausable": true,  "speeds": [0] }
+    { "id": "day",     "name": "낮(준비)",   "ticks": 1800, "pausable": true,  "speeds": [0, 1, 2, 3], "default_speed": 1, "enter_speed_mode": "force" },
+    { "id": "evening", "name": "저녁(개장)", "ticks": 600,  "pausable": true,  "speeds": [0, 1],       "default_speed": 1, "enter_speed_mode": "keep_if_allowed" },
+    { "id": "show",    "name": "공연",       "ticks": 900,  "pausable": false, "speeds": [1],          "default_speed": 1, "enter_speed_mode": "keep_if_allowed" },
+    { "id": "close",   "name": "마감(정산)", "ticks": 0,    "pausable": true,  "speeds": [0],          "default_speed": 0, "enter_speed_mode": "force" }
   ]
 }
