@@ -1,7 +1,11 @@
 extends GutTest
 ## SE-002 AC8(키 리터럴), AC9(경계), AC10(스크린샷 파일): 소스 정적 검사.
+## SE-013 AC4: view/ui 가 tests/ 를 참조하지 않는다(측정 진입점은 tests 쪽에서 view 를 인스턴스화).
 
 const SCREENSHOT_PATH: String = "res://tests/view/screenshots/SE-002/grid_yaw45_zoom2.png"
+const SPIKE_SCRIPT: String = "res://view/perf/spike_crowd.gd"
+## 정규식 문자열. 리터럴 그대로 매치된다(특수 문자 없음).
+const TESTS_REF_PATTERN: String = "res://tests/"
 
 
 func _gd_sources() -> PackedStringArray:
@@ -42,6 +46,30 @@ func test_view_does_not_touch_sim_or_data() -> void:
 	# 이 티켓은 이벤트를 발행하지 않는다(표시 전용).
 	var emits: PackedStringArray = ViewTestUtil.grep(srcs, "EventBus|event_bus")
 	assert_eq(emits.size(), 0, "SE-002 는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
+
+
+func test_view_does_not_reference_tests() -> void:
+	var files: PackedStringArray = _gd_sources()
+	files.append_array(ViewTestUtil.list_sources(ViewTestUtil.SOURCE_ROOTS, "tscn"))
+	files.append_array(ViewTestUtil.list_sources(ViewTestUtil.SOURCE_ROOTS, "tres"))
+	assert_true(files.has(SPIKE_SCRIPT), "검사 대상에 spike_crowd.gd 포함")
+	assert_true(files.has("res://view/perf/spike_crowd.tscn"), "검사 대상에 .tscn 포함")
+	assert_true(files.has("res://view/perf/spike_configs.tres"), "검사 대상에 .tres 포함")
+	var hits: PackedStringArray = ViewTestUtil.grep(files, TESTS_REF_PATTERN)
+	assert_eq(hits.size(), 0, "view/ui 의 .gd/.tscn/.tres 에 res://tests/ 0건: %s" % ", ".join(hits))
+	# spike_crowd.gd 에 옛 측정 진입(--measure 인자, _start_measure)이 남아 있지 않다.
+	var spike_src: PackedStringArray = PackedStringArray([SPIKE_SCRIPT])
+	var old_entry: PackedStringArray = ViewTestUtil.grep(spike_src, "--measure|_start_measure")
+	assert_eq(old_entry.size(), 0, "spike_crowd.gd 에 --measure·_start_measure 없음: %s" % ", ".join(old_entry))
+	# 역검증: 같은 grep 이 가짜 줄 배열에서는 정확히 1건을 잡는다.
+	var fake: PackedStringArray = PackedStringArray([
+		"const OK_PATH: String = \"res://view/perf/spike_crowd.tscn\"",
+		"const BAD_PATH: String = \"res://tests/x\"",
+		"# tests/view/perf 는 res:// 접두어 없이 적으면 걸리지 않는다",
+	])
+	assert_eq(ViewTestUtil.grep_lines(fake, TESTS_REF_PATTERN).size(), 1, "대조군: res://tests/x 1건")
+	assert_eq(ViewTestUtil.grep_lines(PackedStringArray(["func _start_measure() -> void:"]), "--measure|_start_measure").size(), 1,
+		"대조군: _start_measure 1건")
 
 
 func test_screenshot_exists_1080p() -> void:

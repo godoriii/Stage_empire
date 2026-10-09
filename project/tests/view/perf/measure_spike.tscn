@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://tests/view/perf/measure_spike.gd" id="1_measure"]
+[ext_resource type="PackedScene" path="res://view/perf/spike_crowd.tscn" id="2_spike"]
+
+[node name="MeasureSpike" type="Node"]
+script = ExtResource("1_measure")
+spike_scene = ExtResource("2_spike")

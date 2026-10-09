@@ -1,24 +1,23 @@
 class_name SpikeCrowd
 extends Node3D
-## SE-003 성능 스파이크 씬: MultiMesh 캐릭터 프록시 N개 + 동적 라이트 M개(Omni/Spot 혼합)를
-## SE-002 의 IsoCamera(최대 줌아웃)·GridView 위에 전부 화면 안에 띄우고 매 프레임 움직인다.
+## 성능 스파이크 씬(SE-003, SE-013): MultiMesh 캐릭터 프록시 N개 + 동적 라이트 M개(Omni/Spot 혼합) +
+## 무대 프록시 박스(셰도우 캐스터)를 SE-002 의 IsoCamera(최대 줌아웃)·GridView 위에 전부 화면 안에 띄우고 매 프레임 움직인다.
 ## 표시 전용. sim/core 와 연결하지 않고 이벤트 버스를 쓰지 않는다. 툰 룩은 범위 밖(SE-004).
 ##
 ## 수치는 전부 spike_configs.tres(SpikeConfigSet)에 있다. 구성은 config_id(@export) 또는 명령줄로 고른다.
+## 군중 그림자는 구성의 crowd_shadows 를 따른다(구성 E = off, style-guide 2026-10-09 결정).
 ##
-## 실행(구경):  godot --path project res://view/perf/spike_crowd.tscn -- --config=B
-## 실행(측정):  godot --path project res://view/perf/spike_crowd.tscn -- --measure --config=B [--out=<경로.json>]
-##   측정 로직과 JSON 쓰기는 res://tests/view/perf/measure_spike.gd(SpikeMeasure)에 있다.
-##   view/ 는 파일을 쓰지 않는다는 경계 규칙(test_view_boundary.gd) 때문에 측정기를 tests/ 에 두고 경로로 로드한다.
+## 실행(구경):  godot --path project res://view/perf/spike_crowd.tscn -- --config=E
+## 측정은 이 씬이 아니라 tests 쪽 진입점(tests/view/perf/measure_spike.tscn)이 이 씬을 인스턴스화해서 한다.
+##   view/ 는 tests/ 를 참조하지 않는다(test_view_boundary.gd). 측정기가 measure_mode 를 켜고
+##   set_process(false) 로 이 노드의 자체 진행을 멈춘 뒤 advance()·update_label() 을 직접 호출한다.
 ##
 ## 군중 갱신 경로(실제 게임과 같은 비용 구조):
 ##   interpolation_tick_hz 마다 "시뮬레이션이 내준 다음 위치"를 전 인스턴스에 대해 계산하고(_sim_tick),
 ##   매 프레임 이전/다음 위치를 alpha 로 보간해 CPU 에서 전 인스턴스 트랜스폼을 MultiMesh 버퍼에 다시 쓴다.
 
 const DEFAULT_SETTINGS_PATH: String = "res://view/perf/spike_configs.tres"
-const MEASURE_SCRIPT_PATH: String = "res://tests/view/perf/measure_spike.gd"
 const ARG_CONFIG: String = "--config="
-const ARG_MEASURE: String = "--measure"
 
 ## MultiMesh 버퍼 레이아웃(TRANSFORM_3D + use_colors): 행 우선 3×4 트랜스폼 12개 + 색 4개.
 const FLOATS_PER_TRANSFORM: int = 12
@@ -33,12 +32,12 @@ const FLOATS_PER_INSTANCE: int = FLOATS_PER_TRANSFORM + FLOATS_PER_COLOR
 @onready var grid: GridView = $GridView
 @onready var crowd: MultiMeshInstance3D = $Crowd
 @onready var lights_root: Node3D = $Lights
+@onready var stage_props_root: Node3D = $StageProps
 @onready var info_label: Label = $Overlay/InfoLabel
 
 var config: SpikeConfig
+## 측정기가 켠다(입력 무시, 라벨 표시). 이 씬은 명령줄로 측정 모드를 켜지 않는다.
 var measure_mode: bool = false
-## 마지막 advance() 의 CPU 시간(µs): 군중 보간·버퍼 업로드 + 라이트 갱신(GDScript 비용). 측정기가 읽는다.
-var last_advance_usec: int = 0
 
 var _time: float = 0.0
 var _crowd_center: Vector3 = Vector3.ZERO
@@ -72,20 +71,13 @@ func _ready() -> void:
 		settings = load(DEFAULT_SETTINGS_PATH) as SpikeConfigSet
 	for err: String in settings.get_errors():
 		push_error("SpikeCrowd: 설정 오류: %s" % err)
-	var args: PackedStringArray = OS.get_cmdline_user_args()
-	measure_mode = args.has(ARG_MEASURE)
-	var wanted: String = resolve_config_id(config_id, args, settings.default_config_id)
+	var wanted: String = resolve_config_id(config_id, OS.get_cmdline_user_args(), settings.default_config_id)
 	config = settings.get_config(wanted)
 	if config == null:
 		push_error("SpikeCrowd: 구성 '%s' 없음 (가능: %s)" % [wanted, ", ".join(settings.get_config_ids())])
-		if measure_mode:
-			get_tree().quit(2)
-			return
 		config = settings.get_config(settings.default_config_id)
 	config_id = config.id
 	_build()
-	if measure_mode:
-		_start_measure()
 
 
 ## 구성 id 결정: @export 값 > 명령줄 --config= > 기본값.
@@ -121,16 +113,15 @@ func _process(delta: float) -> void:
 		if dir != Vector2.ZERO:
 			iso_camera.pan(dir * iso_camera.get_zoom_size() * iso_camera.params.pan_speed_screens_per_sec * delta)
 	advance(delta)
-	_update_label()
+	update_label()
 
 
 ## 연출을 delta 초 진행한다: 군중 보간 + 버퍼 업로드, 라이트 위치·방향·색.
+## 측정기는 이 호출을 감싸 CPU 시간(군중 갱신 + 라이트 갱신)을 잰다.
 func advance(delta: float) -> void:
-	var t0: int = Time.get_ticks_usec()
 	_time += delta
 	_advance_crowd(delta)
 	_update_lights()
-	last_advance_usec = Time.get_ticks_usec() - t0
 
 
 # --- 조회(테스트·측정기용) -------------------------------------------------
@@ -153,6 +144,28 @@ func get_shadow_light_count() -> int:
 
 func get_instance_mesh_triangle_count() -> int:
 	return crowd.multimesh.mesh.get_faces().size() / 3
+
+
+## 군중이 실제로 그림자를 드리우는지(cast_shadow != OFF).
+func is_crowd_casting_shadows() -> bool:
+	return crowd.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+func get_stage_prop_nodes() -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	for child: Node in stage_props_root.get_children():
+		var mi: MeshInstance3D = child as MeshInstance3D
+		if mi != null and not mi.is_queued_for_deletion():
+			out.append(mi)
+	return out
+
+
+## 무대 프록시 전체 삼각형 수(메인 패스 1회 기준).
+func get_stage_prop_triangle_count() -> int:
+	var n: int = 0
+	for mi: MeshInstance3D in get_stage_prop_nodes():
+		n += mi.mesh.get_faces().size() / 3
+	return n
 
 
 func get_crowd_center() -> Vector3:
@@ -226,8 +239,9 @@ func _build() -> void:
 
 	get_viewport().positional_shadow_atlas_size = config.shadow_atlas_size
 	_build_crowd()
+	_build_stage_props()
 	_build_lights()
-	_update_label()
+	update_label()
 
 
 func _build_crowd() -> void:
@@ -274,7 +288,8 @@ func _build_crowd() -> void:
 	var top: float = s.body_height_m + s.head_size_m + s.bob_height_m
 	mm.custom_aabb = AABB(_crowd_center - Vector3(reach, 0.0, reach), Vector3(reach * 2.0, top, reach * 2.0))
 	crowd.multimesh = mm
-	crowd.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	crowd.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if config.crowd_shadows \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	_tick_dt = 1.0 / s.interpolation_tick_hz
 	_tick_accum = 0.0
@@ -282,6 +297,28 @@ func _build_crowd() -> void:
 	_sim_targets(_sim_time, _prev_pos, _prev_yaw)
 	_sim_targets(_sim_time + _tick_dt, _next_pos, _next_yaw)
 	_write_instances(0.0)
+
+
+## 무대 프록시 박스(셰도우 캐스터)를 군중 영역 안에 한 줄로 놓는다. 모든 구성에서 같다(구성 간 비교 가능성).
+## 배치는 군중과 같은 레이아웃 좌표(카메라 기준 요로 돌린 정사각형)를 쓴다.
+func _build_stage_props() -> void:
+	var s: SpikeConfigSet = settings
+	for child: Node in stage_props_root.get_children():
+		child.queue_free()
+	var n: int = s.stage_prop_count
+	var span: float = _crowd_side_m * s.stage_prop_span_ratio
+	var spacing: float = span / float(n)
+	var v: float = _crowd_side_m * 0.5 * s.stage_prop_offset_ratio
+	var box: BoxMesh = BoxMesh.new()
+	box.size = s.stage_prop_size_m
+	for i: int in range(n):
+		var u: float = (float(i) + 0.5) * spacing - span * 0.5
+		var mi: MeshInstance3D = MeshInstance3D.new()
+		mi.name = "Prop_%02d" % i
+		mi.mesh = box
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		mi.transform = Transform3D(_layout_yaw, _crowd_center + _layout_yaw * Vector3(u, s.stage_prop_size_m.y * 0.5, v))
+		stage_props_root.add_child(mi)
 
 
 func _build_lights() -> void:
@@ -399,25 +436,14 @@ func _update_lights() -> void:
 		light.light_color = Color.from_hsv(fposmod(_time * s.light_hue_speed + _light_phase[i] / TAU, 1.0), s.light_saturation, 1.0)
 
 
-func _update_label() -> void:
+## 오버레이 라벨(구성·수·fps). fps 가 바뀔 때만 다시 쓴다. 측정기도 프레임마다 호출한다.
+func update_label() -> void:
 	if info_label == null or config == null:
 		return
 	var fps: int = int(Engine.get_frames_per_second())
 	if fps == _last_fps_shown and not info_label.text.is_empty():
 		return
 	_last_fps_shown = fps
-	info_label.text = "SE-003 구성 %s%s\n인스턴스 %d · 라이트 %d (셰도우 %d)\n%d fps" % [
+	info_label.text = "스파이크 구성 %s%s\n인스턴스 %d · 라이트 %d (셰도우 %d) · 군중 그림자 %s\n%d fps" % [
 		config.id, " [측정 중]" if measure_mode else "",
-		config.instances, config.lights, config.shadow_lights, fps]
-
-
-func _start_measure() -> void:
-	var script: Script = load(MEASURE_SCRIPT_PATH) as Script
-	if script == null:
-		push_error("SpikeCrowd: 측정기 %s 를 찾을 수 없다" % MEASURE_SCRIPT_PATH)
-		get_tree().quit(3)
-		return
-	var measurer: Node = script.new() as Node
-	measurer.name = "Measure"
-	measurer.call("setup", self, settings, config)
-	add_child(measurer)
+		config.instances, config.lights, config.shadow_lights, "on" if config.crowd_shadows else "off", fps]

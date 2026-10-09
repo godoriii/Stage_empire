@@ -18,7 +18,7 @@ instances = 5000
 lights = 32
 shadow_lights = 8
 shadow_atlas_size = 2048
-note = "관문 구성 (셰도우 아틀라스 ≤ 2048)"
+note = "비교용(군중 그림자 on)"
 
 [sub_resource type="Resource" id="Resource_g7pps"]
 script = ExtResource("1_nowse")
@@ -38,11 +38,21 @@ shadow_lights = 8
 shadow_atlas_size = 2048
 note = "여유 확인"
 
+[sub_resource type="Resource" id="Resource_e013c"]
+script = ExtResource("1_nowse")
+id = "E"
+instances = 5000
+lights = 32
+shadow_lights = 8
+shadow_atlas_size = 2048
+crowd_shadows = false
+note = "관문 구성 (B 와 같고 군중 그림자 off, 셰도우 아틀라스 ≤ 2048)"
+
 [resource]
 script = ExtResource("2_55jm0")
-configs = Array[ExtResource("1_nowse")]([SubResource("Resource_khmpg"), SubResource("Resource_rmjwt"), SubResource("Resource_g7pps"), SubResource("Resource_3mfmq")])
-default_config_id = "B"
-gate_config_id = "B"
+configs = Array[ExtResource("1_nowse")]([SubResource("Resource_khmpg"), SubResource("Resource_rmjwt"), SubResource("Resource_g7pps"), SubResource("Resource_3mfmq"), SubResource("Resource_e013c")])
+default_config_id = "E"
+gate_config_id = "E"
 gate_min_avg_fps = 60.0
 warmup_sec = 10.0
 warmup_min_frames = 120
@@ -64,6 +74,10 @@ wander_speed_min = 0.5
 wander_speed_max = 1.2
 bob_height_m = 0.08
 bob_freq_hz = 2.0
+stage_prop_count = 6
+stage_prop_size_m = Vector3(3, 2, 2)
+stage_prop_span_ratio = 0.85
+stage_prop_offset_ratio = -0.7
 light_height_m = 6.0
 light_area_ratio = 0.85
 light_orbit_radius_m = 2.0
