@@ -72,8 +72,8 @@
       "bio_key": "artist.bio.blanket_tape"
     },
     {
-      "id": "two_cups",
-      "name": "커피 두 잔",
+      "id": "window_seat",
+      "name": "창가 자리",
       "genre": "indie",
       "grade": "local",
       "popularity": 18,
@@ -83,7 +83,7 @@
         "loyal"
       ],
       "rider": [],
-      "bio_key": "artist.bio.two_cups"
+      "bio_key": "artist.bio.window_seat"
     },
     {
       "id": "thumbnail_soda",
@@ -142,8 +142,8 @@
       "bio_key": "artist.bio.eight_opener"
     },
     {
-      "id": "glitter_twins",
-      "name": "반짝 쌍둥이",
+      "id": "gold_foil_mask",
+      "name": "금박 가면",
       "genre": "electronic",
       "grade": "rookie",
       "popularity": 50,
@@ -153,7 +153,7 @@
         "hothead"
       ],
       "rider": [],
-      "bio_key": "artist.bio.glitter_twins"
+      "bio_key": "artist.bio.gold_foil_mask"
     },
     {
       "id": "hand_solder",
