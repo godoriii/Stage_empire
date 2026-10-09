@@ -798,6 +798,35 @@ func test_system_snapshot_rejects_invalid_hook_return() -> void:
 	assert_push_error_count(8)
 
 
+## SE-022 AC1 — restore 5단계 ④: 훅 시스템 객체가 해제돼 훅 Callable 이 더 이상 is_valid() 가 아니면
+## false, push_error 정확히 1회(TickLoop 자신, 하위 0), TickLoop 필드 불변, restore_hook 호출 0회
+## (tick.md#스냅샷 restore 5단계, "push_error 횟수 (SE-017)" 표 2행). snapshot() 도 같은 무효 훅 때문에 {} 를
+## 돌려주므로 상태 해시(_hash) 대신 필드를 직접 비교한다.
+func test_restore_rejects_invalid_hook() -> void:
+	var loop: TickLoop = _new_loop()
+	var journal: Array = []
+	var gone: FakeSys = FakeSys.new("build", journal)
+	assert_true(loop.register_system("build", gone.update, gone.snapshot_hook, gone.restore_hook))
+	loop.advance(10)
+	var good: Dictionary = loop.snapshot()
+	assert_true(good.has("systems") and (good["systems"] as Dictionary).has("build"), "전제: good 에 systems.build 가 있다")
+	assert_true(good.has("tick") and int(good["tick"]) == 10, "전제: good.tick == 10")
+	# good 과 다른 상태로 옮겨 둔다(그래야 '필드 불변' 단언이 부분 적용을 잡는다).
+	loop.advance(20)
+	_req_speed(loop, 2)
+	var fields0: Array = [loop.tick, loop.day, loop.phase, loop.tick_in_phase, loop.speed, loop.master_seed,
+		loop.rng.get_state(), loop.bus.get_pending_commands()]
+	assert_ne(loop.tick, int(good["tick"]), "전제: 현재 tick 이 good 과 다르다")
+	assert_eq(loop.bus.get_pending_commands().size(), 1, "전제: 대기 명령 1개(good 은 0개)")
+	gone = null   # 훅 객체 해제(test_system_snapshot_rejects_invalid_hook_return 와 같은 수법)
+	assert_false(loop.restore(good), "④ 훅 무효 → false")
+	assert_push_error("더 이상 유효하지 않다", "5단계 ④ 에서 거부")
+	assert_push_error_count(1, "push_error 정확히 1회(TickLoop 자신, 하위 0)")
+	assert_eq([loop.tick, loop.day, loop.phase, loop.tick_in_phase, loop.speed, loop.master_seed,
+		loop.rng.get_state(), loop.bus.get_pending_commands()], fields0, "TickLoop 필드(tick·rng·명령 큐 등) 불변")
+	assert_eq(journal, [], "restore_hook 호출 0회")
+
+
 var _reentry_on: bool = false
 var _reentry_snap_done: bool = false
 var _reentry_restore_done: bool = false
