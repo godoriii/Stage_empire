@@ -51,9 +51,12 @@ style-guide "상태 변형" 행(기본/켜짐/고장/철거중 — 머티리얼 
 
 ### 런타임 슬롯 판정
 
-- 메시 서피스의 슬롯 = 그 서피스 머티리얼 이름(glTF 머티리얼 `name`)이다. Godot 임포트 뒤 어느 속성(서피스 이름 / 서피스 머티리얼 `resource_name`)에 남는지는 Godot 4.7.2 에서 확인해 GLTF_SPEC 과 R-B 가 적는다(Q5).
-- 이름이 없는 서피스(코드로 만든 프록시 메시: `CapsuleMesh`·`BoxMesh`·`SurfaceTool` 결과, 스파이크 군중 `build_proxy_mesh`)는 `base` 로 본다. 그래서 현 프로토타입 메시는 전부 `base` 단일 서피스다.
-- 슬롯 이름이 아닌 이름을 가진 서피스는 런타임에서 `base` 로 그리고 `push_warning` 한다(임포트 단계 린터가 먼저 거부하므로 런타임에서 만나는 것은 린터를 거치지 않은 에셋뿐이다).
+- 메시 서피스의 슬롯 = 그 서피스의 이름이다. Godot 4.7.2 glTF 임포트(에디터 임포트·`GLTFDocument` 런타임 경로 모두)는 glTF 머티리얼 `name` 을 `ArrayMesh.surface_get_name(i)` 와 `surface_get_material(i).resource_name` **둘 다**에 그대로 남긴다. 접미(`base.001`)·대소문자(`Accent`)·중복(`base` 2개)을 보존하고 정규화하지 않는다(확인: [GLTF_SPEC.md §9](../../tools/assets/GLTF_SPEC.md), SE-019 2차).
+- 판정 순서: ① `surface_get_name(i)` 를 읽는다(우선). ② 그것이 `''` 이고 서피스 머티리얼이 있으면 `surface_get_material(i).resource_name` 을 읽는다(보조 — 시안 적용 코드가 서피스 머티리얼을 덮어쓰면 사라지므로 우선 기준으로 쓰지 않는다). ③ 얻은 이름을 **완전 일치**로 4종과 비교한다.
+- 판정 결과: 4종 중 하나 → 그 슬롯. `''` → `base`. 그 밖의 이름 → `base` + `push_warning`.
+- `''` 이 나오는 경우는 둘뿐이다: 코드로 만든 프록시 메시(`CapsuleMesh`·`BoxMesh`·`SurfaceTool` 결과, 스파이크 군중 `build_proxy_mesh`)와 glTF 에서 `material` 키가 없는 primitive. 그래서 현 프로토타입 메시는 전부 `base` 단일 서피스다.
+- **임포트 에셋의 이름 없는 머티리얼은 `''` 이 아니다.** `name` 이 없는 glTF 머티리얼은 `material_<materials[] 인덱스>`(예: `material_2`)라는 자동 이름으로 들어오므로 "슬롯 이름이 아닌 이름" 경로(`base` + `push_warning`)로 간다. 실제 에셋에서는 린터 R4(이름 없는 머티리얼 거부)가 임포트 전에 먼저 막는다. 런타임 경고를 만나는 것은 린터를 거치지 않은 에셋(접미·대소문자 변형·자동 이름 `material_<n>`)뿐이다. `material` 키 없는 primitive 는 `''` 이라 경고 없이 `base` 가 되므로 린터(GLTF_SPEC 의 머티리얼 없는 primitive 거부)만이 막는다.
+- 이 판정은 render 쪽 **한 함수에 모은다**(R-B). 시안 적용·인스턴스 파라미터·테스트가 모두 그 함수만 부른다. 슬롯 중복(같은 이름 서피스 2개)은 Godot 이 자동으로 구분하지 않으므로 린터가 거부하고, 런타임은 두 서피스를 같은 슬롯으로 칠한다(경고 없음 — 색 결과가 같으므로).
 
 ## 비교표 — accent(그리고 나머지 슬롯) 표기 방식 3안
 
@@ -128,7 +131,7 @@ style-guide "상태 변형" 행(기본/켜짐/고장/철거중 — 머티리얼 
 | Q2 | 캐릭터(군중)에 `accent` 를 허용하나 | (a) 허용 — 서피스 2, MultiMesh 드로우 +1(+외곽선 1) (b) `base` 만 — 색은 인스턴스 색 한 가지 | (a) 허용. 비용이 인스턴스 수와 무관(+2 드로우). 장르별 관객 의상 강조에 쓸 여지 | 캐릭터 에셋 티켓 |
 | Q3 | 상태 변형의 실제 값(고장·철거 틴트 색, `emissive_energy` 켜짐 값, 점멸 주기) | — | 팔레트 티켓에서 함께. 사람 아트 디렉션 항목은 그쪽 | 팔레트 티켓 |
 | Q4 | (b) 의 드로우콜 증가가 티어 1 대표 장면과 티어 4+ 에서 문제가 되나 | 측정 | 티어 1 가구 배치가 생긴 뒤 성능 측정 티켓에 "서피스 수별 draw calls·fps" 행 추가. 뒤집는 조건은 "채택안·근거" 끝 | qa 성능 측정(관문 시점, 사람 GPU) |
-| Q5 | Godot 4.7.2 glTF 임포터가 슬롯 이름을 서피스 이름·서피스 머티리얼 `resource_name` 중 어디에 남기나, Blender 의 `base.001` 같은 접미가 어떻게 들어오나 | 확인 | art-pipeline 2차(GLTF_SPEC)가 확인 방법을 적고, R-B 가 실제 임포트로 확인해 판정 함수를 한 곳에 둔다 | art-pipeline / R-B |
+| Q5 | Godot 4.7.2 glTF 임포터가 슬롯 이름을 서피스 이름·서피스 머티리얼 `resource_name` 중 어디에 남기나, Blender 의 `base.001` 같은 접미가 어떻게 들어오나 | 확인 | **확인됨(SE-019 2차, GLTF_SPEC §9):** 둘 다에 그대로 남고 정규화 없음, 이름 없는 머티리얼은 `material_<n>`. "런타임 슬롯 판정"에 반영. 남은 확인: 실제 Blender 내보내기·임포트 옵션 변경·`EditorScenePostImport` 단계(GLTF_SPEC §9 한계) | art-pipeline(첫 Blender 에셋) / R-B |
 | Q6 | SE-021 스크린스페이스 외곽선(`ss`)이 채택되면 `glass` 외곽선 제외를 어떻게 하나 | (a) glass 를 외곽선 포스트 패스의 깊이·법선 입력에서 빼기(투명 패스는 깊이를 안 쓰므로 기본 동작) (b) 마스크 | (a). 투명은 깊이를 쓰지 않아 깊이 기반 포스트 외곽선에 자동으로 빠진다 — 확인만 | SE-021 결과 뒤 |
 
 ## 부록 A. 현 구현 일치 판정 (`toon_b` 기준)
@@ -187,3 +190,4 @@ style-guide "상태 변형" 행(기본/켜짐/고장/철거중 — 머티리얼 
 | 날짜 | 버전 | 티켓 | 내용 |
 |---|---|---|---|
 | 2026-10-09 | materials.md v0 | SE-019 | 신규 작성. 채택 (b) 슬롯 = 별도 서피스. `project/data/` 변경 없음, 스키마 변경 없음 |
+| 2026-10-09 | materials.md v0 (1차 보정) | SE-019 (2차 art-pipeline Q5 확인) | "런타임 슬롯 판정"을 Godot 4.7.2 임포트 사실에 맞췄다: 슬롯 이름은 `surface_get_name(i)` 우선·`resource_name` 보조, 완전 일치, 판정 함수 한 곳. "이름 없는 서피스 = `base`" 는 프록시 메시·`material` 키 없는 primitive(`''`)에만 해당하고, 임포트 에셋의 이름 없는 머티리얼은 `material_<n>` 으로 들어와 `base` + `push_warning` 경로(린터 R4 가 먼저 거부). Q5 확인됨. 채택안·슬롯 규약·데이터 변경 없음 |
