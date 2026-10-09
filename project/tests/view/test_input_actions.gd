@@ -96,3 +96,37 @@ func test_shader_variant_actions_registered() -> void:
 	for a: StringName in SHADER_VARIANT_EXPECTED:
 		assert_eq(InputMap.action_get_events(a).size(), 1, "%s 이벤트 중복 없음" % a)
 	assert_eq(ShaderVariants.SELECTABLE_IDS, PackedStringArray(["a", "b", "c"]), "액션 순서 = 시안 a/b/c")
+
+
+# --- SE-037 -----------------------------------------------------------------
+
+const BUILD_EXPECTED: Array[StringName] = [&"build_confirm", &"build_rotate", &"build_cancel", &"build_demolish", &"overlay_cycle"]
+
+
+func test_build_actions_registered() -> void:
+	_erase_all()   # 앞 테스트가 camera_rotate_cw 를 R 로 리맵해 두었을 수 있다 → 기본 바인딩으로.
+	InputActions.register()
+	for a: StringName in BUILD_EXPECTED:
+		if InputMap.has_action(a):
+			InputMap.erase_action(a)
+	assert_eq(InputActions.register_build(), BUILD_EXPECTED.size(), "새로 등록한 배치 액션 수")
+	assert_eq(InputActions.BUILD_ACTIONS, BUILD_EXPECTED, "InputActions.BUILD_ACTIONS 와 티켓 목록 일치")
+	for a: StringName in BUILD_EXPECTED:
+		assert_true(InputMap.has_action(a), "%s 등록됨" % a)
+		assert_false(InputActions.ALL.has(a), "%s 는 카메라 액션 목록(ALL)에 섞이지 않는다" % a)
+	assert_true(_has_key(&"build_rotate", KEY_R), "R = 회전")
+	assert_true(_has_key(&"build_cancel", KEY_ESCAPE), "Esc = 취소")
+	assert_true(_has_key(&"overlay_cycle", KEY_O), "O = 오버레이 순환")
+	assert_true(_has_key(&"build_demolish", KEY_X), "X = 철거 모드")
+	assert_true(_has_mouse(&"build_confirm", MOUSE_BUTTON_LEFT), "왼쪽 클릭 = 배치/철거 실행")
+	assert_eq(InputActions.register_build(), 0, "재등록은 0")
+	# 기존 키와 겹치지 않는다(카메라·시안 액션의 키보드 바인딩).
+	var others: Array[StringName] = []
+	others.append_array(InputActions.ALL)
+	others.append_array(InputActions.SHADER_VARIANT_ACTIONS)
+	for a: StringName in BUILD_EXPECTED:
+		for ev: InputEvent in InputMap.action_get_events(a):
+			if not (ev is InputEventKey):
+				continue
+			for o: StringName in others:
+				assert_false(_has_key(o, (ev as InputEventKey).physical_keycode), "%s 키가 %s 와 겹치지 않는다" % [a, o])

@@ -292,7 +292,7 @@ v0 `system_order`: `build → staff → artist → audience → show → crisis 
 
 | v0 스트림 | 주인 시스템 | 쓰는 단계 |
 |---|---|---|
-| `audience` | audience | 단계 2(유입·취향·이동 선택) |
+| `audience` | audience | 단계 2(유입·취향·이동 선택), 단계 4(`artist.lineup_set` 핸들러 — 저녁 진입 입장 결정, [audience.md](audience.md) R2) |
 | `artist` | artist | 단계 2, 섭외 명령 처리(단계 1) |
 | `events` | crisis | 단계 2(위기·사고·바이럴 롤) |
 | `economy` | economy | 단계 2, 정산 핸들러(단계 4) |
