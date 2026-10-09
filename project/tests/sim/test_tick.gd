@@ -512,5 +512,30 @@ func test_restore_rejects_bad_snapshot() -> void:
 		assert_false(target.restore(bads[label]), label + " → false")
 		assert_eq(_hash(target), before, label + ": 상태 불변")
 	assert_push_error_count(bads.size())
+	# SE-009: restore 3단계의 I4·seed 범위 검사(tick.md#스냅샷). 기대값은 tick.md 의 리터럴.
+	assert_eq(good["phase"], "show", "전제: good 은 show 구간")
+	assert_eq(good["speed"], 1, "전제: good 의 speed 는 1")
+	var errs: int = bads.size()
+	var more: Dictionary = {}
+	s = good.duplicate(true)
+	s["speed"] = 2
+	more["I4 speed 2 in show"] = s
+	s = good.duplicate(true)
+	s["seed"] = -1
+	more["seed -1"] = s
+	s = good.duplicate(true)
+	s["seed"] = 2147483648
+	more["seed 2^31"] = s
+	for label: String in more:
+		assert_false(target.restore(more[label]), label + " → false")
+		errs += 1
+		assert_push_error_count(errs, label + ": push_error 1회")
+		assert_eq(_hash(target), before, label + ": 상태 불변")
+	s = good.duplicate(true)
+	s["seed"] = 2147483647
+	assert_true(target.restore(s), "seed max passes → true")
+	assert_push_error_count(errs, "seed max passes: push_error 추가 0회")
+	assert_eq(target.master_seed, 2147483647, "seed max passes: master_seed")
+	assert_eq(target.snapshot()["seed"], 2147483647, "seed max passes: snapshot seed")
 	assert_true(target.restore(good), "정상 스냅샷은 통과")
 	assert_eq(_hash(target), _hash(loop))
