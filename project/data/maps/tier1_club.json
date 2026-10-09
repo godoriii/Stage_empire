@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "id": "tier1_club",
+  "tier": 1,
+  "name": "지하 라이브클럽",
+  "width": 24,
+  "depth": 24,
+  "persons_per_tile_bp": 2500,
+  "tile_kinds": [
+    { "id": "floor",    "char": ".", "buildable": true,  "walkable": true,  "standing": true,  "blocks_sight": false, "mountable": false, "evac_capacity": 0 },
+    { "id": "wall",     "char": "#", "buildable": false, "walkable": false, "standing": false, "blocks_sight": true,  "mountable": true,  "evac_capacity": 0 },
+    { "id": "pillar",   "char": "P", "buildable": false, "walkable": false, "standing": false, "blocks_sight": true,  "mountable": false, "evac_capacity": 0 },
+    { "id": "entrance", "char": "E", "buildable": false, "walkable": true,  "standing": false, "blocks_sight": false, "mountable": false, "evac_capacity": 40 },
+    { "id": "apron",    "char": "a", "buildable": false, "walkable": true,  "standing": false, "blocks_sight": false, "mountable": false, "evac_capacity": 0 }
+  ],
+  "tiles": [
+    "###########EE###########",
+    "#..........aa..........#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......P........P......#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......P........P......#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "#......................#",
+    "########################"
+  ],
+  "reference_layouts": [
+    {
+      "id": "empty_room",
+      "description": "빈 방. 가구 0. 무대가 없으므로 관람 타일 0, 음향·시야·바 커버리지 0. build.md 부록 A1",
+      "placements": [],
+      "expected": {
+        "has_stage": false,
+        "floor_free": 478, "viewing_count": 0,
+        "sound_count": 0, "sound_bp": 0,
+        "sight_count": 0, "sight_bp": 0,
+        "bar_count": 0, "bar_bp": 0,
+        "capacity": 119, "evac_capacity": 80, "evac_shortfall": 39,
+        "light_grade": 0, "satisfaction_bonus_bp": 0,
+        "upkeep_per_day": 0, "build_cost": 0, "cash_after": 5000,
+        "sight_blocked_cells": []
+      }
+    },
+    {
+      "id": "baseline_show",
+      "description": "기준 배치: 소형 무대 1 + 바닥 스피커 2 + 바 카운터 1 + 벤치 2. 순서대로 배치하면 entity f1~f6. build.md 부록 A2",
+      "placements": [
+        { "furniture_id": "stage_small", "cell": [10, 20], "rotation": 0 },
+        { "furniture_id": "speaker_floor", "cell": [9, 20], "rotation": 0 },
+        { "furniture_id": "speaker_floor", "cell": [14, 20], "rotation": 0 },
+        { "furniture_id": "bar_counter", "cell": [20, 4], "rotation": 90 },
+        { "furniture_id": "bench", "cell": [1, 10], "rotation": 270 },
+        { "furniture_id": "bench", "cell": [1, 13], "rotation": 270 }
+      ],
+      "expected": {
+        "has_stage": true,
+        "floor_free": 457, "viewing_count": 405,
+        "sound_count": 96, "sound_bp": 2370,
+        "sight_count": 364, "sight_bp": 8987,
+        "bar_count": 122, "bar_bp": 3012,
+        "capacity": 122, "evac_capacity": 80, "evac_shortfall": 42,
+        "light_grade": 0, "satisfaction_bonus_bp": 100,
+        "upkeep_per_day": 123, "build_cost": 2140, "cash_after": 2860,
+        "sight_blocked_cells": [[4, 1], [18, 1], [19, 1], [4, 2], [5, 2], [18, 2], [5, 3], [17, 3], [18, 3], [5, 4], [17, 4], [18, 4], [6, 5], [17, 5], [6, 6], [17, 6], [22, 6], [7, 7], [16, 7], [22, 7], [1, 8], [21, 8], [22, 8], [1, 9], [2, 9], [20, 9], [21, 9], [2, 10], [20, 10], [21, 10], [3, 11], [19, 11], [20, 11], [4, 12], [18, 12], [19, 12], [5, 13], [17, 13], [18, 13], [6, 14], [17, 14]]
+      }
+    }
+  ]
+}
