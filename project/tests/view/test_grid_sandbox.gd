@@ -92,3 +92,49 @@ func test_se_zoom_arg_sets_zoom_index() -> void:
 	assert_push_warning_count(3, "범위 밖 3건 경고")
 	assert_true(_sandbox.apply_zoom_args(PackedStringArray(["--se-zoom=3"])), "최대 인덱스 3")
 	assert_eq(cam.get_zoom_index(), cam.get_zoom_level_count() - 1)
+
+
+# --- SE-037 -----------------------------------------------------------------
+
+func test_default_sandbox_has_no_build_ui() -> void:
+	assert_eq(_sandbox.get_build_preset(), "", "인자 없으면 배치 UI 없음(기준 캡처 불변)")
+	assert_null(_sandbox.get_event_bus())
+	assert_null(_sandbox.get_furniture_view())
+	assert_null(_sandbox.get_build_palette())
+	assert_true(_sandbox.get_placeholders().visible, "시안 플레이스홀더 표시")
+
+
+func test_build_preset_baseline_sets_up_layout_and_sound_overlay() -> void:
+	assert_eq(BuildPreset.resolve(PackedStringArray(["--se-build-preset=Baseline"])), "baseline", "인자 해석(소문자)")
+	assert_eq(BuildPreset.resolve(PackedStringArray(["--se-zoom=1"])), "", "인자 없음")
+	assert_true(_sandbox.setup_build("baseline"))
+	var layout: Dictionary = {}
+	for l: Dictionary in BuildTestUtil.map_json()["reference_layouts"]:
+		if l["id"] == BuildPreset.BASELINE_LAYOUT_ID:
+			layout = l
+	assert_eq(_sandbox.get_furniture_view().get_instance_count(), (layout["placements"] as Array).size(), "기준 배치 가구 수")
+	assert_eq(_sandbox.get_coverage_overlay().get_mode(), "sound", "음향 오버레이")
+	assert_eq(_sandbox.get_coverage_overlay().get_decal_count(), int(layout["expected"]["viewing_count"]), "데칼 = 관람 타일")
+	assert_false(_sandbox.get_placeholders().visible, "프리셋이면 시안 플레이스홀더 숨김")
+	assert_eq(_sandbox.get_build_palette().get_item_buttons().size(), (BuildTestUtil.furniture_json()["rows"] as Array).size())
+	# 시안 전환이 가구에는 적용되고 고스트·데칼은 건드리지 않는다.
+	assert_true(_sandbox.apply_material("a"))
+	var proxy: MeshInstance3D = _sandbox.get_furniture_view().get_instance_node("f1").get_node(^"Proxy") as MeshInstance3D
+	assert_eq(proxy.material_override.resource_path, ShaderVariants.load_material("a").resource_path, "가구 = 시안 a")
+	var decals: MultiMeshInstance3D = _sandbox.get_coverage_overlay().get_node(^"Decals") as MultiMeshInstance3D
+	assert_false(decals.material_override is ShaderMaterial, "데칼은 시안 대상 아님")
+	assert_false((_sandbox.get_placement_ghost().get_node(^"GhostBox") as MeshInstance3D).material_override is ShaderMaterial,
+		"고스트는 시안 대상 아님")
+	# 샌드박스 클릭 → 명령 큐(sim 미등록이라 남는다).
+	var ghost: PlacementGhost = _sandbox.get_placement_ghost()
+	ghost.select("speaker_floor")
+	ghost.hover(Vector2i(5, 5))
+	assert_true(ghost.click())
+	assert_eq(_sandbox.get_event_bus().get_pending_commands().size(), 1, "명령 큐 1건")
+	assert_false(_sandbox.setup_build("baseline"), "두 번째 setup 은 거부")
+
+
+func test_build_preset_unknown_id_rejected() -> void:
+	assert_false(_sandbox.setup_build("nope"), "없는 프리셋")
+	assert_push_error("배치 프리셋 'nope' 없음", "push_error 1건")
+	assert_null(_sandbox.get_event_bus(), "아무것도 붙이지 않는다")

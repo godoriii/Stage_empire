@@ -45,9 +45,13 @@ func test_view_does_not_touch_sim_or_data() -> void:
 	scene_files.append_array(ViewTestUtil.list_sources(ViewTestUtil.SOURCE_ROOTS, "tres"))
 	var scene_refs: PackedStringArray = ViewTestUtil.grep(scene_files, "res://(sim|core)/")
 	assert_eq(scene_refs.size(), 0, "씬/리소스가 sim/core 참조 없음: %s" % ", ".join(scene_refs))
-	# 이 티켓은 이벤트를 발행하지 않는다(표시 전용).
-	var emits: PackedStringArray = ViewTestUtil.grep(srcs, "EventBus|event_bus")
-	assert_eq(emits.size(), 0, "SE-002 는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
+	# SE-002 의 표시 전용 코드는 이벤트 버스를 쓰지 않는다. SE-037 부터 배치 UI(view/build, ui/build)와
+	# 그것을 붙이는 샌드박스만 EventBus 를 쓴다(구독 + *_requested 발행, test_build_ui_boundary_ac6 이 검사).
+	var emits: PackedStringArray = PackedStringArray()
+	for h: String in ViewTestUtil.grep(srcs, "EventBus|event_bus"):
+		if not _is_build_ui_file(h):
+			emits.append(h)
+	assert_eq(emits.size(), 0, "배치 UI 밖에서는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
 
 
 func test_view_does_not_reference_tests() -> void:
@@ -180,3 +184,115 @@ func test_ss_shader_has_no_forward_plus_only_features() -> void:
 	assert_gt(ViewTestUtil.grep(src, "RENDERER_COMPATIBILITY").size(), 0, "Compatibility NDC 분기")
 	assert_eq(ViewTestUtil.grep_lines(PackedStringArray(["uniform sampler2D n : hint_normal_roughness_texture;"]),
 		"hint_normal_roughness_texture").size(), 1, "대조군")
+
+
+# --- SE-037 AC6 -------------------------------------------------------------
+
+## EventBus 를 쓸 수 있는 view/ui 파일(배치 UI + 그것을 붙이는 샌드박스).
+const BUILD_UI_PREFIXES: Array[String] = ["res://view/build/", "res://ui/build/", "res://view/scenes/grid_sandbox.gd"]
+const SE037_SHOT: String = "res://tests/view/screenshots/SE-037/build_baseline_yaw45_zoom2.png"
+
+
+## grep 결과 줄("경로:줄: 내용")이 배치 UI 파일인가.
+func _is_build_ui_file(hit: String) -> bool:
+	for p: String in BUILD_UI_PREFIXES:
+		if hit.begins_with(p):
+			return true
+	return false
+
+
+## res://sim·core·world 의 class_name 전부(현재 리포지토리 기준으로 읽는다 — 새 클래스가 생겨도 검사가 따라간다).
+func _sim_class_names() -> PackedStringArray:
+	var names: PackedStringArray = PackedStringArray()
+	var re: RegEx = RegEx.create_from_string("^class_name\\s+([A-Za-z_][A-Za-z0-9_]*)")
+	for path: String in ViewTestUtil.list_sources(["res://sim", "res://core", "res://world"], "gd"):
+		for line: String in FileAccess.get_file_as_string(path).split("\n"):
+			var m: RegExMatch = re.search(line)
+			if m != null:
+				names.append(m.get_string(1))
+	return names
+
+
+func test_build_ui_boundary_ac6() -> void:
+	var srcs: PackedStringArray = _gd_sources()
+	for must: String in ["res://view/build/furniture_view.gd", "res://view/build/placement_ghost.gd",
+			"res://view/build/coverage_overlay.gd", "res://ui/build/build_palette.gd"]:
+		assert_true(srcs.has(must), "검사 대상에 %s 포함" % must)
+	var files: PackedStringArray = _all_view_files()
+	# (1) sim/core/world 스크립트·씬 로드 0건.
+	var loads: PackedStringArray = ViewTestUtil.grep(files, "(load|preload)\\(\\s*\"res://(sim|core|world)/")
+	assert_eq(loads.size(), 0, "view/ui 가 res://sim·core·world 를 load/preload 하지 않는다: %s" % ", ".join(loads))
+	var refs: PackedStringArray = ViewTestUtil.grep(files, "res://(sim|core|world)/")
+	assert_eq(refs.size(), 0, "view/ui 에 res://sim·core·world 경로 0건: %s" % ", ".join(refs))
+	# (2) EventBus 외 sim/core/world 클래스 참조 0건(주석 제외 코드 부분).
+	var names: PackedStringArray = _sim_class_names()
+	assert_true(names.has("EventBus"), "class_name 수집이 동작한다(EventBus 포함)")
+	var other: PackedStringArray = PackedStringArray()
+	for n: String in names:
+		if n == "EventBus":
+			continue
+		other.append_array(ViewTestUtil.grep(srcs, "^[^#]*\\b%s\\b" % n))
+	assert_eq(other.size(), 0, "EventBus 외 sim/core/world 클래스 참조 0건 (%d종 검사): %s" % [names.size() - 1, ", ".join(other)])
+	# (3) EventBus 사용 = 타입 표기(: EventBus / -> EventBus)뿐. 생성(EventBus.new)은 샌드박스 전용 버스 1곳만.
+	var usage: PackedStringArray = PackedStringArray()
+	var news: PackedStringArray = PackedStringArray()
+	for h: String in ViewTestUtil.grep(srcs, "^[^#]*\\bEventBus\\b"):
+		var code: String = h.get_slice("#", 0)
+		var stripped: String = code.replace(": EventBus", "").replace("-> EventBus", "")
+		if stripped.contains("EventBus.new()") and h.begins_with("res://view/scenes/grid_sandbox.gd"):
+			news.append(h)
+			stripped = stripped.replace("EventBus.new()", "")
+		if RegEx.create_from_string("\\bEventBus\\b").search(stripped) != null:
+			usage.append(h)
+	assert_eq(usage.size(), 0, "EventBus 는 타입 참조만: %s" % ", ".join(usage))
+	assert_eq(news.size(), 1, "EventBus.new() 는 샌드박스 1곳: %s" % ", ".join(news))
+	# (4) 발행은 *_requested 명령만, 문자열 리터럴로(검사 가능하게).
+	var publishes: PackedStringArray = ViewTestUtil.grep(srcs, "^[^#]*\\.publish\\(")
+	assert_eq(publishes.size(), 2, "발행 지점 2곳(place·demolish): %s" % ", ".join(publishes))
+	for h: String in publishes:
+		assert_true(RegEx.create_from_string("\\.publish\\(\\s*\"[a-z_]+\\.[a-z_]+_requested\"").search(h) != null,
+			"*_requested 명령만 발행: %s" % h)
+	# (5) 버스 상태 조작 0건(명령 디스패치·큐 교체는 core/sim 몫).
+	var ops: PackedStringArray = ViewTestUtil.grep(srcs, "^[^#]*\\b(dispatch_commands|set_pending_commands|normalize_commands)\\(")
+	assert_eq(ops.size(), 0, "view/ui 가 명령 큐를 조작하지 않는다: %s" % ", ".join(ops))
+	# 역검증: 같은 정규식이 가짜 줄에서 정확히 잡는다.
+	var fake: PackedStringArray = PackedStringArray([
+		"_bus.publish(\"build.placed\", {})",
+		"_bus.publish(\"build.place_requested\", {})",
+		"# _bus.publish(\"build.placed\") 주석",
+		"var b: Build = Build.new(cfg, bus)",
+	])
+	assert_eq(ViewTestUtil.grep_lines(fake, "^[^#]*\\.publish\\(").size(), 2, "대조군: 코드 줄 publish 2건")
+	assert_eq(ViewTestUtil.grep_lines(fake, "^[^#]*\\bBuild\\b").size(), 1, "대조군: 클래스 참조 1건")
+	assert_null(RegEx.create_from_string("\\.publish\\(\\s*\"[a-z_]+\\.[a-z_]+_requested\"").search(fake[0]), "대조군: build.placed 는 명령 아님")
+
+
+func test_build_data_numbers_not_hardcoded() -> void:
+	# AC5: 가구 수·카테고리 수는 데이터에서 읽는다. 배치 UI 코드에 행 수 리터럴이 없다.
+	var f: Dictionary = ViewTestUtil.read_json("res://data/furniture/furniture.json")
+	var row_count: int = (f["rows"] as Array).size()
+	var files: PackedStringArray = ViewTestUtil.list_sources(["res://view/build", "res://ui/build"], "gd")
+	assert_gt(files.size(), 0)
+	var hits: PackedStringArray = ViewTestUtil.grep(files, "^[^#]*(^|[^0-9.%])" + str(row_count) + "($|[^0-9.])")
+	assert_eq(hits.size(), 0, "배치 UI 코드에 행 수 리터럴 %d 없음: %s" % [row_count, ", ".join(hits)])
+	var row_re: String = "^[^#]*(^|[^0-9.%])" + str(row_count) + "($|[^0-9.])"
+	var fake: PackedStringArray = PackedStringArray([
+		"for i: int in range(%d):" % row_count, "var a: float = 0.%d" % row_count, "# 가구 %d종" % row_count, "var b: int = 1%d" % row_count,
+	])
+	assert_eq(ViewTestUtil.grep_lines(fake, row_re).size(), 1, "대조군: 코드 리터럴 1건만")
+	# 가구 id 리터럴도 배치 UI 코드에 없다(프리셋은 레이아웃 id 만 쓴다).
+	var ids: PackedStringArray = PackedStringArray()
+	for r: Dictionary in f["rows"]:
+		ids.append(r["id"])
+	var id_hits: PackedStringArray = ViewTestUtil.grep(files, "^[^#]*\"(%s)\"" % "|".join(ids))
+	assert_eq(id_hits.size(), 0, "가구 id 리터럴 없음: %s" % ", ".join(id_hits))
+
+
+func test_se037_screenshot_exists_1080p() -> void:
+	var abs_path: String = ProjectSettings.globalize_path(SE037_SHOT)
+	assert_true(FileAccess.file_exists(abs_path), "SE-037 캡처 존재: %s" % SE037_SHOT)
+	if not FileAccess.file_exists(abs_path):
+		return
+	var img: Image = Image.new()
+	assert_eq(img.load(abs_path), OK, "PNG 로드")
+	assert_eq(Vector2i(img.get_width(), img.get_height()), Vector2i(1920, 1080), "1920×1080")
