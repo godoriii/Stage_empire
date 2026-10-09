@@ -47,10 +47,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
-      - name: Xvfb·Mesa(llvmpipe) 설치
+      - name: Xvfb·Mesa(llvmpipe)·한글 폰트 설치
+        # fonts-wqy-zenhei: 로컬 캡처와 같은 한글 폴백 폰트. 없으면 HUD 한글이 □ 로 그려져 기준 PNG 와 HUD 영역(bbox 28,16,593,198)이 달라진다(SE-025 진단).
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri
+          sudo apt-get install -y xvfb mesa-utils libgl1-mesa-dri fonts-wqy-zenhei
       - name: Godot 설치
         uses: chickensoft-games/setup-godot@v2
         with:
