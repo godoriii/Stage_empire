@@ -1,6 +1,6 @@
 class_name Economy
 extends RefCounted
-## 경제 시스템 v0 (SE-012). 규칙: docs/gdd/economy.md (R1~R6, 입력 계약, C1~C4, F1~F3, S1~S17, B1~B3, P1~P5,
+## 경제 시스템 v0 (SE-012). 규칙: docs/gdd/economy.md (R1~R6, 입력 계약, C1~C4, F1~F3, S0~S17, B1~B3, P1~P5,
 ## #스냅샷). 이벤트: docs/gdd/events.md 의 economy.* 행.
 ##
 ## - 현금(cash)은 이 시스템만 바꾼다. 다른 시스템은 이벤트로 지출·환불·매출을 제안·보고만 한다.
@@ -46,9 +46,10 @@ const PHASE_CLOSE: String = "close"
 ## 새 게임 날(tick.md 카운터 표 "day 새 게임 1").
 const NEW_GAME_DAY: int = 1
 
-const LEDGER_ADMISSIONS: String = "admissions"
-const LEDGER_AUDIENCE: String = "audience"
-const LEDGER_GUARANTEE: String = "guarantee"
+## 장부 키는 EconomyConfig 가 정의한다(K5 교차 검사와 같은 목록).
+const LEDGER_ADMISSIONS: String = EconomyConfig.LEDGER_ADMISSIONS
+const LEDGER_AUDIENCE: String = EconomyConfig.LEDGER_AUDIENCE
+const LEDGER_GUARANTEE: String = EconomyConfig.LEDGER_GUARANTEE
 ## snapshot() 의 키(economy.md #상태 표).
 const SNAPSHOT_FIELDS: Array[String] = [
 	"cash", "tier", "day", "phase", "ticket_price", "upkeep_per_day", "ledger", "last_settled_day",
@@ -225,7 +226,8 @@ func _on_charge_proposed(p: Dictionary) -> void:
 		if ledger.has(reason):
 			ledger[reason] = int(ledger[reason]) + amount
 		else:
-			push_error("[Economy] operating 사유 '%s' 의 ledger 항목이 없다(v0 는 guarantee 만)" % reason)
+			# 방어 경로: K5 를 통과한 설정으로는 닿지 않는다(economy.md "회계 분류와 장부 키").
+			push_error("[Economy] operating 사유 '%s' 의 ledger 항목이 없다(K5 위반 설정)" % reason)
 	if amount > 0:
 		bus.publish(EV_CASH_CHANGED, {"cash": cash, "delta": -amount, "reason": reason})
 	_resolve_charge(rid, reason, amount, DECLINE_NONE)
@@ -308,7 +310,8 @@ func _on_bailout_accept_requested(_p: Dictionary) -> void:
 	_accept_bailout(false)
 
 
-## phase·day 추적. close 진입이면 정산(1회성).
+## phase·day 추적. close 진입이면 정산(1회성). 1회성 검사를 통과했는데 제안 중인 구제가 남아 있으면
+## (time.day_started 없이 다음 close 가 옴 = 시간 이벤트 계약 위반) S0: push_warning 1회 후 auto 수락, 그다음 정산.
 func _on_phase_changed(p: Dictionary) -> void:
 	if bankrupt:
 		return
@@ -320,6 +323,9 @@ func _on_phase_changed(p: Dictionary) -> void:
 	phase = to
 	day = d
 	if phase == PHASE_CLOSE and last_settled_day != d:
+		if pending_bailout != null:                                                            # S0
+			push_warning("[Economy] S0: time.day_started 없이 %d일 close — %d일 제안 구제를 자동 수락" % [d, int(pending_bailout["day"])])
+			_accept_bailout(true)
 		_settle(d)
 
 

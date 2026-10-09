@@ -1,6 +1,6 @@
 class_name EconomyConfig
 extends RefCounted
-## economy.json 로더 (SE-012). 규칙: docs/gdd/economy.md#설정-로드와-공개-api (교차 검사 K1~K4).
+## economy.json 로더 (SE-012). 규칙: docs/gdd/economy.md#설정-로드와-공개-api (교차 검사 K1~K5).
 ## 스키마(economy.schema.json)로 못 하는 검사만 여기서 한다. 모든 필드는 읽기 전용으로 취급한다.
 ## JSON 숫자는 float 로 파싱되므로 정수값 float 는 int 로 정규화해서 보관한다(R1: 금액은 int).
 
@@ -15,6 +15,12 @@ const ROW_ID_PREFIX: String = "tier_"
 const GUARANTEE_UNKNOWN: int = -1
 const CLASS_CAPITAL: String = "capital"
 const CLASS_OPERATING: String = "operating"
+## 장부(ledger) 키. 고정 3개(economy.md #상태 `ledger`, "회계 분류와 장부 키"). Economy 가 같은 이름을 쓴다.
+const LEDGER_ADMISSIONS: String = "admissions"
+const LEDGER_AUDIENCE: String = "audience"
+const LEDGER_GUARANTEE: String = "guarantee"
+## K5: charge_reasons 에서 "operating" 인 사유는 이 목록(ledger 키 이름)에 있어야 한다.
+const LEDGER_KEYS: Array[String] = [LEDGER_ADMISSIONS, LEDGER_AUDIENCE, LEDGER_GUARANTEE]
 const ROW_INT_FIELDS: Array[String] = [
 	"tier", "rent_per_day", "tax_rate_bp", "ticket_price_default", "ticket_price_min", "ticket_price_max",
 	"bar_purchase_rate_bp", "bar_avg_spend", "bar_cost_rate_bp", "bailout_loan_amount", "bailout_interest_bp",
@@ -82,6 +88,8 @@ static func from_dict(d: Dictionary) -> EconomyConfig:
 		var cls: Variant = reasons[r]
 		if not (r is String) or not (cls == CLASS_CAPITAL or cls == CLASS_OPERATING):
 			return _fail("charge_reasons.%s 는 '%s' 또는 '%s' 여야 한다" % [r, CLASS_CAPITAL, CLASS_OPERATING])
+		if cls == CLASS_OPERATING and not LEDGER_KEYS.has(r):
+			return _fail("K5 charge_reasons.%s 가 '%s' 인데 ledger 키가 아니다(ledger: %s)" % [r, CLASS_OPERATING, LEDGER_KEYS])
 		cfg.charge_reasons[r] = cls
 
 	var rows: Variant = d.get("rows")

@@ -1,5 +1,5 @@
 extends GutTest
-## SE-012 EC1 — EconomyConfig 로더·교차 검사 K1~K4 (docs/gdd/economy.md#설정-로드와-공개-api).
+## SE-012 EC1 — EconomyConfig 로더·교차 검사 K1~K5 (docs/gdd/economy.md#설정-로드와-공개-api).
 
 
 func _raw() -> Dictionary:
@@ -71,6 +71,18 @@ func test_config_loads_and_cross_checks() -> void:
 	d = _raw()
 	d["reference_scenarios"][0]["guarantee_grade"] = "midlevel"
 	cases["K4 guarantee_grade midlevel"] = d
+	d = _raw()
+	d["charge_reasons"]["build"] = "operating"
+	cases["K5 build = operating (ledger 키 아님)"] = d
 	for label: String in cases:
 		assert_null(EconomyConfig.from_dict(cases[label]), label + " → null")
 	assert_push_error_count(3 + cases.size(), "사본마다 push_error 1회")
+
+	# K5 는 operating 만 제한한다: guarantee = capital 사본은 로드 성공(추가 push_error 0).
+	d = _raw()
+	d["charge_reasons"]["guarantee"] = "capital"
+	var cap: EconomyConfig = EconomyConfig.from_dict(d)
+	assert_not_null(cap, "K5 guarantee = capital → 로드 성공")
+	if cap != null:
+		assert_eq(cap.charge_reasons["guarantee"], "capital")
+	assert_push_error_count(3 + cases.size(), "capital 사본은 push_error 없음")

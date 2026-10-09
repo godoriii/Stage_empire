@@ -517,6 +517,57 @@ func test_bailout_auto_accepted_on_next_day() -> void:
 	var m: Dictionary = _run_bailout_day(true)
 	assert_eq(m["loans"][0]["day_taken"], d, "수동 수락도 day_taken == 제안일")
 	assert_eq(m["settled2"], a["settled2"], "수동 수락과 d + 1 일 day_settled 동일")
+	assert_push_warning_count(0, "정상 경로(TickLoop)에서는 S0 경고 없음")
+
+	# S0 (SE-012 후속): EventBus 만으로 d 일 close 에서 제안 → time.day_started 없이 d + 1 일 close.
+	var u: Array = _unit()
+	var bus: EventBus = u[0]
+	var econ: Economy = u[1]
+	var rec: EventRecorder = u[2]
+	_charge(bus, "build", _deficit_build(econ.cash))
+	_close(bus, d)
+	var offered: Dictionary = _last(rec, "economy.bailout_offered")
+	assert_false(offered.is_empty(), "준비: d 일 close 에서 구제 제안")
+	assert_not_null(econ.pending_bailout)
+	var amount: int = offered["amount"]
+	var loan_amt: int = _row["bailout_loan_amount"]
+	var left_before: int = econ.bailouts_left
+	rec.clear()
+	_close(bus, d + 1)
+	assert_push_warning_count(1, "S0: push_warning 1회")
+	var settled: Dictionary = _last(rec, "economy.day_settled")
+	var want: Array = [
+		["economy.cash_changed", {"cash": loan_amt, "delta": amount, "reason": "bailout"}],
+		["economy.bailout_taken", {"day": d, "kind": "loan", "amount": amount, "total_due": offered["total_due"], "repay_days": offered["repay_days"], "bailouts_left": left_before - 1, "cash": loan_amt, "auto": true}],
+	]
+	if int(settled.get("settlement_delta", 0)) != 0:
+		want.append(["economy.cash_changed", {"cash": settled["cash"], "delta": settled["settlement_delta"], "reason": "settlement"}])
+	want.append(["economy.day_settled", settled])
+	assert_eq(_econ_events(rec), want, "cash_changed{bailout} → bailout_taken{auto:true, day:d} → (cash_changed{settlement}) → day_settled")
+	assert_eq(settled["day"], d + 1)
+	assert_eq(econ.bailouts_left, left_before - 1, "bailouts_left 1 감소")
+	assert_eq(econ.loans[0]["day_taken"], d, "loans[0].day_taken == 제안일")
+	assert_eq(settled["loan_repayment"], offered["first_installment"], "첫 회차는 이번 정산 S13")
+	assert_null(econ.pending_bailout, "B2 시점의 pending_bailout 은 null(덮어쓰기 없음)")
+	# 결과는 빠진 time.day_started 가 왔을 때와 같다.
+	var n: Array = _unit()
+	var nbus: EventBus = n[0]
+	var necon: Economy = n[1]
+	var nrec: EventRecorder = n[2]
+	_charge(nbus, "build", _deficit_build(necon.cash))
+	_close(nbus, d)
+	_new_day(nbus, d + 1)
+	_close(nbus, d + 1)
+	assert_eq(_last(nrec, "economy.day_settled"), settled, "time.day_started 가 있었을 때와 day_settled 동일")
+	assert_eq(_ehash(econ), _ehash(necon), "time.day_started 가 있었을 때와 상태 동일")
+	# 같은 날 close 를 한 번 더: 아무 일도 없음(1회성, pending_bailout 그대로).
+	var before: String = _ehash(econ)
+	rec.clear()
+	_close(bus, d + 1)
+	assert_eq(rec.events.size(), 1, "다시 보낸 time.phase_changed 1개뿐")
+	assert_eq(_econ_events(rec), [], "economy 이벤트 0")
+	assert_eq(_ehash(econ), before, "상태 불변")
+	assert_push_warning_count(1, "중복 close 는 S0 경고를 더 내지 않음")
 
 
 # --- EC11 --------------------------------------------------------------------
