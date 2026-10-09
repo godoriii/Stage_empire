@@ -17,7 +17,7 @@ art-pipeline, render-engineer, audio 가 이 문서를 기준으로 일한다.
 
 | 항목 | 후보/기준 | 상태 |
 |---|---|---|
-| 셰이더 시안 | 3종 비교(셀 2단계/3단계, 외곽선 두께 1px/2px, 림라이트 유무) | 미정 |
+| 셰이더 시안 | **B 확정(2026-10-09 프로덕트 오너)**: 셀 3단계, 외곽선 2px(색 (0.05, 0.04, 0.07)), 림라이트 on(`rim_strength 0.9`, `rim_width 0.35`, 역광 가중 — 무대 스포트 같은 역광에서만 보임), `shadow_tint (0.32, 0.3, 0.45, 0.55)`. 파일 `project/view/shaders/params/toon_b.tres`·`outline_b.tres`, 기본값은 `ShaderVariants.DEFAULT_ID`(SE-018). 비교 자료 `docs/reports/perf/SE-004-{default,a,b,c}.png`, 비용 구성 E M1 88.4 → 70.5 fps(docs/reports/SE-004.md). 박스 모서리 외곽선 가늘어짐은 SE-021 | 확정 |
 | 팔레트 | 장르별 강조색 8개 + 중립 톤 6개, 색약 팔레트 별도 | 미정 |
 | 폴리곤 예산 | 가구 소형 ≤ 300 tri, 대형 설비 ≤ 1,500 tri, 캐릭터 ≤ 800 tri (인스턴싱 대상), 임포스터용 LOD1 ≤ 150 tri | 초안 |
 | 머티리얼 슬롯 이름 | `base`, `accent`, `emissive`, `glass` 네 종으로 고정 — 색 변형은 슬롯 파라미터로 | 초안 |

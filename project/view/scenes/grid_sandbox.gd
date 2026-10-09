@@ -8,9 +8,10 @@ extends Node3D
 ## 스크린샷(사람 검수용): 위 명령 뒤에 -- --se-screenshot=<절대경로.png> [--se-hover=x,z]
 ##   (GPU/디스플레이가 있는 환경 필요. --headless 에서는 캡처가 안 된다.)
 ##
-## SE-004 셰이더 시안: -- --material=<default|a|b|c> 면 ShaderPlaceholders(바·무대·캐릭터·벽·컬러 스포트)를
-##   그리드 중심에 만들고 시안을 적용한다(바닥·커서·HUD 제외). 키 1/2/3(shader_variant_1/2/3)으로 a/b/c 전환,
-##   HUD 에 "시안: <id>". 없는 id 면 push_error + 종료 코드 2. --material= 이 없으면 SE-002 와 동작·화면이 같다.
+## 셰이더 시안(SE-004, SE-018): 시작 시 ShaderPlaceholders(바·무대·캐릭터·벽·컬러 스포트)를 그리드 중심에 만들고
+##   시안을 적용한다(바닥·커서·HUD 제외). 기본은 ShaderVariants.DEFAULT_ID(시안 B), 비교용으로
+##   -- --material=<plain|a|b|c>(plain = SE-004 이전 정점색 룩). 키 1/2/3(shader_variant_1/2/3)으로 a/b/c 전환,
+##   HUD 에 "시안: <id>". 없는 id(예전 "default" 포함)면 push_error + 종료 코드 2.
 ##   -- --se-zoom=<0..3> 은 시작 줌 인덱스(0 = 최근접). 범위 밖이면 push_warning 후 기본 줌 유지.
 
 const SCREENSHOT_ARG: String = "--se-screenshot="
@@ -27,7 +28,7 @@ const SCREENSHOT_WARMUP_FRAMES: int = 10
 @onready var iso_camera: IsoCamera = $IsoCamera
 @onready var hud: DebugHud = $DebugHud
 
-## SE-004: 비워 두면 명령줄 --material=<id>, 그것도 없으면 시안 없음(SE-002 그대로).
+## SE-004/SE-018: 비워 두면 명령줄 --material=<id>, 그것도 없으면 ShaderVariants.DEFAULT_ID.
 @export var material_id: String = ""
 
 var _placeholders: ShaderPlaceholders
@@ -43,8 +44,8 @@ func _ready() -> void:
 	hud.bind(iso_camera, cursor)
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	apply_zoom_args(args)
-	var wanted: String = ShaderVariants.resolve_material_id(material_id, args, "")
-	if not wanted.is_empty() and not apply_material(wanted):
+	var wanted: String = ShaderVariants.resolve_material_id(material_id, args, ShaderVariants.DEFAULT_ID)
+	if not apply_material(wanted):
 		get_tree().quit(EXIT_BAD_MATERIAL)
 		return
 	_run_screenshot_if_requested()
@@ -52,6 +53,7 @@ func _ready() -> void:
 
 ## SE-004: 시안을 적용한다. 처음 부르면 플레이스홀더 세트를 그리드 중심에 만든다.
 ## 바닥(GridView)·커서(TileCursor)·HUD 는 제외. 없는 id 면 push_error 후 false(플레이스홀더를 만들지 않는다).
+## 시안 머티리얼 로드가 실패하면(ShaderVariants.apply 가 -1, push_error 는 거기서) false, 시안 id·HUD 는 그대로.
 func apply_material(id: String) -> bool:
 	var wanted: String = id.strip_edges().to_lower()
 	if not ShaderVariants.is_valid_id(wanted):
@@ -62,13 +64,14 @@ func apply_material(id: String) -> bool:
 		_placeholders.position = grid.get_center_world()
 		add_child(_placeholders)
 	var excluded: Array[Node] = [grid, cursor, hud]
-	ShaderVariants.apply(self, wanted, excluded)
+	if ShaderVariants.apply(self, wanted, excluded) < 0:
+		return false
 	_material_id = wanted
 	hud.set_shader_variant(wanted)
 	return true
 
 
-## 현재 시안 id. --material= 없이 실행했으면 빈 문자열.
+## 현재 시안 id(_ready 뒤에는 항상 유효한 id. 인자가 없으면 ShaderVariants.DEFAULT_ID).
 func get_material_id() -> String:
 	return _material_id
 
@@ -105,7 +108,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion and Input.is_action_pressed(InputActions.CAMERA_PAN_DRAG):
 		_drag_pan(event as InputEventMouseMotion)
 	elif _placeholders != null:
-		# 시안 전환은 --material= 로 플레이스홀더가 있을 때만(없으면 SE-002 와 같은 동작).
+		# 시안 전환은 플레이스홀더가 있을 때만(_ready 가 항상 만든다. 시작 전 입력 방어).
 		for i: int in range(InputActions.SHADER_VARIANT_ACTIONS.size()):
 			if event.is_action_pressed(InputActions.SHADER_VARIANT_ACTIONS[i]):
 				apply_material(ShaderVariants.SELECTABLE_IDS[i])

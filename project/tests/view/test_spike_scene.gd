@@ -364,18 +364,39 @@ func _instance_colors(spike: SpikeCrowd) -> PackedFloat32Array:
 	return out
 
 
+## SE-018 AC5: --material= 없이(material_id 빈 값) 구성 E 를 로드하면 시안 b(ShaderVariants.DEFAULT_ID).
+func test_default_material_is_b() -> void:
+	var spike: SpikeCrowd = _spawn_with_material("E", "")
+	var toon_b: Material = load("res://view/shaders/params/toon_b.tres")
+	assert_eq(spike.get_material_id(), "b", "material_id 비면 b")
+	assert_eq(spike.get_material_id(), ShaderVariants.DEFAULT_ID, "기본값 출처 = ShaderVariants.DEFAULT_ID")
+	assert_eq(spike.crowd.material_override, toon_b, "$Crowd.material_override == toon_b.tres")
+	var props: Array[Node] = spike.stage_props_root.get_children()
+	assert_gt(props.size(), 0, "$StageProps 자식이 있다")
+	for n: Node in props:
+		if n is GeometryInstance3D:
+			assert_eq((n as GeometryInstance3D).material_override, toon_b, "$StageProps/%s == toon_b.tres" % n.name)
+	assert_string_contains(spike.info_label.text, "시안 b", "오버레이 라벨에 시안 표기")
+	# 예전 id "default" 는 없는 id: push_error 후 DEFAULT_ID 로 폴백.
+	var legacy: SpikeCrowd = _spawn_with_material("E", "default")
+	assert_push_error("'default' 없음")
+	assert_eq(legacy.get_material_id(), "b", "default → 폴백 b")
+	assert_eq(legacy.crowd.material_override, toon_b, "폴백도 toon_b.tres")
+
+
+## SE-004 AC6 / SE-018 AC5: 비교 기준은 plain(SE-004 이전 룩). 기본(빈 값 = b)과 메시·인스턴스·라이트가 같다.
 func test_material_variant_keeps_mesh_and_instance_counts() -> void:
-	var base: SpikeCrowd = _spawn_with_material("E", "")
-	var b: SpikeCrowd = _spawn_with_material("E", "b")
+	var base: SpikeCrowd = _spawn_with_material("E", "plain")
+	var b: SpikeCrowd = _spawn_with_material("E", "")
 	var toon_b: Material = load("res://view/shaders/params/toon_b.tres")
 	var outline_b: Material = load("res://view/shaders/params/outline_b.tres")
-	# default(빈 값) = SE-013 그대로.
-	assert_eq(base.get_material_id(), "default", "material_id 비면 default")
-	assert_null(base.crowd.material_override, "default: 군중 material_override == null")
+	# plain = SE-013 측정 때의 머티리얼(정점색 StandardMaterial3D).
+	assert_eq(base.get_material_id(), "plain", "material_id plain")
+	assert_null(base.crowd.material_override, "plain: 군중 material_override == null")
 	for mi: MeshInstance3D in base.get_stage_prop_nodes():
-		assert_null(mi.material_override, "default: %s material_override == null" % mi.name)
-	# 시안 b 적용.
-	assert_eq(b.get_material_id(), "b")
+		assert_null(mi.material_override, "plain: %s material_override == null" % mi.name)
+	# 기본(시안 b) 적용.
+	assert_eq(b.get_material_id(), "b", "material_id 비면 b")
 	assert_eq(b.crowd.material_override, toon_b, "$Crowd.material_override == toon_b.tres")
 	assert_eq(b.crowd.material_override.next_pass, outline_b, "외곽선은 next_pass")
 	assert_eq(b.get_stage_prop_nodes().size(), base.get_stage_prop_nodes().size(), "무대 프록시 개수 동일")
@@ -384,22 +405,26 @@ func test_material_variant_keeps_mesh_and_instance_counts() -> void:
 	# 메시·인스턴스·그림자·라이트 불변.
 	var mesh_b: Mesh = b.crowd.multimesh.mesh
 	assert_eq(b.get_instance_count(), 5000, "instance_count == 5000")
-	assert_eq(b.get_instance_count(), base.get_instance_count(), "인스턴스 수 = default")
-	assert_eq(b.get_instance_mesh_triangle_count(), base.get_instance_mesh_triangle_count(), "메시 삼각형 = default (708)")
-	assert_eq(mesh_b.get_faces(), base.crowd.multimesh.mesh.get_faces(), "메시 기하 = default")
+	assert_eq(b.get_instance_count(), base.get_instance_count(), "인스턴스 수 = plain")
+	assert_eq(b.get_instance_mesh_triangle_count(), base.get_instance_mesh_triangle_count(), "메시 삼각형 = plain")
+	assert_eq(b.get_instance_mesh_triangle_count(), 708, "메시 삼각형 708")
+	assert_eq(mesh_b.get_faces(), base.crowd.multimesh.mesh.get_faces(), "메시 기하 = plain")
 	assert_eq(mesh_b.get_surface_count(), 1, "서피스 1개(드로우 1회 + 외곽선 패스)")
 	assert_true(mesh_b.surface_get_material(0) is StandardMaterial3D, "메시 자체 머티리얼은 그대로(override 만 바뀜)")
 	assert_eq(b.crowd.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "E: 군중 cast_shadow OFF")
+	assert_eq(base.crowd.cast_shadow, b.crowd.cast_shadow, "cast_shadow = plain")
 	assert_eq(_lights_in_tree(b).size(), 32, "라이트 32")
+	assert_eq(_lights_in_tree(b).size(), _lights_in_tree(base).size(), "라이트 수 = plain")
 	assert_eq(b.get_shadow_light_count(), 8, "셰도우 라이트 8")
+	assert_eq(b.get_shadow_light_count(), base.get_shadow_light_count(), "셰도우 라이트 수 = plain")
 	assert_eq(b.get_stage_prop_triangle_count(), base.get_stage_prop_triangle_count(), "무대 프록시 삼각형 동일")
 	assert_eq(_descendant_count(b), _descendant_count(base), "자손 노드 수 동일(외곽선 노드 없음)")
 	assert_eq(_instance_colors(b), _instance_colors(base), "인스턴스 색 분포 동일(정점색 × base_color)")
 	# 같은 씬에서 시안을 다시 바꿔도 메시 리소스는 같은 객체다.
 	ShaderVariants.apply(b.crowd, "c")
-	ShaderVariants.apply(b.crowd, "default")
+	ShaderVariants.apply(b.crowd, "plain")
 	assert_eq(b.crowd.multimesh.mesh, mesh_b, "재적용해도 메시 리소스 그대로")
-	assert_null(b.crowd.material_override, "default 로 되돌리면 null")
+	assert_null(b.crowd.material_override, "plain 으로 되돌리면 null")
 	# 명령줄 상당: 대소문자 무시.
 	var c: SpikeCrowd = _spawn_with_material("E", "C")
 	assert_eq(c.get_material_id(), "c", "대소문자 무시")
