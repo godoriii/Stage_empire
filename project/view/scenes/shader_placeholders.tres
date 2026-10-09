@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="ShaderPlaceholderSet" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://view/scenes/shader_placeholder_set.gd" id="1_set"]
+
+[resource]
+script = ExtResource("1_set")
+bar_size_m = Vector3(3, 1.1, 1)
+bar_offset_m = Vector2(3.5, -2.5)
+bar_color = Color(0.45, 0.3, 0.2, 1)
+bar_accent_top = true
+stage_size_m = Vector3(4, 0.6, 3)
+stage_offset_m = Vector2(-2, -3.5)
+stage_color = Color(0.25, 0.25, 0.3, 1)
+stage_accent_top = false
+wall_size_m = Vector3(6, 2.5, 0.2)
+wall_offset_m = Vector2(-2, -5.1)
+wall_color = Color(0.55, 0.52, 0.5, 1)
+character_radius_m = 0.25
+character_height_m = 1.7
+character_offsets_m = PackedVector2Array(-2.5, 1.5, -1.5, 0.5, -0.5, -0.5, 0.5, -1.5, 1.5, -2.5)
+character_colors = PackedColorArray(0.85, 0.3, 0.35, 1, 0.3, 0.55, 0.85, 1, 0.95, 0.8, 0.35, 1, 0.4, 0.75, 0.45, 1, 0.75, 0.45, 0.85, 1)
+accent_color = Color(0.937, 0.498, 0.722, 1)
+spot_offsets_m = PackedVector3Array(-3.5, 4.5, -3.5, -2, 4.5, -4, -0.5, 4.5, -4.5)
+spot_targets_m = PackedVector3Array(-2.5, 0.8, 1.5, -0.5, 0.8, -0.5, 1.5, 0.8, -2.5)
+spot_colors = PackedColorArray(1, 0.25, 0.6, 1, 0.25, 0.8, 1, 1, 1, 0.7, 0.25, 1)
+spot_energy = 8.0
+spot_range_m = 12.0
+spot_angle_deg = 30.0

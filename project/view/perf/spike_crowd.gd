@@ -2,12 +2,14 @@ class_name SpikeCrowd
 extends Node3D
 ## 성능 스파이크 씬(SE-003, SE-013): MultiMesh 캐릭터 프록시 N개 + 동적 라이트 M개(Omni/Spot 혼합) +
 ## 무대 프록시 박스(셰도우 캐스터)를 SE-002 의 IsoCamera(최대 줌아웃)·GridView 위에 전부 화면 안에 띄우고 매 프레임 움직인다.
-## 표시 전용. sim/core 와 연결하지 않고 이벤트 버스를 쓰지 않는다. 툰 룩은 범위 밖(SE-004).
+## 표시 전용. sim/core 와 연결하지 않고 이벤트 버스를 쓰지 않는다.
+## SE-004: 툰 셰이더 시안은 material_id(@export) 또는 --material=<default|a|b|c> 로 고른다(ShaderVariants).
+##   군중(MultiMesh)과 무대 프록시의 material_override 만 바꾼다. 메시·인스턴스 수·cast_shadow·라이트·구성 값은 그대로.
 ##
 ## 수치는 전부 spike_configs.tres(SpikeConfigSet)에 있다. 구성은 config_id(@export) 또는 명령줄로 고른다.
 ## 군중 그림자는 구성의 crowd_shadows 를 따른다(구성 E = off, style-guide 2026-10-09 결정).
 ##
-## 실행(구경):  godot --path project res://view/perf/spike_crowd.tscn -- --config=E
+## 실행(구경):  godot --path project res://view/perf/spike_crowd.tscn -- --config=E [--material=b]
 ## 측정은 이 씬이 아니라 tests 쪽 진입점(tests/view/perf/measure_spike.tscn)이 이 씬을 인스턴스화해서 한다.
 ##   view/ 는 tests/ 를 참조하지 않는다(test_view_boundary.gd). 측정기가 measure_mode 를 켜고
 ##   set_process(false) 로 이 노드의 자체 진행을 멈춘 뒤 advance()·update_label() 을 직접 호출한다.
@@ -27,6 +29,8 @@ const FLOATS_PER_INSTANCE: int = FLOATS_PER_TRANSFORM + FLOATS_PER_COLOR
 @export var settings: SpikeConfigSet
 ## 비워 두면 명령줄 --config=<id>, 그것도 없으면 settings.default_config_id.
 @export var config_id: String = ""
+## SE-004 셰이더 시안. 비워 두면 명령줄 --material=<id>, 그것도 없으면 "default"(기존 StandardMaterial3D).
+@export var material_id: String = ""
 
 @onready var iso_camera: IsoCamera = $IsoCamera
 @onready var grid: GridView = $GridView
@@ -77,6 +81,11 @@ func _ready() -> void:
 		push_error("SpikeCrowd: 구성 '%s' 없음 (가능: %s)" % [wanted, ", ".join(settings.get_config_ids())])
 		config = settings.get_config(settings.default_config_id)
 	config_id = config.id
+	var wanted_material: String = ShaderVariants.resolve_material_id(material_id, OS.get_cmdline_user_args(), ShaderVariants.DEFAULT_ID)
+	if not ShaderVariants.is_valid_id(wanted_material):
+		push_error("SpikeCrowd: 시안 '%s' 없음 (가능: %s)" % [wanted_material, ", ".join(ShaderVariants.IDS)])
+		wanted_material = ShaderVariants.DEFAULT_ID
+	material_id = wanted_material
 	_build()
 
 
@@ -125,6 +134,11 @@ func advance(delta: float) -> void:
 
 
 # --- 조회(테스트·측정기용) -------------------------------------------------
+
+## SE-004: 적용된 셰이더 시안 id(default/a/b/c).
+func get_material_id() -> String:
+	return material_id
+
 
 func get_instance_count() -> int:
 	return crowd.multimesh.instance_count
@@ -241,7 +255,14 @@ func _build() -> void:
 	_build_crowd()
 	_build_stage_props()
 	_build_lights()
+	_apply_material()
 	update_label()
+
+
+## SE-004: 군중과 무대 프록시에 시안 머티리얼을 씌운다(default 면 null = 원래 머티리얼). 노드는 추가하지 않는다.
+func _apply_material() -> void:
+	ShaderVariants.apply(crowd, material_id)
+	ShaderVariants.apply(stage_props_root, material_id)
 
 
 func _build_crowd() -> void:
@@ -444,6 +465,8 @@ func update_label() -> void:
 	if fps == _last_fps_shown and not info_label.text.is_empty():
 		return
 	_last_fps_shown = fps
-	info_label.text = "스파이크 구성 %s%s\n인스턴스 %d · 라이트 %d (셰도우 %d) · 군중 그림자 %s\n%d fps" % [
-		config.id, " [측정 중]" if measure_mode else "",
+	# 시안이 default 가 아닐 때만 시안 표기를 붙인다(default 는 SE-013 과 같은 라벨).
+	var variant: String = "" if material_id == ShaderVariants.DEFAULT_ID else " · 시안 %s" % material_id
+	info_label.text = "스파이크 구성 %s%s%s\n인스턴스 %d · 라이트 %d (셰도우 %d) · 군중 그림자 %s\n%d fps" % [
+		config.id, variant, " [측정 중]" if measure_mode else "",
 		config.instances, config.lights, config.shadow_lights, "on" if config.crowd_shadows else "off", fps]

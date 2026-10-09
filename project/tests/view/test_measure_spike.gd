@@ -2,6 +2,7 @@ extends GutTest
 ## SE-013 AC5, AC6 (SE-003 AC6 의 헤드리스 부분 포함): 측정 진입점 measure_spike.tscn 을 짧게 돌려 JSON 이
 ## 필수 키 전부로 생성되는지, 측정기가 SpikeCrowd 를 타입으로 다루는지.
 ## 실제 fps 는 의미 없다(헤드리스 = 렌더 없음 → run_valid false, 관문 "무효"). GPU 측정은 사람 PC 에서 한다.
+## SE-004 AC7: material_id(--material=) → JSON material 키, 기본 출력 파일명, 없는 시안 거부.
 
 const ENTRY_SCENE: String = "res://tests/view/perf/measure_spike.tscn"
 const MEASURE_SCRIPT: String = "res://tests/view/perf/measure_spike.gd"
@@ -16,6 +17,8 @@ const SE003_KEYS: Array[String] = [
 const SE013_KEYS: Array[String] = ["gpu_timing_available", "gpu_timing_note", "crowd_cast_shadow"]
 
 var _saved_max_fps: int = 0
+## _run_entry 가 단축 전에 읽은 기본 출력 경로(SE-004 파일명 검사용).
+var _default_out_path: String = ""
 var _saved_root_size: Vector2i = Vector2i.ZERO
 
 
@@ -33,7 +36,7 @@ func after_each() -> void:
 
 
 ## 진입점 씬을 1080p SubViewport 에 띄우고 단축 예열·측정으로 끝까지 돌린다. 끝나면 JSON(Dictionary) 또는 null.
-func _run_entry(config_id: String) -> Variant:
+func _run_entry(config_id: String, material_id: String = "") -> Variant:
 	var vp: SubViewport = ViewTestUtil.make_viewport(self)
 	autofree(vp)
 	var m: SpikeMeasure = (load(ENTRY_SCENE) as PackedScene).instantiate() as SpikeMeasure
@@ -41,8 +44,10 @@ func _run_entry(config_id: String) -> Variant:
 	if m == null:
 		return null
 	m.config_id = config_id
+	m.material_id = material_id
 	m.auto_quit = false
 	vp.add_child(m)
+	_default_out_path = m.out_path
 	# _ready 에서 설정값·명령줄로 정한 길이를 첫 _process 전에 단축한다(헤드리스 동작 확인용).
 	m.out_path = OUT_PATH
 	m.warmup_sec = 0.0
@@ -118,3 +123,48 @@ func test_measurer_uses_typed_spike() -> void:
 	var fake: String = "var _spike: Node\nvar n: int = int(_spike.call(\"get_instance_count\"))"
 	assert_true(fake.contains("_spike.call(\""), "대조군: 덕타이핑 문자열을 잡는다")
 	assert_false(fake.contains("var _spike: SpikeCrowd"), "대조군: 타입 선언 없음을 잡는다")
+
+
+# --- SE-004 AC7 -------------------------------------------------------------
+
+func test_material_arg_in_json_and_bad_id_rejected() -> void:
+	var data: Variant = await _run_entry("E", "c")
+	assert_true(data is Dictionary, "JSON 파싱")
+	if not (data is Dictionary):
+		return
+	var d: Dictionary = data
+	assert_eq(d["material"], "c", "JSON material == c")
+	assert_eq(d["ticket"], "SE-013", "ticket 값은 SE-013 그대로")
+	assert_eq(d["config"], "E")
+	assert_false(bool(d["crowd_cast_shadow"]), "E: 군중 그림자 off")
+	for k: String in SE003_KEYS:
+		assert_true(d.has(k), "SE-003 필수 키 %s" % k)
+	for k: String in SE013_KEYS:
+		assert_true(d.has(k), "SE-013 키 %s" % k)
+	assert_eq(int(d["instance_count_actual"]), 5000, "시안을 씌워도 인스턴스 5000")
+	assert_eq(_default_out_path.get_file(), "SE-013_E_c.json", "기본 출력 파일명 SE-013_<config>_<material>.json")
+	assert_eq(SpikeMeasure.default_out_path("E", "default").get_file(), "SE-013_E.json", "default 시안은 SE-013 과 같은 파일명")
+	assert_eq(SpikeMeasure.default_out_path("B", "a").get_file(), "SE-013_B_a.json")
+
+	# 없는 시안: _spawn_spike() 가 false, push_error 1건, 스파이크 자식 없음(auto_quit 이면 종료 코드 2).
+	var bad: SpikeMeasure = (load(ENTRY_SCENE) as PackedScene).instantiate() as SpikeMeasure
+	autofree(bad)
+	bad.auto_quit = false
+	bad.config_id = "E"
+	bad.material_id = "zzz"
+	assert_false(bad._spawn_spike(), "_spawn_spike() == false")
+	assert_push_error_count(1, "push_error 1건")
+	assert_null(bad.get_spike(), "스파이크 없음")
+	assert_eq(bad.get_child_count(), 0, "스파이크 자식이 생기지 않는다")
+	assert_eq(SpikeMeasure.EXIT_BAD_SETUP, 2, "종료 코드 2(--config 오류와 같은 경로)")
+
+
+func test_default_material_report_matches_se013() -> void:
+	var data: Variant = await _run_entry("E")
+	assert_true(data is Dictionary, "JSON 파싱")
+	if not (data is Dictionary):
+		return
+	var d: Dictionary = data
+	assert_eq(d["material"], "default", "--material 없으면 default")
+	assert_eq(_default_out_path.get_file(), "SE-013_E.json", "--material 없으면 SE-013 과 같은 기본 파일명")
+	assert_eq(d["ticket"], "SE-013")
