@@ -229,3 +229,74 @@ func test_ss_spike_has_one_post_pass_and_no_next_pass() -> void:
 		func(n: Node) -> bool: return n.is_in_group(ShaderVariants.POST_PASS_GROUP))
 	assert_eq(passes.size(), 1, "포스트 패스 노드 정확히 1개")
 	assert_eq(ShaderVariants.get_post_pass(spike), passes[0] if passes.size() == 1 else null, "스파이크 직속")
+
+
+# --- SE-024 AC4 (SE-018 후속 A) ----------------------------------------------
+
+## 로드 실패를 만드는 시안 경로 패턴(존재하지 않는 폴더). 측정기가 스파이크에 그대로 넘긴다.
+const MISSING_MATERIAL_PATTERN: String = "res://tests/view/missing_params/toon_%s.tres"
+
+
+## 측정기를 SubViewport 에 띄운다(_ready 가 _spawn_spike 를 부른다). 끝까지 돌리지 않는다.
+func _add_measurer(material_id: String, path_pattern: String) -> SpikeMeasure:
+	var vp: SubViewport = ViewTestUtil.make_viewport(self)
+	autofree(vp)
+	var m: SpikeMeasure = (load(ENTRY_SCENE) as PackedScene).instantiate() as SpikeMeasure
+	m.config_id = "E"
+	m.material_id = material_id
+	m.auto_quit = false
+	m.material_path_pattern = path_pattern
+	vp.add_child(m)
+	return m
+
+
+## user:// 파일의 수정 시각(없으면 -1). JSON 이 새로 쓰이지 않았는지 비교용.
+static func _mtime(path: String) -> int:
+	return FileAccess.get_modified_time(path) if FileAccess.file_exists(path) else -1
+
+
+## material_id = "b" 인데 toon_b.tres 로드가 실패하면: _spawn_spike() == false, push_error ≥ 1, 종료 코드 2,
+## 스파이크 자식 없음, 측정 진행 없음, JSON 생성 0("라벨은 b, 실제 룩은 plain" 인 결과를 내지 않는다).
+func test_material_load_failure_is_bad_setup_without_json() -> void:
+	var default_json: String = SpikeMeasure.default_out_path("E", "b")
+	var plain_json: String = SpikeMeasure.default_out_path("E", ShaderVariants.PLAIN_ID)
+	var before: Array[int] = [_mtime(default_json), _mtime(plain_json), _mtime(OUT_PATH)]
+	var m: SpikeMeasure = _add_measurer("b", MISSING_MATERIAL_PATTERN)
+	# _ready 의 첫 시도: 로드 실패 → 스파이크 경로 2건 + 측정기 1건.
+	assert_push_error("시안 'b' 머티리얼 로드 실패: %s" % (MISSING_MATERIAL_PATTERN % "b"), "ShaderVariants 로드 실패(경로 포함)")
+	assert_push_error("SpikeCrowd: 시안 'b' 머티리얼을 적용할 수 없어 plain 로 떨어진다", "스파이크 폴백")
+	assert_push_error("SpikeMeasure: 시안 'b' 머티리얼 로드 실패 (스파이크 실제 시안 plain)", "측정기 거부")
+	assert_eq(m.exit_code, SpikeMeasure.EXIT_BAD_SETUP, "종료 코드 EXIT_BAD_SETUP")
+	assert_eq(SpikeMeasure.EXIT_BAD_SETUP, 2, "EXIT_BAD_SETUP == 2")
+	assert_null(m.get_spike(), "스파이크 연결 없음")
+	assert_eq(m.get_child_count(), 0, "스파이크 자식을 떼어 냈다")
+	assert_false(m.is_processing(), "측정 진행 없음(_process off)")
+	assert_eq(m.out_path, "", "setup 이 불리지 않아 출력 경로도 정해지지 않았다")
+	# 직접 다시 불러도 false(같은 경로를 한 번 더 탄다).
+	assert_false(m._spawn_spike(), "_spawn_spike() == false")
+	assert_push_error_count(6, "push_error 6건(≥ 1 충족: 두 번 시도 × 3건)")
+	assert_eq(m.exit_code, SpikeMeasure.EXIT_BAD_SETUP, "두 번째도 종료 코드 2")
+	assert_eq(m.get_child_count(), 0, "두 번째도 자식 없음")
+	# 측정 시간만큼 프레임을 돌려도 JSON 은 생기지 않는다(finished 신호도 없음).
+	watch_signals(m)
+	await wait_physics_frames(5)
+	assert_signal_not_emitted(m, "finished", "finished 신호 없음")
+	var after: Array[int] = [_mtime(default_json), _mtime(plain_json), _mtime(OUT_PATH)]
+	assert_eq(after, before, "JSON 생성 0(기본 b·plain 파일명, 테스트 경로 모두 그대로)")
+
+
+## 대조군: plain 은 로드 대상이 아니라 같은 잘못된 경로 패턴이어도 정상 진행(측정기 검사가 plain 을 거부하지 않는다),
+## 기본 경로 패턴의 b 도 정상(오류 0, 종료 코드 기록 없음).
+func test_material_load_check_control() -> void:
+	var plain: SpikeMeasure = _add_measurer(ShaderVariants.PLAIN_ID, MISSING_MATERIAL_PATTERN)
+	assert_not_null(plain.get_spike(), "plain: 스파이크 연결")
+	assert_eq(plain.get_spike().get_material_id(), ShaderVariants.PLAIN_ID, "plain: 시안 plain")
+	assert_eq(plain.exit_code, -1, "plain: _quit 호출 없음")
+	plain.set_process(false)
+	var b: SpikeMeasure = _add_measurer("b", ShaderVariants.MATERIAL_PATH_PATTERN)
+	assert_not_null(b.get_spike(), "b: 스파이크 연결")
+	assert_eq(b.get_spike().get_material_id(), "b", "b: 시안 b")
+	assert_eq(b.get_spike().crowd.material_override, load("res://view/shaders/params/toon_b.tres"), "b: toon_b.tres")
+	assert_eq(b.exit_code, -1, "b: _quit 호출 없음")
+	b.set_process(false)
+	assert_push_error_count(0, "대조군: push_error 0")
