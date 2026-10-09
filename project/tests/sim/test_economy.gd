@@ -90,6 +90,14 @@ func _ehash(econ: Economy) -> String:
 	return JSON.stringify(econ.snapshot(), "", true)
 
 
+## 파산 뒤 비교용: day·phase 를 뺀 경제 상태 해시(SE-016, economy.md "파산 뒤").
+func _hash_without_day_phase(econ: Economy) -> String:
+	var s: Dictionary = econ.snapshot()
+	s.erase("day")
+	s.erase("phase")
+	return JSON.stringify(s, "", true)
+
+
 func _lhash(loop: TickLoop) -> String:
 	return JSON.stringify(loop.snapshot(), "", true)
 
@@ -684,22 +692,37 @@ func test_bankrupt_after_bailouts_exhausted() -> void:
 	assert_eq(bankrupt_events, [{"day": exp["bankrupt_day"], "cash": cash_by_day[cash_by_day.size() - 1], "bailouts_used": 2}], "economy.bankrupt 정확히 1회")
 	assert_eq(int(exp["bankrupt_day"]), 14, "리터럴 14")
 	assert_true(econ.bankrupt)
-	# 파산 뒤: 지출·환불·매출·유지비·가격·정산·구제 입력 전부 무시.
-	var before: String = _ehash(econ)
+	assert_eq([econ.day, econ.phase], [14, "close"], "파산일 close")
+	# 파산 뒤(SE-016): 지출·환불·매출·유지비·가격·정산·구제 입력은 무시하고 time.* 의 day·phase 추적만 유지.
+	var before: String = _hash_without_day_phase(econ)
 	rec.clear()
 	_charge(bus, "build", 0, "after")
 	_refund(bus, 1000)
 	_sales(bus, 100, 100)
 	_upkeep(bus, 0)
-	_command(bus, "economy.ticket_price_requested", {"price": 25})
+	_command(bus, "economy.ticket_price_requested", {"price": 25})   # 파산일 close 구간에서 처리
 	_accept(bus)
 	_new_day(bus, 15)
+	assert_eq([econ.day, econ.phase], [15, "day"], "파산 뒤에도 time.day_started·phase_changed 를 따라온다")
+	_command(bus, "economy.ticket_price_requested", {"price": 30})   # 15일 day 구간에서 처리
+	bus.publish("time.phase_changed", {"from": "day", "to": "show", "day": 15, "tick": 14 * _scfg.day_ticks + _scfg.phase_start("show")})
+	assert_eq(econ.phase, "show")
 	_close(bus, 15)
-	assert_eq(_ehash(econ), before, "파산 뒤 상태 불변")
+	assert_eq(econ.day, 15, "day == 15")
+	assert_eq(econ.phase, "close", "phase == close")
+	assert_eq(_hash_without_day_phase(econ), before, "day·phase 를 뺀 상태 불변(정산·S0·자동 수락 없음)")
 	assert_eq(_econ_events(rec), [
 		["economy.charge_resolved", {"request_id": "after", "reason": "build", "amount": 0, "approved": false, "decline_reason": "bankrupt", "cash": econ.cash}],
-		["economy.ticket_price_rejected", {"price": 25, "reason": "not_allowed", "phase": econ.phase}],
-	], "지출은 C1 거절, 가격은 not_allowed, 나머지는 이벤트 없음")
+		["economy.ticket_price_rejected", {"price": 25, "reason": "not_allowed", "phase": "close"}],
+		["economy.ticket_price_rejected", {"price": 30, "reason": "not_allowed", "phase": "day"}],
+	], "지출은 C1 거절, 가격은 not_allowed(처리 시점 구간), 나머지는 이벤트 없음")
+	assert_eq(rec.of("economy.ticket_price_rejected")[1]["phase"], "day", "15일 day 구간 요청은 phase == \"day\"(낡은 \"close\" 아님)")
+	for ev: String in ["economy.day_settled", "economy.bailout_offered", "economy.bailout_taken", "economy.cash_changed", "economy.bankrupt"]:
+		assert_eq(rec.of(ev).size(), 0, "파산 뒤 %s 0건" % ev)
+	# 잘못된 time.* 페이로드는 파산 전과 같이 push_warning 후 무시.
+	bus.publish("time.day_started", {"day": "x"})
+	assert_push_warning("time.day_started 페이로드 무시", "파산 뒤에도 페이로드 검사")
+	assert_eq([econ.day, econ.phase], [15, "close"], "잘못된 페이로드는 day 를 바꾸지 않는다")
 
 
 # --- EC13 --------------------------------------------------------------------
@@ -984,6 +1007,91 @@ func test_snapshot_roundtrip() -> void:
 		r_b.clear()
 		assert_false(loop_b.restore(sb), "TickLoop: %s → false" % label)
 		errs += 2   # Economy.restore 1 + TickLoop 7단계 1
+		assert_push_error_count(errs, label + ": push_error 2회(시스템 + TickLoop)")
+		assert_eq(_lhash(loop_b), before_l, label + ": TickLoop 해시 불변")
+		assert_eq(_ehash(e_b), before_eb, label + ": Economy 해시 불변")
+		assert_eq(r_b.events, [], label + ": 이벤트 0개")
+
+
+## SE-015 EC16 (c) 범위 검사 ①~⑥ (economy.md #스냅샷 "범위 검사"). 정상 스냅샷을 duplicate(true) 한 뒤
+## 필드 하나만 범위 밖으로 바꾼 사본. 각 사본이 의도한 검사에서 걸리는지 push_error 문구 일부로 확인한다.
+func test_restore_rejects_out_of_range() -> void:
+	var ua: Array = _econ_with_loan_and_pending()
+	var good: Dictionary = _rt((ua[1] as Economy).snapshot())
+	var loan_n: int = (good["loans"][0]["installments"] as Array).size()
+	assert_eq(good["loans"].size(), 1, "전제: loans 1개")
+	assert_gte(int(good["loans"][0]["paid"]), 1, "전제: paid ≥ 1")
+	assert_lt(int(good["loans"][0]["paid"]), loan_n, "전제: paid < installments 개수")
+	assert_not_null(good["pending_bailout"], "전제: pending_bailout 있음")
+	assert_eq((good["pending_bailout"]["installments"] as Array).size(), int(good["pending_bailout"]["repay_days"]), "전제: installments 개수 == repay_days")
+	assert_gte(int(good["pending_bailout"]["repay_days"]), 2, "전제: 한 개 빼도 비어 있지 않음(⑤가 타입 검사가 아니라 범위 검사에 걸리게)")
+	assert_false(_cfg.has_row(99), "전제: tier 99 행 없음")
+	var control: Economy = (_unit()[1] as Economy)
+	assert_true(control.restore(good.duplicate(true)), "전제: 바꾸지 않은 사본은 복원된다")
+
+	# [라벨, 사본, push_error 문구 일부]
+	var bads: Array = []
+	var x: Dictionary = good.duplicate(true)
+	x["tier"] = 99
+	bads.append(["① tier = 99", x, "경제 행이 없다"])
+	x = good.duplicate(true)
+	x["day"] = 0
+	bads.append(["② day = 0", x, "범위 밖 값"])
+	for key: String in ["ticket_price", "upkeep_per_day", "last_settled_day", "bailouts_left"]:
+		x = good.duplicate(true)
+		x[key] = -1
+		bads.append(["③ %s = -1" % key, x, "범위 밖 값"])
+	for key: String in EconomyConfig.LEDGER_KEYS:
+		x = good.duplicate(true)
+		x["ledger"][key] = -1
+		bads.append(["④ ledger.%s = -1" % key, x, "ledger.%s 가 0 이상" % key])
+	x = good.duplicate(true)
+	(x["pending_bailout"]["installments"] as Array).pop_back()
+	bads.append(["⑤ pending_bailout.installments 한 개 뺌", x, "installments 개수가 repay_days 와 다르다"])
+	x = good.duplicate(true)
+	x["loans"][0]["paid"] = loan_n
+	bads.append(["⑥ loans[0].paid = installments 개수", x, "loans[].paid 가 0 이상"])
+	x = good.duplicate(true)
+	x["loans"][0]["paid"] = -1
+	bads.append(["⑥ loans[0].paid = -1", x, "loans[].paid 가 0 이상"])
+	assert_eq(bads.size(), 12, "①1 + ②1 + ③4 + ④3 + ⑤1 + ⑥2")
+
+	# Economy 단독: false, push_error 정확히 1회, 해시 불변, 이벤트 0.
+	var ub: Array = _unit()
+	var econ_b: Economy = ub[1]
+	var rec_b: EventRecorder = ub[2]
+	var errs: int = 0
+	for b: Array in bads:
+		var label: String = b[0]
+		var before_e: String = _ehash(econ_b)
+		rec_b.clear()
+		assert_false(econ_b.restore(b[1]), "Economy: %s → false" % label)
+		errs += 1
+		assert_push_error(b[2], label + ": 의도한 범위 검사에서 거부")
+		assert_push_error_count(errs, label + ": push_error 1회")
+		assert_eq(_ehash(econ_b), before_e, label + ": 상태 불변")
+		assert_eq(rec_b.events, [], label + ": 이벤트 0개")
+
+	# TickLoop 경로(②·⑥): systems.economy 에 넣은 스냅샷 → false, 양쪽 해시 불변, push_error 2회.
+	var base: Dictionary = _rt((_looped(42)[0] as TickLoop).snapshot())
+	var lc: Array = _looped(7)
+	var ok_snap: Dictionary = base.duplicate(true)
+	ok_snap["systems"]["economy"] = good.duplicate(true)
+	assert_true((lc[0] as TickLoop).restore(ok_snap), "전제: 같은 TickLoop 스냅샷에 정상 economy 면 복원된다")
+	var lb: Array = _looped(7)
+	var loop_b: TickLoop = lb[0]
+	var e_b: Economy = lb[1]
+	var r_b: EventRecorder = lb[2]
+	for i: int in [1, 10, 11]:   # ② day = 0, ⑥ paid = 개수, ⑥ paid = -1
+		var label: String = bads[i][0]
+		var sb: Dictionary = base.duplicate(true)
+		sb["systems"]["economy"] = (bads[i][1] as Dictionary).duplicate(true)
+		var before_l: String = _lhash(loop_b)
+		var before_eb: String = _ehash(e_b)
+		r_b.clear()
+		assert_false(loop_b.restore(sb), "TickLoop: %s → false" % label)
+		errs += 2   # Economy.restore 1 + TickLoop 7단계 1
+		assert_push_error(bads[i][2], label + ": Economy 의 범위 검사 문구")
 		assert_push_error_count(errs, label + ": push_error 2회(시스템 + TickLoop)")
 		assert_eq(_lhash(loop_b), before_l, label + ": TickLoop 해시 불변")
 		assert_eq(_ehash(e_b), before_eb, label + ": Economy 해시 불변")

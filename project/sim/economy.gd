@@ -313,8 +313,6 @@ func _on_bailout_accept_requested(_p: Dictionary) -> void:
 ## phase·day 추적. close 진입이면 정산(1회성). 1회성 검사를 통과했는데 제안 중인 구제가 남아 있으면
 ## (time.day_started 없이 다음 close 가 옴 = 시간 이벤트 계약 위반) S0: push_warning 1회 후 auto 수락, 그다음 정산.
 func _on_phase_changed(p: Dictionary) -> void:
-	if bankrupt:
-		return
 	var to: Variant = p.get("to")
 	var d: Variant = EconomyConfig.as_int(p.get("day"))
 	if not (to is String) or d == null:
@@ -322,6 +320,8 @@ func _on_phase_changed(p: Dictionary) -> void:
 		return
 	phase = to
 	day = d
+	if bankrupt:   # 파산 뒤: day·phase 추적만, 정산·S0 없음(SE-016)
+		return
 	if phase == PHASE_CLOSE and last_settled_day != d:
 		if pending_bailout != null:                                                            # S0
 			push_warning("[Economy] S0: time.day_started 없이 %d일 close — %d일 제안 구제를 자동 수락" % [d, int(pending_bailout["day"])])
@@ -331,13 +331,13 @@ func _on_phase_changed(p: Dictionary) -> void:
 
 ## day 추적. 제안 중인 구제는 자동 수락(auto: true).
 func _on_day_started(p: Dictionary) -> void:
-	if bankrupt:
-		return
 	var d: Variant = EconomyConfig.as_int(p.get("day"))
 	if d == null:
 		push_warning("[Economy] time.day_started 페이로드 무시: %s" % [p])
 		return
 	day = d
+	if bankrupt:   # 파산 뒤: day 추적만, 자동 수락 없음(SE-016)
+		return
 	if pending_bailout != null:
 		_accept_bailout(true)
 
