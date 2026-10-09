@@ -25,7 +25,7 @@
       "type": "integer", "enum": [7000]
     },
     "guarantee_by_grade": {
-      "description": "v0 아티스트 개런티 고정표(등급 → 금액). 동적 공식은 artist.md 가 대체한다. economy.md#개런티",
+      "description": "v0 아티스트 개런티 고정표(등급 → 금액). 동적 공식은 artist.md 가 대체한다. v0 필수 키는 local·rookie. 표에 없는 등급의 EconomyConfig.guarantee() 는 push_error 후 -1. economy.md#개런티",
       "type": "object",
       "required": ["local", "rookie"],
       "additionalProperties": false,
@@ -86,7 +86,10 @@
           "admissions": { "description": "공연이 열린 날의 유료 입장 수(입력)", "type": "integer", "minimum": 0 },
           "audience": { "description": "공연이 열린 날의 관객 수(입력, 바 계산용)", "type": "integer", "minimum": 0 },
           "ticket_price": { "description": "없으면 해당 티어 ticket_price_default", "type": "integer", "minimum": 0 },
-          "guarantee_grade": { "type": "string", "enum": ["local", "rookie", "midlevel", "headliner", "legend"] },
+          "guarantee_grade": {
+            "description": "개런티 등급. enum 은 artist.md 가 쓸 등급 이름 목록(5종)이고, 값이 guarantee_by_grade 의 키여야 한다는 조건은 JSON Schema 로 표현할 수 없어 EconomyConfig.load() 의 K4 가 검사한다(v0 는 local·rookie 만 통과). economy.md#설정-로드와-공개-api",
+            "type": "string", "enum": ["local", "rookie", "midlevel", "headliner", "legend"]
+          },
           "booking_policy": {
             "description": "book_if_affordable: 매일 낮에 개런티를 제안해 승인되면 공연(admissions·audience 적용), 거절되면 그날 공연 없음(0명)",
             "type": "string", "enum": ["book_if_affordable"]

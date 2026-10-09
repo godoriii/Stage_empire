@@ -49,7 +49,7 @@ Economy 가 소유하는 상태. 전부 기본형이며 스냅샷 대상이다(#
 | `last_settled_day` | int | 0 | 마지막으로 정산한 날 |
 | `bailouts_left` | int | `bailout_count` | 남은 구제 횟수 |
 | `pending_bailout` | Dictionary 또는 `null` | `null` | 제안 중인 구제 조건 `{day, kind, deficit, amount, interest, total_due, repay_days, installments}` |
-| `loans` | Array | `[]` | 상환 중인 대출, 받은 순서. 원소 `{day_taken, amount, total_due, installments: Array[int], paid: int}` |
+| `loans` | Array | `[]` | 상환 중인 대출, 받은 순서. 원소 `{day_taken, amount, total_due, installments: Array[int], paid: int}`. `day_taken`은 **제안일**(`pending_bailout.day`)이다. 수락 경로(수동·자동)와 무관하게 같은 값이고, 상환 시점 판정에는 쓰지 않는다(기록·표시용, S13) |
 | `bankrupt` | bool | false | 파산(게임 오버) 여부 |
 
 **회계일.** 회계일 `d` = 직전 정산 직후부터 `d`일 정산까지. 새 게임은 1회계일의 시작이다. close 에서 정산 뒤에 일어난 지출·매출은 다음 회계일에 들어간다.
@@ -70,7 +70,8 @@ economy 는 다른 시스템을 직접 호출하지 않고(CLAUDE.md 원칙 4) �
 | `time.day_started` | 상태 | TickLoop | `day` 갱신. 제안 중인 구제 자동 수락 |
 
 - 정수 필드는 `int` 또는 정수값 `float`만 받고 `int()`로 정규화한다(tick.md 배속 요청과 같은 규칙). 그 밖은 각 표의 "무효" 행.
-- economy 는 `system_order`에서 crisis 뒤, reputation 앞에 구독한다(tick.md "시스템 등록"). 그래서 같은 `time.phase_changed {to:"close"}`에서 reputation 은 정산이 끝난 `cash`를 본다.
+- economy 는 `system_order`에서 crisis 뒤, reputation 앞에 구독한다(tick.md "시스템 등록").
+- 정산 결과가 필요한 시스템은 `cash`를 읽지 않고 `economy.day_settled`를 구독한다. 티어 해금 자금 판정은 reputation.md 가 `economy.day_settled.cash`(정산 뒤·구제 전 값)를 구독해서 한다. 이 이벤트는 E2 로 큐에 들어가 `time.phase_changed {to:"close"}`의 모든 구독자가 끝난 뒤 전달되므로 판정 결과는 구독 순서에 의존하지 않는다.
 
 **같은 경계 안의 핸드셰이크.** build 가 설치 명령을 처리하며 `economy.charge_proposed`를 발행 → (tick.md E2, FIFO) economy 가 판정하고 `economy.charge_resolved`를 발행 → build 가 `approved`를 보고 설치를 확정(`build.placed`)하거나 `build.rejected {reason:"insufficient_cash"}`를 낸다.
 명령 하나의 연쇄는 다음 명령보다 먼저 끝나므로(tick.md E5) 같은 경계의 두 번째 설치 명령은 갱신된 `cash`로 판정된다. 다른 시스템은 `cash`를 직접 읽지 않는다.
@@ -234,8 +235,11 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 - `economy.bailout_accept_requested {}` 명령(close 에서 UI·봇이 보냄, 다음 경계 처리에서 적용, `auto: false`).
 - `time.day_started` 수신(플레이어가 수락하지 않고 다음 날로 넘어감, `auto: true`). v0 에서 구제는 거절할 수 없다(Q5).
 
-수락 동작: `cash += amount`, `bailouts_left −= 1`, `loans.append({day_taken: day, amount, total_due, installments, paid: 0})`, `pending_bailout = null` → `economy.cash_changed {cash, delta: amount, reason: "bailout"}` → `economy.bailout_taken {day, kind, amount, total_due, repay_days, bailouts_left, cash, auto}`.
-`pending_bailout == null`일 때 받은 수락 명령은 무시한다(상태 불변, 이벤트 없음). 첫 상환은 다음 정산(`day_taken + 1`)부터 정산마다 1회차씩.
+수락 동작: `cash += amount`, `bailouts_left −= 1`, `loans.append({day_taken: pending_bailout.day, amount, total_due, installments, paid: 0})`, `pending_bailout = null` → `economy.cash_changed {cash, delta: amount, reason: "bailout"}` → `economy.bailout_taken {day, kind, amount, total_due, repay_days, bailouts_left, cash, auto}`.
+`day_taken`과 `economy.bailout_taken.day`는 둘 다 **제안일**(`pending_bailout.day`)이다. 현재 `day`를 쓰지 않는다. 자동 수락은 `time.day_started` 핸들러에서 `day`를 갱신한 뒤 일어나서, 현재 `day`를 쓰면 수동 수락과 값이 하루 달라지기 때문이다.
+`pending_bailout == null`일 때 받은 수락 명령은 무시한다(상태 불변, 이벤트 없음).
+첫 회차는 **수락 뒤 첫 정산(S13)**에서 나가고, 그 뒤 정산마다 1회차씩 나간다. S13 은 날짜를 보지 않고 `loans`의 모든 대출에서 `installments[paid]`를 뺀다. 그래서 상환 시점을 `day_taken`과 비교하는 조건(예: "`day > day_taken`일 때만")을 넣지 않는다.
+예: 8일 close 에서 제안된 구제는 수동 수락(8일 close)이든 자동 수락(9일 `time.day_started`)이든 9일 정산에서 첫 회차가 나간다. 두 경로 사이에 현금을 바꾸는 입력이 없으면 9일 정산 뒤 `cash`도 같다.
 자동 수락의 이벤트 순서는 tick.md E2 FIFO 에 따라 `time.day_started → time.phase_changed {close→day} → time.speed_changed → economy.cash_changed → economy.bailout_taken`이다.
 
 **파산 뒤.** `bankrupt == true`면 economy 는 모든 입력을 무시한다. 지출은 C1 거절, 환불·매출·유지비 보고 무시, 정산 없음, 티켓 가격은 `not_allowed`, 구제 없음. `economy.bankrupt`는 게임당 정확히 1회다.
@@ -287,10 +291,11 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | K1 | `rows[].id == "tier_" + str(rows[].tier)`, `tier` 중복 없음, `tier == 1` 행이 있음 |
 | K2 | 행마다 `ticket_price_min ≤ ticket_price_default ≤ ticket_price_max` |
 | K3 | `version == 1`, `rate_scale == 10000` |
+| K4 | 모든 `reference_scenarios[].guarantee_grade`가 `guarantee_by_grade`의 키다. 스키마 enum(5종)은 artist.md 가 쓸 등급 이름의 목록이다. 그래서 v0 테이블에 값이 없는 등급(`midlevel` 등)도 스키마는 통과하고, 이 검사가 그런 등급을 막는다 |
 
 | 클래스 | 멤버 | 설명 |
 |---|---|---|
-| `EconomyConfig` | `row(tier: int) -> Dictionary`, `guarantee(grade: String) -> int`, `starting_cash`, `bailout_count`, `rate_scale`, `demolish_refund_rate_bp`, `charge_reasons`, `reference_scenarios` | 읽기 전용 |
+| `EconomyConfig` | `row(tier: int) -> Dictionary`, `guarantee(grade: String) -> int`, `starting_cash`, `bailout_count`, `rate_scale`, `demolish_refund_rate_bp`, `charge_reasons`, `reference_scenarios` | 읽기 전용. `guarantee(grade)`는 `guarantee_by_grade`에 있는 키면 그 값(int ≥ 0)을 돌려준다. 없는 키(v0 의 `midlevel`·`headliner`·`legend`, 오타 포함)면 `push_error` 후 **`-1`**을 돌려준다. `-1`을 그대로 `charge_proposed.amount`에 넣으면 C2(`amount < 0`)로 거절(`"invalid"`)되므로 현금은 바뀌지 않는다. `row(tier)`는 없는 티어면 `push_error`, `{}` |
 | `Economy` | `new(config: EconomyConfig, bus: EventBus)` | #입력-계약의 이벤트를 구독. 이벤트 발행 없음 |
 | | `cash`, `tier`, `day`, `phase`, `ticket_price`, `upkeep_per_day`, `ledger`, `bailouts_left`, `pending_bailout`, `loans`, `bankrupt` | 읽기 전용 |
 | | `snapshot() -> Dictionary`, `restore(d) -> bool` | #스냅샷 |
@@ -377,7 +382,7 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 - 일자 검증: 1일차 건설 뒤 2,000 → 매일 +1,142 → 24일 정산 뒤 29,408(미달), 25일 정산 뒤 30,550(도달).
 - 시간 근거: PRD "티어 2까지 약 2시간". 1일 = 3,300틱(`sim.json`) = 낮 1,800틱(3배속 60초) + 저녁 600틱(1배속 60초) + 공연 900틱(90초) + 정산 리포트(약 30초, 플레이어 체류 가정) ≈ 4분. 2시간 ≈ 30일. 25일 ≈ 100분.
 - 30일 안에 들려면 평균 입장이 91명 이상이어야 한다(위 표). 입장 수 곡선은 audience.md 와 qa 봇 플레이로 맞춘다.
-- 범위 밖: 티어 2 의 다른 조건 **명성 500**(`tiers.json` `unlock_reputation`)은 reputation.md 소관이고 이 추정에 넣지 않았다. "자금 3만"은 정산 뒤 `cash ≥ unlock_cash`로 해석했다(판정은 reputation.md 가 확정).
+- 범위 밖: 티어 2 의 다른 조건 **명성 500**(`tiers.json` `unlock_reputation`)은 reputation.md 소관이고 이 추정에 넣지 않았다. "자금 3만"은 `economy.day_settled.cash ≥ unlock_cash`로 해석했다(판정은 reputation.md 가 확정, #입력-계약).
 
 ### 파산 시나리오 (`reference_scenarios[tier1_bankrupt]`)
 
@@ -411,13 +416,21 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 결과: **구제 1 은 8일째, 구제 2 는 11일째 제안, 14일째 정산에서 게임 오버.** 기대값은 `reference_scenarios[tier1_bankrupt].expected`(`cash_by_day`, `bailout_offered_days`, `bailout_amounts`, `bankrupt_day`).
 `bailout_count`만 바꿨을 때(같은 입력): 0회 → 8일, 1회 → 11일, 2회 → 14일, 3회 → 16일에 게임 오버(Q1).
 
+이 시나리오는 "제안된 close 에서 바로 수락"(수동 수락, `day_taken` = 제안일)으로 계산했다. 자동 수락(다음 날 `time.day_started`)으로 바꿔도 기대값은 같다.
+- 두 수락 시점 사이에 현금을 바꾸는 입력이 없다. 개런티 지출은 다음 날 낮, `day_started` 뒤에 온다. 그래서 다음 날 낮의 시작 현금이 3,000 으로 같다.
+- S13 은 날짜를 보지 않는다. 그래서 두 경로 모두 구제 1 의 첫 회차는 9일 정산, 구제 2 의 첫 회차는 12일 정산에서 나간다.
+
+**기대값 변경 없음 근거(2026-10-09 후속).** `day_taken` 정의 변경(제안일 고정)은 상환 시점을 바꾸지 않는다. S13 은 원래부터 수락 뒤 첫 정산에 첫 회차를 뺐다. 그래서 `reference_scenarios` 기대값은 그대로다.
+- `tier1_bankrupt`: `cash_by_day`, `bailout_offered_days` [8, 11], `bailout_amounts` [3,742, 3,354], `bankrupt_day` 14.
+- `tier1_baseline`: 대출이 없어 영향이 없다.
+
 ## 수용 기준
 
 구현 티켓의 테스트 케이스 목록이다. 파일은 `project/tests/sim/test_economy.gd`. 기대 수치는 테스트에 하드코딩하지 않고 `economy.json`의 `reference_scenarios`와 행 값에서 읽는다(수치가 바뀌어도 테스트 코드는 그대로).
 
 | # | 케이스 | 검증 |
 |---|---|---|
-| EC1 | `test_economy.gd::test_config_loads_and_cross_checks` | `EconomyConfig.load()`가 성공하고 `row(1)`·`guarantee("local")`가 JSON 값과 같음. K1~K3 를 하나씩 깬 사본(예: `ticket_price_min > ticket_price_default`)은 `null` (#설정-로드와-공개-API) |
+| EC1 | `test_economy.gd::test_config_loads_and_cross_checks` | `EconomyConfig.load()`가 성공하고 `row(1)`·`guarantee("local")`가 JSON 값과 같음. K1~K4 를 하나씩 깬 사본(예: `ticket_price_min > ticket_price_default`, K4 는 `reference_scenarios[0].guarantee_grade = "midlevel"`인 사본)은 `null`. 정상 설정에서 `guarantee("midlevel") == -1`, `guarantee("nope") == -1` (#설정-로드와-공개-API) |
 | EC2 | `test_economy.gd::test_new_game_state` | 생성 직후 `cash == starting_cash`, `ticket_price == ticket_price_default`, `bailouts_left == bailout_count`, `bankrupt == false`, 생성자가 이벤트 0개 (#시작-자금) |
 | EC3 | `test_economy.gd::test_settles_once_on_close_entry` | `TickLoop`으로 `advance(3300)` → `economy.day_settled` 정확히 1회(`day: 1`), 그 틱의 `tick.advanced`보다 먼저. 같은 `time.phase_changed {to:"close", day:1}`를 다시 발행해도 정산 0회. 다음 날 close 에서 `day: 2`로 1회 더 (#정산 1회성) |
 | EC4 | `test_economy.gd::test_immediate_vs_settlement_items` | `charge_proposed {reason:"build", amount:1000}` → 즉시 `cash −1000`, `day_settled.operating_costs`·`pretax`에 안 들어감. `{reason:"guarantee", amount:400}` → 즉시 `cash −400`, `day_settled.guarantee == 400`이고 `operating_costs`에 포함, `settlement_delta`에는 안 들어감. `sales_reported`는 정산 전까지 `cash` 불변 (#즉시-반영-항목과-정산-반영-항목) |
@@ -426,8 +439,8 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | EC7 | `test_economy.gd::test_demolish_refund_floor` | `refund_proposed {reason:"demolish", base_amount}` 1,000 → `+700`, 999 → `+699`, 1 → `+0`이고 `cash_changed` 없음. `reason` 다름·음수 → 무시. 환불은 `pretax`에 안 들어감 (F1~F3) |
 | EC8 | `test_economy.gd::test_reference_scenario_baseline` | `tier1_baseline`: `compute_settlement` 결과가 `expected`의 S1~S14 키와 전부 같음. 버스로 하루 진행(build 지출 → 개런티 지출 → `sales_reported` → close)한 `day_settled` 페이로드도 같음. `net × rate_scale ÷ rent_per_day`가 `checks` 범위 안. `⌈(tier_2.unlock_cash − starting_cash + initial_build_spend) ÷ net⌉ == expected.days_to_tier2_cash ≤ checks.tier2_max_days` (#기준-시나리오) |
 | EC9 | `test_economy.gd::test_bailout_offered_then_accepted` | 정산 뒤 `cash < 0`, `bailouts_left > 0` → `economy.bailout_offered` 페이로드가 공식대로(`deficit`, `amount`, `interest`, `total_due`, `first_installment`, `bailouts_left_after`). `economy.bailout_accept_requested` 후 경계 처리(`bus.dispatch_commands()`) → `cash == bailout_loan_amount`, `bailouts_left` 1 감소, `loans` 1개, `cash_changed {reason:"bailout"}` → `bailout_taken {auto:false}`. 두 번째 수락 명령은 무시 (#파산과-구제) |
-| EC10 | `test_economy.gd::test_bailout_auto_accepted_on_next_day` | 수락 없이 `time.next_day_requested` → `advance(0)` → 이벤트 순서 `time.day_started → time.phase_changed → time.speed_changed → economy.cash_changed → economy.bailout_taken {auto:true}` |
-| EC11 | `test_economy.gd::test_loan_installments` | `total_due` 4,116, `repay_days` 10 → `installments` = 412 × 6 + 411 × 4, 합 4,116. 첫 상환은 받은 다음 날 정산, 10회 뒤 `loans`에서 제거. 두 대출이 겹치면 받은 순서로 합산 (R5, S13) |
+| EC10 | `test_economy.gd::test_bailout_auto_accepted_on_next_day` | `d`일 close 에서 구제 제안 → 수락 없이 `time.next_day_requested` → `advance(0)` → 이벤트 순서 `time.day_started → time.phase_changed → time.speed_changed → economy.cash_changed → economy.bailout_taken {auto:true}`. `bailout_taken.day == d`(제안일), `loans[0].day_taken == d`. 그 다음 정산(`d + 1`일 close)의 `economy.day_settled.loan_repayment == bailout_offered.first_installment`. 같은 입력을 수동 수락(`d`일 close)으로 돌린 실행과 `d + 1`일 `day_settled` 페이로드가 같음 |
+| EC11 | `test_economy.gd::test_loan_installments` | `total_due` 4,116, `repay_days` 10 → `installments` = 412 × 6 + 411 × 4, 합 4,116. 첫 상환은 수락 뒤 첫 정산(S13), 10회 뒤 `loans`에서 제거. 두 대출이 겹치면 받은 순서로 합산 (R5, S13) |
 | EC12 | `test_economy.gd::test_bankrupt_after_bailouts_exhausted` | `tier1_bankrupt` 정책으로 날을 돌려 날마다 정산 뒤 `cash`가 `expected.cash_by_day`, 구제 제안일이 `bailout_offered_days`, 원금이 `bailout_amounts`, `economy.bankrupt {day}`가 `bankrupt_day`에 정확히 1회. 그 뒤 지출·환불·매출·가격·정산 입력이 전부 무시됨 (B3, #파산과-구제 "파산 뒤") |
 | EC13 | `test_economy.gd::test_ticket_price_rules` | P1~P5: 비정수 `"invalid"`, 낮 아닌 구간 `"not_allowed"`, 범위 밖 `"out_of_range"`, 같은 값 무시, 정상 → `ticket_price_changed {price, from}`. 정수값 `float`(25.0) 허용 (#티켓-가격) |
 | EC14 | `test_economy.gd::test_settlement_event_order` | close 진입 틱의 이벤트: `time.phase_changed {to:"close"}` → `economy.cash_changed {reason:"settlement"}` → `economy.day_settled` → (`economy.bailout_offered` 또는 `economy.bankrupt`) → `time.speed_changed {speed:0}` → `tick.advanced`. 정산 연쇄는 최외곽 `time.phase_changed` 발행 안에서 끝난다(tick.md E3). `settlement_delta == 0`이면 `cash_changed` 없음 (#정산 이벤트) |
@@ -461,3 +474,6 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 |---|---|---|---|
 | 2026-10-09 | economy.md v0 | SE-005 | 신규 작성 |
 | 2026-10-09 | `economy.json` v1, `economy.schema.json` version 1 | SE-005 | 신규 테이블. 전역(`rate_scale`, `starting_cash`, `bailout_count`, `demolish_refund_rate_bp`, `guarantee_by_grade`, `charge_reasons`) + 티어 행(`rows[tier_1]`) + `reference_scenarios`(기준·파산 시나리오 입력과 기대값). 티켓 후보 필드 이름에서 바꾼 것: 비율은 정수 bp(`tax_rate` → `tax_rate_bp`, `bailout_interest_rate` → `bailout_interest_bp`, `bar_purchase_rate`·`bar_cost_rate`·`demolish_refund_rate` → `*_bp`). `tiers.json`은 바꾸지 않았다(경제 수치는 `economy.json` 행으로 분리) |
+| 2026-10-09 | economy.md v0 (후속 수정) | SE-005 후속 (리뷰 발견 1) | 대출 `day_taken`과 `economy.bailout_taken.day`를 제안일(`pending_bailout.day`)로 고정했다. "첫 상환은 다음 정산(`day_taken + 1`)부터"를 "첫 회차는 수락 뒤 첫 정산(S13)"으로 바꾸고, 상환 시점에 날짜 조건을 두지 않는다고 적었다. EC10 에 단언 3개를 추가했다: 자동 수락 다음 정산의 `loan_repayment == first_installment`, `day_taken`·`bailout_taken.day` = 제안일, 수동 수락과 같은 `day_settled`. EC11 문구도 맞췄다. 상환 시점(S13)이 그대로라 `reference_scenarios` 기대값은 바뀌지 않았다(파산 시나리오 절 근거) |
+| 2026-10-09 | economy.md v0 (후속 수정) | SE-005 후속 (리뷰 발견 2) | 입력 계약에서 "reputation 은 정산이 끝난 `cash`를 본다"를 지웠다. 대신 정산 결과가 필요한 시스템은 `economy.day_settled`를 구독한다고 적었다(티어 해금 자금 = `day_settled.cash`, 구독 순서와 무관). 티어 2 도달 추정 절의 해석 문구도 같은 이벤트로 맞췄다. "다른 시스템은 `cash`를 직접 읽지 않는다"와 모순되는 문장은 0개다 |
+| 2026-10-09 | economy.md v0 (후속 수정), `economy.schema.json` version 1 유지 | SE-005 후속 (리뷰 발견 3) | 설정 로드 검사에 K4(`reference_scenarios[].guarantee_grade` ∈ `guarantee_by_grade` 키)를 추가했다. `EconomyConfig.guarantee()`에 모르는 등급이면 `push_error` 후 `-1`을 돌려준다고 적었다(그 값을 지출로 보내면 C2 거절). `row()`의 없는 티어 반환값(`{}`)도 적었다. EC1 에 K4 위반 사본과 `guarantee("midlevel") == -1`을 추가했다. 스키마는 enum 을 줄이지 않고(artist.md 등급 이름 5종 유지) `guarantee_grade`·`guarantee_by_grade`의 `description`만 고쳤다. 받아들이는 문서 집합이 그대로라 스키마 `version`과 `economy.json` `version`은 1 로 두었다. `economy.json`은 바꾸지 않았다 |
