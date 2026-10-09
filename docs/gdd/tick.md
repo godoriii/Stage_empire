@@ -129,7 +129,7 @@
 
 | 순서 | 조건 | 상태 | 발행 |
 |---|---|---|---|
-| 1 | `speed`가 정수가 아님(`int`, 또는 정수값인 `float`만 정수로 인정. 키 없음·문자열·1.5 등은 아님) | 불변 | `time.speed_rejected {speed: <받은 값 또는 null>, reason:"invalid", phase}` |
+| 1 | `speed` 키가 없거나 값이 `int`가 아님(문자열·`bool`·`null` 등). `float`(`2.0`·`1.5` 모두)는 버스가 먼저 거부한다(E4: `publish()`가 `false` + `push_error`, 큐잉 안 함) — 핸들러 도달 없음, 이 표의 어느 행에도 오지 않고 이벤트도 없다 | 불변 | `time.speed_rejected {speed: <받은 값 또는 null>, reason:"invalid", phase}` |
 | 2 | `speed ∉ phases[phase].speeds` | 불변 | `time.speed_rejected {speed, reason:"not_allowed", phase}` |
 | 3 | `speed == 현재 speed` | 불변 | 없음 |
 | 4 | 그 외 | `speed` 갱신 | `time.speed_changed {speed, from, cause:"requested"}` |
@@ -321,10 +321,12 @@ v0 는 시간·RNG·명령 큐만 담는다. 경제·관객 등 시스템 상태
 |---|---|---|
 | 1 | 재진입 아님 | `push_error`, `false`, 상태 불변 |
 | 2 | `s.schema_version == snapshot_schema_version` (마이그레이션은 후속 세이브 티켓) | 〃 |
-| 3 | 숫자 필드는 `int()`로 정규화(JSON 왕복 시 float 로 오므로). `phase`가 유효, `day ≥ 1`, I1·I3 성립 | 〃 |
+| 3 | 숫자 필드(`seed`·`tick`·`day`·`tick_in_phase`·`speed`)는 `int`, 또는 정수값인 `float`(JSON 왕복 산물)를 `int`로 정규화. 그 밖의 값이면 실패. `seed` 0~2^31−1(2,147,483,647), `phase`가 유효, `day ≥ 1`, I1·I3·I4(`speed ∈ phases[phase].speeds`) 성립, `rng`가 Dictionary | 〃 |
 | 4 | 카운터·`speed`·`seed` 덮어쓰기, `SeededRng`을 `seed`로 다시 만들고 `rng` 상태 적용. 스냅샷에 없는 스트림(데이터에 새로 추가된 것)은 새 파생 시드에서 시작, 데이터에 없는 스트림은 `push_warning` 후 무시 | — |
-| 5 | 버스 명령 큐를 `pending_commands`로 교체(`speed` 같은 정수 페이로드는 정수로 정규화), `acc = 0` | — |
+| 5 | 버스 명령 큐를 `pending_commands`로 교체, `acc = 0`. 교체할 목록은 페이로드 안(재귀, 배열·중첩 Dictionary 포함)의 정수값인 `float`를 `int`로 정규화한 것이다(`EventBus.normalize_commands`). 명령 페이로드 숫자는 원래 `int`뿐이므로(E4) 손실 없는 역변환이다. 정수가 아닌 `float`(예: `1.5`)나 형식 오류(원소가 `{name, payload}`가 아님, 이름이 `*_requested`가 아님, 페이로드가 E4 위반)가 하나라도 있으면 복원 실패 | `push_error`, `false`, 상태 불변 |
 | 6 | 이벤트를 발행하지 않는다. `true` | — |
+
+**실패 시 상태 불변.** 1·2·3단계의 검사, 5단계의 정규화·형식 검사, `rng` 상태 형식 검사는 4단계의 덮어쓰기 전에 전부 끝낸다(검사 → 적용). 하나라도 실패하면 카운터·`seed`·`rng`·명령 큐 어느 것도 바뀌지 않는다.
 
 복원 후 진행 = 연속 진행: 상태 A 에서 `s = snapshot()` → 새 `TickLoop`에 `restore(s)` → `advance(N)` 결과의 상태 해시가, A 에서 그대로 `advance(N)`한 결과와 같다.
 
@@ -338,7 +340,7 @@ v0 는 시간·RNG·명령 큐만 담는다. 경제·관객 등 시스템 상태
 | E1 | 같은 이름의 구독자는 **구독한 순서대로** 호출된다. 디스패치 중 `subscribe`/`unsubscribe`는 다음 이벤트부터 반영(진행 중인 이벤트의 호출 목록은 시작 시점 사본) |
 | E2 | 디스패치 중(핸들러 안) `publish()`한 상태 이벤트는 즉시 전달되지 않고 버스의 이벤트 큐 끝에 들어간다. 현재 이벤트의 모든 구독자 호출이 끝난 뒤 FIFO 로 전달된다. **재진입 없음** — 핸들러 실행 중에 다른 핸들러가 끼어들지 않는다 |
 | E3 | 버스가 쉬고 있을 때의 `publish()`(최외곽)는 그 이벤트와 연쇄된 모든 상태 이벤트가 전달된 뒤 반환한다 |
-| E4 | 페이로드는 `Dictionary`. 키는 `String`(또는 `StringName`), 값은 `null`/`bool`/`int`/`float`/`String`/`StringName`/`Array`/`Dictionary`만(재귀). 그 밖(`Object`, `Vector2`, `Callable`, `Packed*Array` 등)이 하나라도 있으면 `push_error`, `false`, 전달·큐잉 안 함. 버스는 페이로드를 깊은 복사해 모든 구독자에게 같은 사본을 준다. 핸들러는 페이로드를 수정하지 않는다(리뷰 규약) |
+| E4 | 페이로드는 `Dictionary`. 키는 `String`(또는 `StringName`), 값은 `null`/`bool`/`int`/`float`/`String`/`StringName`/`Array`/`Dictionary`만(재귀). 그 밖(`Object`, `Vector2`, `Callable`, `Packed*Array` 등)이 하나라도 있으면 `push_error`, `false`, 전달·큐잉 안 함. 버스는 페이로드를 깊은 복사해 모든 구독자에게 같은 사본을 준다. 핸들러는 페이로드를 수정하지 않는다(리뷰 규약). **명령 페이로드 숫자는 `int`만(v0).** 명령(`*_requested`) 페이로드 안(재귀)에 `float`가 하나라도 있으면 정수값(`2.0`)이어도 `publish()`가 `push_error` + `false`를 돌려주고 명령 큐에 넣지 않는다. 상태 이벤트는 `float` 허용. 이유: 명령은 `pending_commands`로 스냅샷에 들어가고 JSON 왕복에서 `int`도 `float`로 돌아오므로, 원래 값이 `int`뿐이어야 restore 5단계의 정규화가 원본을 손실 없이 되살린다(#스냅샷 "복원 후 진행 = 연속 진행"). 완화(정수값인 `float` 허용 + 정규형 스냅샷)는 기존 호출자를 깨지 않는 방향이라 필요해지면 나중에 한다 |
 | E5 | 명령 이벤트(`*_requested`)는 명령 큐로 가서 경계 처리에서 전달된다(#명령-큐와-틱-순서). 경계 처리 안의 명령 하나는 E3 처럼 최외곽 전달로 취급된다 |
 | E6 | 상태 이벤트는 그 틱 안에서 발생 순서대로 전달된다. 한 틱의 이벤트 순서 = [단계 1 명령 연쇄] → [단계 2 시스템 순서대로] → [단계 4 `time.phase_changed` → `time.speed_changed`] → [단계 5 `tick.advanced`] |
 | E7 | `tick.advanced`는 그 틱에서 `TickLoop`이 마지막으로 발행하는 이벤트다. `tick.advanced` 구독자(view/ui/세이브/테스트 기록기)는 상태 이벤트를 발행하지 않는다(명령만 가능, 다음 경계에서 적용). 위반은 reviewer 반려 대상 |
@@ -379,7 +381,7 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | AC4 | `test_tick.gd::test_close_holds_until_next_day_requested` | close 에서 `advance(10)` 반환 0, `step(1.0)` 반환 0, `tick` 3,300 불변. `time.next_day_requested` 발행 후 `advance(0)` → `day 2`, `phase "day"`, `tick_in_day 0`, `tick 3300`, `speed 1`; 이벤트 `time.day_started {day:2}` → `time.phase_changed {close→day, day:2, tick:3300}` → `time.speed_changed {speed:1, from:0, cause:"phase_enter"}` 순서. 이어서 `advance(1)` → `tick 3301` (#세션-구간, E8) |
 | AC4 | `test_tick.gd::test_next_day_ignored_outside_close` (SE-006 추가) | day·evening·show 에서 `time.next_day_requested` → `advance(0)` 후 상태 해시 불변, 시간 이벤트 0개 (#세션-구간) |
 | AC5 | `test_tick.gd::test_speed_allowed_per_phase` | 4구간 × 요청 0~3: `∈ speeds`이고 현재와 다르면 적용 + `time.speed_changed {cause:"requested"}` 1회, 현재와 같으면 이벤트 0개, `∉ speeds`면 거부 (#배속 요청 처리 표) |
-| AC5 | `test_tick.gd::test_speed_rejected_keeps_state` | show 에서 0/2/3 → `time.speed_rejected {reason:"not_allowed", phase:"show"}`, `"fast"`·1.5·키 없음 → `reason:"invalid"`. 요청 전후 상태 해시 동일 (#배속) |
+| AC5 | `test_tick.gd::test_speed_rejected_keeps_state` | show 에서 0/2/3 → `time.speed_rejected {reason:"not_allowed", phase:"show"}`, `"fast"`·키 없음 → `reason:"invalid"`. 요청 전후 상태 해시 동일. `{speed: 1.5}` → `publish()` `false` + `push_error` 1회, 경계 처리(`advance(0)`) 뒤 `time.speed_rejected` 없음(이벤트 0개), 상태 해시 불변 (#배속 요청 처리 1행, E4) |
 | AC5 | `test_tick.gd::test_speed_clamped_on_phase_enter` | 클램프 표 전 행: day 3배속 → evening 진입 시 1(`cause:"phase_enter"`), day 2 → 1, show 진입 1 유지(이벤트 없음), close 진입 → 0, 다음 날 → 1 (#배속 클램프 표) |
 | AC6 | `test_tick.gd::test_step_accumulator_by_speed` | day 에서 배속 1: `step(0.1)`×100 → 100틱. 배속 3 → 300틱. 배속 0 → 0틱. 새 루프 둘에서 `step(0.05)`×2 와 `step(0.1)`×1 의 상태 해시 동일 (#배속 누적기) |
 | AC6 | `test_tick.gd::test_step_caps_and_discards` (SE-006 추가) | 배속 1에서 `step(10.0)` → 30틱(`max_ticks_per_step`) 그리고 이어진 `step(0.0)` → 0틱. day 끝 3배속에서 큰 `step`이 evening 진입(3→1)에서 멈추고 남은 몫을 버림. close 진입 시 멈춤 (#배속 S5·S6) |
@@ -391,6 +393,7 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | AC8 | `test_event_bus.gd::test_unsubscribe_stops_delivery` | `unsubscribe` 후 호출 0회. 디스패치 중 해지는 다음 이벤트부터 (E1) |
 | AC8 | `test_event_bus.gd::test_rejects_object_payload` | 값에 `RefCounted.new()`, `Vector2()`, `Callable`, 중첩 배열 안의 `Object` → `false`, 구독자 호출 0회 (E4) |
 | AC8 | `test_event_bus.gd::test_commands_deferred_until_dispatch` (SE-006 추가) | `test.x_requested` 발행 → 구독자 0회 → `dispatch_commands()` 반환 1, 구독자 1회. 전달 중 발행한 명령은 이번 호출에 전달되지 않고 다음 호출에 전달 (#명령-큐와-틱-순서) |
+| AC8 | `test_event_bus.gd::test_command_payload_numbers_int_only` (SE-008 추가) | 명령 `{v: 1.5}`와 배열 안 정수값 `{cell: [1.0, 2]}` → 각각 `false`, `push_error` 2회, 명령 큐 0개. 명령 `{cell: [1, 2], n: null, s: "a"}` → `true`. 상태 이벤트 `{v: 1.5}` → `true`(float 허용). 명령 큐를 JSON 왕복한 뒤 `EventBus.normalize_commands` 결과가 원본과 같은 해시이고 `cell[0]`의 타입이 `int`. 정수가 아닌 `float`를 담은 목록·명령 이름이 아닌 원소 → `null` (E4, #스냅샷 restore 5단계) |
 | AC9 | `test_rng.gd::test_same_seed_same_sequence` | 시드 42 두 인스턴스 `stream("audience").randi()` 10,000회 일치 |
 | AC9 | `test_rng.gd::test_different_seed_differs` | 시드 42 vs 43 첫 100개 중 하나 이상 다름 |
 | AC9 | `test_rng.gd::test_streams_independent` | `audience` 1,000회 소비 여부와 무관하게 `events`의 다음 값 동일. `rng_streams`에 스트림을 하나 더한 설정에서도 기존 스트림 열 동일 |
@@ -398,7 +401,7 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | AC9 | `test_rng.gd::test_derived_seed_vectors` (SE-006 추가) | `derive_seed`가 #결정성과-rng 검증 벡터 8개와 일치. 모르는 스트림 이름 → `null` + 오류 |
 | AC10 | `test_tick.gd::test_snapshot_restore_equivalence` | 시드 42, `advance(1000)` + `audience` 10회 소비 + `time.speed_requested {3}` 발행(미적용) → `snapshot()`이 #스냅샷 표의 9개 키만 기본형으로 가짐 → JSON 왕복 → 다른 시드로 만든 루프에 `restore` → 양쪽 `advance(1500)` → 상태 해시 동일 |
 | AC10 | `test_tick.gd::test_snapshot_rejected_mid_tick` | `tick.advanced` 핸들러 안과 가짜 시스템 `update` 안의 `snapshot()`이 `{}` + `push_error`. 핸들러 안 `restore()`·`advance()`는 `false`/0 |
-| AC10 | `test_tick.gd::test_restore_rejects_bad_snapshot` (SE-006 추가) | `schema_version` 불일치, I1 위반(`tick` 조작), 모르는 `phase` → `false`, 상태 불변 |
+| AC10 | `test_tick.gd::test_restore_rejects_bad_snapshot` (SE-006 추가) | `schema_version` 불일치, I1 위반(`tick` 조작), 모르는 `phase`, `pending_commands`에 `{speed: 1.5}`(SE-008 추가) → 각각 `false`, 상태 불변 |
 | AC11 | `replay/test_replay_tick.gd::test_two_runs_identical` | 아래 리플레이 스크립트. 실행 A(`advance`를 목표까지 한 번에)와 B(`advance(37)` 반복)의 최종 상태 해시·이벤트 열·뽑은 난수 열이 완전히 같음. 기대 최종 상태와 이벤트 개수도 단언 |
 | AC12 | `test_core_boundary.gd::test_core_has_no_node_or_direct_random` | `project/core/**/*.gd`에 `extends Node`, `_process(`, `_physics_process(`, `get_node(`, `Time.` 0건. `randi(`/`randf(`/`randomize(`/`RandomNumberGenerator`는 `rng.gd`에만. 모든 클래스가 `class_name` + `RefCounted`/`Resource` |
 | AC13 | (테스트 아님) qa 실행 로그 | `tools/run_tests.sh project/tests/sim` 녹색, `python3 tools/validate_data.py --strict` 통과 |
@@ -451,3 +454,4 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 |---|---|---|---|
 | 2026-10-09 | tick.md v0 | SE-006 | 신규 작성 |
 | 2026-10-09 | `sim.json` v1 → v2, `sim.schema.json` version 2 | SE-006 | 필드 추가: `max_ticks_per_step`(30), `snapshot_schema_version`(1), `rng_streams`, `system_order`, `phases[].default_speed`, `phases[].enter_speed_mode`. 스키마: 새 필드 필수화, `version` `enum [2]`, `phases` `maxItems 4`, `speeds` `minItems 1`·`uniqueItems`. **기존 값(10 tick/s, 1,800/600/900/0, 허용 배속, pausable)은 변경 없음** |
+| 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-008 (SE-001 리뷰 발견 1·2, SE-001 구현 결정 1·2) | E4 에 명령 페이로드 숫자 `int` 전용을 확정했다: 명령의 `float`는 정수값(`2.0`)이어도 `publish()`가 `push_error` + `false`, 큐잉 안 함. 상태 이벤트는 `float` 허용. 배속 요청 처리 1행에서 정수값인 `float` 인정을 지우고 "버스가 먼저 거부(핸들러 도달 없음)"로 바꿨다. restore 3단계에 I4·`seed` 0~2^31−1 검사를, 5단계에 `pending_commands` 재귀 정규화(정수가 아닌 `float`는 복원 실패, 상태 불변)를 확정하고 "검사 → 적용" 순서를 적었다. 수용 기준 표: `test_speed_rejected_keeps_state`의 `1.5`를 "publish false + push_error 1회, speed_rejected 없음, 상태 해시 불변"으로 바꾸고, AC8 에 `test_command_payload_numbers_int_only`, AC10 `test_restore_rejects_bad_snapshot`에 명령 `float` 케이스를 더했다. 이벤트 이름·페이로드 키·수치 변경 없음. SE-001 구현이 이미 이 규칙이라 코드 변경 없음 |

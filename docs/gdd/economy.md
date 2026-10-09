@@ -69,7 +69,8 @@ economy 는 다른 시스템을 직접 호출하지 않고(CLAUDE.md 원칙 4) �
 | `time.phase_changed` | 상태 | TickLoop | `phase`, `day` 갱신. `to == "close"`면 정산 |
 | `time.day_started` | 상태 | TickLoop | `day` 갱신. 제안 중인 구제 자동 수락 |
 
-- 정수 필드는 `int` 또는 정수값 `float`만 받고 `int()`로 정규화한다(tick.md 배속 요청과 같은 규칙). 그 밖은 각 표의 "무효" 행.
+- 명령 입력(`economy.ticket_price_requested`, `economy.bailout_accept_requested`)의 숫자는 `int`만이다(tick.md E4). `float`는 정수값이어도 버스가 `publish()`에서 거부(`push_error` + `false`, 큐잉 안 함)하므로 economy 핸들러에 오지 않는다. 핸들러는 `int`가 아닌 값(키 없음·문자열·`bool`·`null`)만 각 표의 무효 행(P1)으로 처리한다.
+- 상태 입력(`economy.charge_proposed`·`economy.refund_proposed`·`economy.sales_reported`·`economy.upkeep_reported`)은 E4 상 버스가 `float`를 막지 않는다. 발행 주체는 R1 에 따라 `int`를 싣는다. economy 는 방어적으로 정수 필드에 `int` 또는 정수값인 `float`를 받아 `int()`로 정규화하고, 그 밖은 각 표의 무효 행(C2, F2 등)이다. 이 입력은 즉시 전달되어 스냅샷에 남지 않으므로 이 정규화는 세이브 동치에 영향이 없다.
 - economy 는 `system_order`에서 crisis 뒤, reputation 앞에 구독한다(tick.md "시스템 등록").
 - 정산 결과가 필요한 시스템은 `cash`를 읽지 않고 `economy.day_settled`를 구독한다. 티어 해금 자금 판정은 reputation.md 가 `economy.day_settled.cash`(정산 뒤·구제 전 값)를 구독해서 한다. 이 이벤트는 E2 로 큐에 들어가 `time.phase_changed {to:"close"}`의 모든 구독자가 끝난 뒤 전달되므로 판정 결과는 구독 순서에 의존하지 않는다.
 
@@ -260,7 +261,7 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 
 | # | 조건 | 결과 |
 |---|---|---|
-| P1 | `price`가 없거나 정수가 아님(정수값 `float` 허용) | `economy.ticket_price_rejected {price, reason: "invalid", phase}` (`price`는 받은 값, 없으면 `null`) |
+| P1 | `price`가 없거나 `int`가 아님(문자열·`bool`·`null` 등). `float`는 정수값(`25.0`)이어도 버스가 먼저 거부하므로(tick.md E4, `publish()` `false`) 이 표에 오지 않는다 | `economy.ticket_price_rejected {price, reason: "invalid", phase}` (`price`는 받은 값, 없으면 `null`) |
 | P2 | `bankrupt`, 또는 `phase != "day"` | 거절 `reason: "not_allowed"` |
 | P3 | `price < ticket_price_min` 또는 `price > ticket_price_max` | 거절 `reason: "out_of_range"` |
 | P4 | `price == ticket_price` | 무시(이벤트 없음) |
@@ -442,7 +443,7 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | EC10 | `test_economy.gd::test_bailout_auto_accepted_on_next_day` | `d`일 close 에서 구제 제안 → 수락 없이 `time.next_day_requested` → `advance(0)` → 이벤트 순서 `time.day_started → time.phase_changed → time.speed_changed → economy.cash_changed → economy.bailout_taken {auto:true}`. `bailout_taken.day == d`(제안일), `loans[0].day_taken == d`. 그 다음 정산(`d + 1`일 close)의 `economy.day_settled.loan_repayment == bailout_offered.first_installment`. 같은 입력을 수동 수락(`d`일 close)으로 돌린 실행과 `d + 1`일 `day_settled` 페이로드가 같음 |
 | EC11 | `test_economy.gd::test_loan_installments` | `total_due` 4,116, `repay_days` 10 → `installments` = 412 × 6 + 411 × 4, 합 4,116. 첫 상환은 수락 뒤 첫 정산(S13), 10회 뒤 `loans`에서 제거. 두 대출이 겹치면 받은 순서로 합산 (R5, S13) |
 | EC12 | `test_economy.gd::test_bankrupt_after_bailouts_exhausted` | `tier1_bankrupt` 정책으로 날을 돌려 날마다 정산 뒤 `cash`가 `expected.cash_by_day`, 구제 제안일이 `bailout_offered_days`, 원금이 `bailout_amounts`, `economy.bankrupt {day}`가 `bankrupt_day`에 정확히 1회. 그 뒤 지출·환불·매출·가격·정산 입력이 전부 무시됨 (B3, #파산과-구제 "파산 뒤") |
-| EC13 | `test_economy.gd::test_ticket_price_rules` | P1~P5: 비정수 `"invalid"`, 낮 아닌 구간 `"not_allowed"`, 범위 밖 `"out_of_range"`, 같은 값 무시, 정상 → `ticket_price_changed {price, from}`. 정수값 `float`(25.0) 허용 (#티켓-가격) |
+| EC13 | `test_economy.gd::test_ticket_price_rules` | P1~P5: 비정수 `"invalid"`, 낮 아닌 구간 `"not_allowed"`, 범위 밖 `"out_of_range"`, 같은 값 무시, 정상 → `ticket_price_changed {price, from}`. `{price: 25.0}`·`{price: 25.5}` → 각각 `publish()` `false` + `push_error` 1회, 경계 처리 뒤 `economy.ticket_price_*` 이벤트 0개, 상태 해시 불변(tick.md E4) (#티켓-가격) |
 | EC14 | `test_economy.gd::test_settlement_event_order` | close 진입 틱의 이벤트: `time.phase_changed {to:"close"}` → `economy.cash_changed {reason:"settlement"}` → `economy.day_settled` → (`economy.bailout_offered` 또는 `economy.bankrupt`) → `time.speed_changed {speed:0}` → `tick.advanced`. 정산 연쇄는 최외곽 `time.phase_changed` 발행 안에서 끝난다(tick.md E3). `settlement_delta == 0`이면 `cash_changed` 없음 (#정산 이벤트) |
 | EC15 | `test_economy.gd::test_determinism_no_rng` | 같은 시드·같은 명령/입력 열로 두 번 돌린 `economy.*` 이벤트 열과 `snapshot()` 해시가 같음. 정산 전후 `rng.get_state()["economy"]` 불변 (#결정성과-rng) |
 | EC16 | `test_economy.gd::test_snapshot_roundtrip` | 대출 진행 중인 상태에서 `snapshot()` → JSON 왕복 → 새 `Economy.restore()` → 같은 입력 열 → 연속 진행과 상태 해시가 같음. 잘못된 스냅샷은 `false`, 상태 불변 (#스냅샷) |
@@ -479,3 +480,4 @@ C3 때문에 즉시 지출로는 `cash`가 음수가 되지 않는다. 음수는
 | 2026-10-09 | economy.md v0 (후속 수정) | SE-005 후속 (리뷰 발견 1) | 대출 `day_taken`과 `economy.bailout_taken.day`를 제안일(`pending_bailout.day`)로 고정했다. "첫 상환은 다음 정산(`day_taken + 1`)부터"를 "첫 회차는 수락 뒤 첫 정산(S13)"으로 바꾸고, 상환 시점에 날짜 조건을 두지 않는다고 적었다. EC10 에 단언 3개를 추가했다: 자동 수락 다음 정산의 `loan_repayment == first_installment`, `day_taken`·`bailout_taken.day` = 제안일, 수동 수락과 같은 `day_settled`. EC11 문구도 맞췄다. 상환 시점(S13)이 그대로라 `reference_scenarios` 기대값은 바뀌지 않았다(파산 시나리오 절 근거) |
 | 2026-10-09 | economy.md v0 (후속 수정) | SE-005 후속 (리뷰 발견 2) | 입력 계약에서 "reputation 은 정산이 끝난 `cash`를 본다"를 지웠다. 대신 정산 결과가 필요한 시스템은 `economy.day_settled`를 구독한다고 적었다(티어 해금 자금 = `day_settled.cash`, 구독 순서와 무관). 티어 2 도달 추정 절의 해석 문구도 같은 이벤트로 맞췄다. "다른 시스템은 `cash`를 직접 읽지 않는다"와 모순되는 문장은 0개다 |
 | 2026-10-09 | economy.md v0 (후속 수정), `economy.schema.json` version 1 유지 | SE-005 후속 (리뷰 발견 3) | 설정 로드 검사에 K4(`reference_scenarios[].guarantee_grade` ∈ `guarantee_by_grade` 키)를 추가했다. `EconomyConfig.guarantee()`에 모르는 등급이면 `push_error` 후 `-1`을 돌려준다고 적었다(그 값을 지출로 보내면 C2 거절). `row()`의 없는 티어 반환값(`{}`)도 적었다. EC1 에 K4 위반 사본과 `guarantee("midlevel") == -1`을 추가했다. 스키마는 enum 을 줄이지 않고(artist.md 등급 이름 5종 유지) `guarantee_grade`·`guarantee_by_grade`의 `description`만 고쳤다. 받아들이는 문서 집합이 그대로라 스키마 `version`과 `economy.json` `version`은 1 로 두었다. `economy.json`은 바꾸지 않았다 |
+| 2026-10-09 | economy.md v0 (후속 수정), `economy.json`·스키마 변경 없음 | SE-008 (SE-001 리뷰 발견 1) | 명령 페이로드 숫자 `int` 전용(tick.md E4)에 맞췄다. 입력 계약의 "정수값인 `float` 허용(tick.md 배속 요청과 같은 규칙)"을 명령 입력(`int`만, `float`는 버스가 거부해 핸들러 도달 없음)과 상태 입력(방어적 정수값 `float` 정규화 유지, 세이브 동치 무관)으로 나눴다. P1 에서 정수값 `float` 허용을 지우고 "버스가 먼저 거부"로 바꿨다. EC13 의 "`25.0` 허용"을 "`{price: 25.0}`·`{price: 25.5}` → `publish()` false + `push_error`, 이벤트 0개, 상태 해시 불변"으로 바꿨다. 이벤트 이름·페이로드 키·수치 변경 없음 |
