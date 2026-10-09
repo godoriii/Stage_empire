@@ -50,7 +50,7 @@ audience 가 구독하는 이벤트. 구독 순서는 `system_order`(build, staf
 
 | 이벤트 | audience 동작 |
 |---|---|
-| `build.coverage_changed {has_stage, capacity, satisfaction_bonus_bp, viewing_tiles, sound_tiles, sight_tiles, bar_tiles, …}` | 7개 필드를 `coverage`에 저장하고 자리 순위(#자리-선택)를 다시 만든다. 형식 오류(필드 없음·타입 다름·좌표가 int 2원소 배열 아님)면 `push_warning`, 무시. 저녁 진입 틱에 `cause:"sync"`로 반드시 한 번 온다(build.md) |
+| `build.coverage_changed {has_stage, capacity, satisfaction_bonus_bp, viewing_tiles, sound_tiles, sight_tiles, bar_tiles, blocked_cells, …}` | 8개 필드를 `coverage`에 저장하고 자리 순위(#자리-선택)와 경로 그래프 `tile_path`(#상태 파생값)를 다시 만든다. `blocked_cells`는 가구 점유 셀 전체(build.md C0, G6 순서, 증분 아님)라 받은 목록으로 통째로 바꾼다. 형식 오류(필드 없음·타입 다름·좌표가 int 2원소 배열 아님)면 `push_warning`, 무시. 저녁 진입 틱에 `cause:"sync"`로 반드시 한 번 온다(build.md) |
 | `artist.lineup_set {day, artist_id, genre, grade, popularity, skill}` | #입장-수 결정(저녁 진입 틱 단계 4). 아래 LS1~LS4 |
 | `reputation.changed {total, …}` (SE-030) | `total`이 `int ≥ 0`이면 `reputation_total = total`, 아니면 `push_warning` 후 무시 |
 | `economy.ticket_price_changed {price, from}` | `price`가 `int ≥ 1`이면 `ticket_price = price`, 아니면 `push_warning` 후 무시. 새 게임 값은 `economy.json` `rows[tier_1].ticket_price_default`(20) |
@@ -70,7 +70,7 @@ artist 가 등록되지 않은 실행(테스트)에서는 `artist.lineup_set`이
 
 ### 상태
 
-AudienceSystem 이 소유하는 상태. 파생값(자리 순위, 타일 점유 수, 자리 예약 수)을 빼고 전부 스냅샷 대상이다(#스냅샷).
+AudienceSystem 이 소유하는 상태. 파생값(자리 순위, 경로 그래프, 타일 점유 수, 자리 예약 수)을 빼고 전부 스냅샷 대상이다(#스냅샷).
 
 | 필드 | 타입 | 새 게임 값 | 설명 |
 |---|---|---|---|
@@ -79,7 +79,7 @@ AudienceSystem 이 소유하는 상태. 파생값(자리 순위, 타일 점유 �
 | `ticket_price` | int | `ticket_price_default` | `economy.ticket_price_changed`를 따라온 가격 |
 | `reputation_total` | int | 0 | `reputation.changed.total` |
 | `lineup` | Dictionary 또는 `null` | `null` | 오늘 결정에 쓴 라인업 `{artist_id, genre, grade, popularity, skill}` |
-| `coverage` | Dictionary | `{has_stage: false, capacity: 0, satisfaction_bonus_bp: 0, viewing_tiles: [], sound_tiles: [], sight_tiles: [], bar_tiles: []}` | 마지막 `build.coverage_changed`의 7개 필드 |
+| `coverage` | Dictionary | `{has_stage: false, capacity: 0, satisfaction_bonus_bp: 0, viewing_tiles: [], sound_tiles: [], sight_tiles: [], bar_tiles: [], blocked_cells: []}` | 마지막 `build.coverage_changed`의 8개 필드. 8번째 `blocked_cells`(가구 점유 셀 전체)를 여기 저장하므로 복원 직후에도 커버리지 이벤트 없이 경로 그래프를 다시 만든다(#스냅샷) |
 | `today` | Dictionary 또는 `null` | `null` | 오늘 결정 `{day, admissions, expected, noise_bp, capped_by, has_lineup, by_type, left_early, bar_buyers}`. `left_early`·`bar_buyers`는 진행 중 누적 |
 | `arrivals` | Array | `[]` | 아직 도착하지 않은 에이전트 `[id, type, spawn_tick, bar_planned]`, id 오름차순 |
 | `agents` | Array | `[]` | 도착한 에이전트(#에이전트-레코드), id 오름차순 |
@@ -107,7 +107,7 @@ AudienceSystem 이 소유하는 상태. 파생값(자리 순위, 타일 점유 �
 | `left_early` | bool | 조기 퇴장 여부 |
 | `sat` | int | 확정 만족 bp. 확정 전 −1 |
 
-**파생값**(스냅샷에 넣지 않고 복원·커버리지 수신 때 다시 만든다): 유형별 관람 자리 순위 `spot_rank[type]`, 바 자리 순위 `bar_rank`, 입구 타일 목록 `entrances`(맵의 `entrance` 타일, z·x 오름차순), 타일 점유 수 `occ(t)`(= `state ∈ {entering, moving, at_bar, watching, leaving}`인 에이전트의 "점유 타일" — `next`가 있으면 `next`, 없으면 `tile` — 이 `t`인 수), 자리 예약 수 `claims(t)`(= `target_kind ∈ {"bar", "spot"}`이고 `target == t`인 에이전트 수).
+**파생값**(스냅샷에 넣지 않고 복원·커버리지 수신 때 다시 만든다): 유형별 관람 자리 순위 `spot_rank[type]`, 바 자리 순위 `bar_rank`, 경로 그래프 `tile_path`(`TilePath` 인스턴스 = 생성자가 받은 맵의 `walkable` + `coverage.blocked_cells` 막힘, #자리-선택), 입구 타일 목록 `entrances`(맵의 `entrance` 타일, z·x 오름차순), 타일 점유 수 `occ(t)`(= `state ∈ {entering, moving, at_bar, watching, leaving}`인 에이전트의 "점유 타일" — `next`가 있으면 `next`, 없으면 `tile` — 이 `t`인 수), 자리 예약 수 `claims(t)`(= `target_kind ∈ {"bar", "spot"}`이고 `target == t`인 에이전트 수).
 
 ### 입장 수
 
@@ -147,8 +147,8 @@ LS4 에서 한 번 계산한다(저녁 진입 틱, tick.md 단계 4 의 `time.ph
 | SP4 | **고르기**: 순위에서 처음으로 `claims(t) < spot_tile_cap`이고 `TilePath`가 출발 타일 → `t` 경로를 돌려주는 타일. 고르면 그 타일을 예약(`target = t`, `target_kind`, `path` = 경로). 관람 타일은 build C0 의 도달 집합 안이라 경로는 항상 있다. 없으면(빈 배열) 다음 타일 |
 | SP5 | **출구 고르기**: `entrances` 중 출발 타일에서 `TilePath` 경로 길이가 가장 짧은 것, 같으면 입구 순서가 앞인 것. 출발 타일이 입구면 경로는 빈 배열 |
 
-- `TilePath`는 SE-032 의 `AStarGrid2D` 래퍼(4방향, 대각 금지, 같은 입력 같은 경로)다. 걸을 수 있는 타일 = 맵 `walkable`이고 가구가 점유하지 않은 타일(build C0 와 같은 그래프). **다른 에이전트는 경로를 막지 않는다**(혼잡은 이동 단계에서 처리, MV2).
-- 경로는 목표가 정해질 때 한 번 구하고(`path`에 저장, 경로 캐시) 그 뒤 앞에서 하나씩 꺼낸다. 커버리지는 낮에만 바뀌므로(build B2) 저녁·공연 중 경로가 낡지 않는다.
+- `TilePath`는 SE-032 의 `AStarGrid2D` 래퍼(4방향, 대각 금지, 같은 입력 같은 경로)다. 걸을 수 있는 타일 = 맵 `walkable`이고 가구가 점유하지 않은 타일(build C0 와 같은 그래프). **audience 가 가구 점유를 아는 방법은 `coverage.blocked_cells`(= 마지막 `build.coverage_changed.blocked_cells`, 스냅샷에 들어 있음) 하나뿐이다.** 관객 시스템은 자기 `tile_path`를 갖는다: 생성자가 받은 맵으로 `TilePath.new(map)`을 만들고 `set_occupied(coverage.blocked_cells, true)`로 막는다. 커버리지를 받을 때와 `restore` 성공 뒤 이 과정을 다시 한다(이전 점유를 지우는 방법은 구현 자유, 결과가 새로 만든 것과 같으면 된다). SP4·SP5 의 경로 질의는 이 `tile_path`에만 한다. `BuildSystem`(그 `find_path`·`path_from_entrance`·`coverage()` 포함)은 부르지도 참조하지도 않는다(원칙 4 — 점유는 이벤트로만 받는다). **다른 에이전트는 경로를 막지 않는다**(혼잡은 이동 단계에서 처리, MV2).
+- 경로는 목표가 정해질 때 한 번 구하고(`path`에 저장, 경로 캐시) 그 뒤 앞에서 하나씩 꺼낸다. 커버리지는 낮에만 바뀌므로(build B2) 저녁·공연 중 경로가 낡지 않는다. 저녁·공연 중에 복원해도 `tile_path`는 스냅샷의 `coverage.blocked_cells`로 다시 만들어지므로, 복원 직후의 경로 질의(T11 바 → 관람 자리 SP4, P1 출구 SP5)가 연속 진행과 같다. `BuildSystem.restore`는 이벤트를 내지 않아 다음 `cause:"sync"`(다음 저녁 진입)까지 커버리지가 다시 오지 않으므로 이 저장이 필요하다(AU10(a)).
 
 ### 상태 기계
 
@@ -258,11 +258,14 @@ LS4 에서 한 번 계산한다(저녁 진입 틱, tick.md 단계 4 의 `time.ph
 
 **표시 좌표**(SE-038 이 보간하는 값). `P = pos_scale`, `c(t) = [t.x × P + P/2, t.z × P + P/2]`.
 
+위에서부터 처음 맞는 행.
+
 | 상태 | `[px, pz]` |
 |---|---|
 | `queued` | `c(entrances[0])`(입구에 줄 선 것으로 표시) |
 | 건너는 중(`next != null`) | `c(tile) + (c(next) − c(tile)) × progress ÷ move_ticks_per_tile` (축마다, `P mod move_ticks_per_tile == 0`이라 정확히 나누어떨어진다, AL5) |
-| 그 밖 | `c(tile)` |
+| `tile == null`(`queued`에서 바로 `gone`이 된 에이전트 — T3 → P1, 또는 FN3 에서 `queued`인 채 `gone`) | `c(entrances[0])`(줄 서 있던 자리에서 사라진다) |
+| 그 밖(`tile != null`) | `c(tile)` |
 
 ### 결정성과 RNG
 
@@ -287,7 +290,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | # | 검사 |
 |---|---|
 | RU1 | 10개 키가 있고 타입이 맞음. `phase ∈ sim.json phases[].id`, `day ≥ 1`, `ticket_price ≥ 1`, `reputation_total ≥ 0`, `next_id ≥ 1` |
-| RU2 | `coverage` 7키·타입, 타일 배열 원소가 맵 안 `[x, z]` |
+| RU2 | `coverage` 8키(`blocked_cells` 포함)·타입, 타일 배열 5개(`viewing_tiles`·`sound_tiles`·`sight_tiles`·`bar_tiles`·`blocked_cells`)의 원소가 맵 안 `[x, z]` |
 | RU3 | `lineup`이 `null` 또는 5키(장르가 `genre_fit_bp` 키, 인기·실력 0~100) |
 | RU4 | `today`가 `null` 또는 9키, `by_type` 키 = 유형 id 전부, `0 ≤ left_early ≤ admissions ≤ max_agents` |
 | RU5 | `arrivals`·`agents`의 id 가 둘을 합쳐 엄격히 증가하고 전부 `< next_id`, 합 개수 ≤ `max_agents` |
@@ -295,7 +298,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | RU7 | 예약 수 `claims(t) ≤ spot_tile_cap`(모든 `t`) |
 
 - 하지 않는 의미 검사: 경로가 실제로 이어지는지, `occ ≤ pass_tile_cap`인지(나가는 사람은 넘을 수 있다), `today`와 에이전트 수의 관계.
-- 복원 성공 뒤 파생값(자리 순위, `occ`, `claims`)을 다시 만든다. 이벤트 없음. 복원 후 진행 = 연속 진행(SH6), SH1~SH7 준수. `sim.json.snapshot_schema_version`은 바꾸지 않는다(`systems.audience` 항목 추가만).
+- 복원 성공 뒤 파생값(자리 순위, `tile_path` — 생성자의 맵 + 복원한 `coverage.blocked_cells`, `occ`, `claims`)을 다시 만든다. 이벤트 없음, `BuildSystem`을 부르지 않는다. 복원 후 진행 = 연속 진행(SH6), SH1~SH7 준수. `sim.json.snapshot_schema_version`은 바꾸지 않는다(`systems.audience` 항목 추가만).
 
 ### 설정 로드 검사
 
@@ -312,6 +315,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | AL7 | `satisfaction.weights_bp` 4값 합 == 10000 |
 | AL8 | `price_factor_min_bp ≤ 10000 ≤ price_factor_max_bp` |
 | AL9 | `reference_scenarios[].layout`이 `tier1_club.json` `reference_layouts[].id`에 있고, `lineup.slot`이 `artist.json` `roster_plan.slots[].slot`에 있으며 장르·등급·인기·실력이 그 슬롯과 같음. `checks`의 슬롯도 `roster_plan`에 있음 |
+| AL10 | `flow.pass_override_ticks < min_t patience_ticks_t`(연속으로 막힌 사람이 T7 로 밀고 들어가기 전에 인내를 넘겨 조기 퇴장하지 않게. 현재 10 < 150) |
 
 `checks`·`reference_scenarios`는 런타임이 읽지 않는다(테스트·qa 용). 아티스트 id 는 어디에도 쓰지 않는다(명단 id 는 content-writer 가 바꿀 수 있어서 슬롯 번호로 참조한다).
 
@@ -319,12 +323,12 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 
 | 클래스 | 멤버 | 설명 |
 |---|---|---|
-| `AudienceConfig` | `static load(path := "res://data/audience/audience.json") -> AudienceConfig`, `static from_dicts(audience, artist, genres, economy, sim, map: Dictionary) -> AudienceConfig` | AL1~AL9. `load`는 나머지를 기본 경로에서 읽는다(읽기 전용) |
+| `AudienceConfig` | `static load(path := "res://data/audience/audience.json") -> AudienceConfig`, `static from_dicts(audience, artist, genres, economy, sim, map: Dictionary) -> AudienceConfig` | AL1~AL10. `load`는 나머지를 기본 경로에서 읽는다(읽기 전용) |
 | | `type_ids() -> Array[String]`, `type_rule(id) -> Dictionary`, `color(id) -> String`, `max_agents`, `pos_scale`, `admission`, `flow`, `satisfaction`, `entrances() -> Array`, `scenario(id) -> Dictionary`(없으면 `{}`, 오류 없음) | 읽기 전용, 깊은 복사 |
 | | `static expected_by_type(cfg, lineup, reputation_total: int, ticket_price: int) -> Dictionary` | 순수 함수 AD1~AD5 → `{type: e_t}`. 테스트·UI 예상치용 |
 | | `static admissions_from(e_by_type: Dictionary, u: int, capacity: int, has_stage: bool, cfg) -> Dictionary` | 순수 함수 AD6~AD10 → `{expected, noise_bp, raw, admissions, capped_by, by_type}` |
 | | `static agent_satisfaction(cfg, agent: Dictionary, lineup, ticket_price: int, crowd_bp: int, bonus_bp: int) -> Dictionary` | 순수 함수 SF1~SF8 → `{satisfaction_bp, lineup_bp, sound_bp, sight_bp, value_bp, wait_bp}` |
-| `AudienceSystem` | `new(config: AudienceConfig, bus: EventBus, rng: SeededRng, path: TilePath)` | #입력-계약의 6개 이벤트 구독. 생성자는 이벤트를 내지 않는다. `TilePath`는 SE-032 것(읽기 전용 질의) |
+| `AudienceSystem` | `new(config: AudienceConfig, bus: EventBus, rng: SeededRng, map: MapConfig)` | #입력-계약의 6개 이벤트 구독. 생성자는 이벤트를 내지 않는다. `map`은 SE-032 `MapConfig`(조립 루트가 `MapConfig.load()` 기본 경로 `res://data/maps/tier1_club.json`으로 만든 것 — `AudienceConfig`가 읽는 맵·`BuildConfig.load` 기본 맵과 같은 파일, build.md 공개 API 와 같은 규약). 이 맵으로 자기 `tile_path`(`TilePath.new(map)`, 새 게임은 `blocked_cells` 빈 목록)를 만든다. **`BuildSystem`·`BuildSystem.find_path`를 부르지 않는다(원칙 4)** — 점유는 `build.coverage_changed`의 `blocked_cells`로만 받는다 |
 | | `update(ctx)`, `snapshot()`, `restore(d)` | #상태-기계, #스냅샷 |
 | | `agents() -> Array`(깊은 복사), `today`, `day`, `phase`, `ticket_price`, `reputation_total` | 읽기 전용 |
 
@@ -481,11 +485,11 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 
 ### 구현 (SE-034 — `test_audience_config.gd`는 AU0, 성능은 `test_audience_perf.gd`, 나머지는 `test_audience_system.gd`)
 
-기대 수치는 테스트에 하드코딩하지 않고 `audience.json` `reference_scenarios`·`checks`와 행 값에서 읽는다. 이벤트 이름·상태 문자열·`reason`은 리터럴로 단언한다. 공통 전제: `TickLoop`(시드 = 시나리오 `seed`)에 economy·audience 를 훅과 함께 등록하고, 커버리지는 `tier1_club.json` `reference_layouts[layout]`대로 build 를 돌리거나 `build.coverage_changed` 페이로드를 테스트가 직접 발행한다. 라인업·명성은 `artist.lineup_set`·`reputation.changed`를 테스트가 발행한다(artist·reputation 미등록 가능).
+기대 수치는 테스트에 하드코딩하지 않고 `audience.json` `reference_scenarios`·`checks`와 행 값에서 읽는다. 이벤트 이름·상태 문자열·`reason`은 리터럴로 단언한다. 공통 전제: `TickLoop`(시드 = 시나리오 `seed`)에 economy·audience 를 훅과 함께 등록하고, 커버리지는 `tier1_club.json` `reference_layouts[layout]`대로 build 를 돌리거나 `build.coverage_changed` 페이로드를 테스트가 직접 발행한다(직접 발행할 때도 `blocked_cells`를 넣는다 — 없으면 형식 오류로 무시된다). 라인업·명성은 `artist.lineup_set`·`reputation.changed`를 테스트가 발행한다(artist·reputation 미등록 가능).
 
 | # | 케이스 | 검증 |
 |---|---|---|
-| AU0 | `test_config_loads_and_cross_checks` | 실제 데이터로 `AudienceConfig.load()` 성공. AL1~AL9 를 하나씩 깬 사본 9건 이상이 `null`(예: 유형 2개, `genre_fit_bp`에서 `indie` 제거, `jazz` 추가, `max_agents` 3,001, `pos_scale` 99, `arrival_window_ticks` 601, 가중치 합 9,999, `price_factor_max_bp` 9,000, 시나리오 `slot` 이 roster_plan 과 다른 인기) |
+| AU0 | `test_config_loads_and_cross_checks` | 실제 데이터로 `AudienceConfig.load()` 성공. AL1~AL10 을 하나씩 깬 사본 10건 이상이 `null`(예: 유형 2개, `genre_fit_bp`에서 `indie` 제거, `jazz` 추가, `max_agents` 3,001, `pos_scale` 99, `arrival_window_ticks` 601, 가중치 합 9,999, `price_factor_max_bp` 9,000, 시나리오 `slot` 이 roster_plan 과 다른 인기, `pass_override_ticks` 150) |
 | AU1 | `test_reference_admissions_seed0` | 4개 시나리오 각각: `expected_by_type`가 `e_centi`, 첫 `randi()`가 `first_draw`, `audience.admissions_decided`의 `admissions`·`noise_bp`·`capped_by`·`by_type`·`expected`(= `expected_centi ÷ 100`)가 `expected`와 같음. `no_lineup`은 `by_type`의 팬·뜨내기 0 |
 | AU2 | `test_admissions_other_seeds_in_range` | 시드 1~100 각각 같은 시나리오의 `admissions`가 `admissions_range_other_seeds` 안, `by_type` 합 == `admissions` |
 | AU3 | `test_admissions_cap` | `capacity` 를 40 으로 바꾼 커버리지 → `admissions == 40`, `capped_by "capacity"`. `capacity` 150·인기 100·명성 2,000 → `admissions == 150`, 에이전트 최대 동시 수 150. `has_stage false` → 0·`"no_stage"`이고 이때도 `audience` 스트림 상태가 정확히 1 뽑기만큼 진행 |
@@ -495,14 +499,14 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | AU7 | `test_day_events_once` | `TickLoop` 하루(3,300틱): `audience.admissions_decided` 1회(저녁 진입 틱, `artist.lineup_set` 뒤), `audience.agent_moved` 정확히 1,500회(저녁·공연 틱마다, 낮 0), 각 페이로드의 원소 수 == 그 틱의 에이전트 수, 원소 5개 타입 `[int, int, int, String, String]`, id 오름차순. 공연 마지막 틱에 `agent_moved`(전원 `gone`) → `audience.day_summary` → `economy.sales_reported {admissions, audience}` 각 1회, 그 틱의 `time.phase_changed {to:"close"}`보다 먼저. `economy.day_settled.admissions`·`.audience`가 보고값과 같음 |
 | AU8 | `test_reference_satisfaction` | 4개 시나리오를 하루 돌린 `day_summary.avg_satisfaction_bp`가 `avg_satisfaction_bp_range` 안, `crowd_bp`·`left_early`·`audience`가 `expected`와 같음. `agent_satisfaction` 순수 함수로 부록 B2 표의 유형별 값 재현 |
 | AU9 | `test_determinism` | 같은 시드·입력 두 번 → `audience.*`·`economy.sales_reported` 이벤트 열 해시와 `snapshot()` 해시 같음. `audience` 외 스트림 상태 불변. 저녁 진입 틱의 `audience` 뽑기 수 == `max(1, admissions)`(1 + N − 1), 다른 틱 0(스트림 상태 비교) |
-| AU10 | `test_snapshot_roundtrip` | (a) 저녁 중간(도착 대기 남음)과 공연 중간(건너는 사람·`at_bar` 있음) 두 시점에서 `snapshot()` → JSON 왕복 → 새 시스템 `restore()` `true` → 끝까지 진행한 `day_summary`와 이벤트 열이 연속 진행과 같음. (b) `TickLoop` 수준 `systems.audience` 왕복. (c) 거부 사본 ≥ 6건(RU1~RU7 에서: `phase "noon"`, 모르는 유형, `state "dancing"`, id 가 `next_id` 이상, `queued`인데 `tile` 있음, `progress 5`, 같은 자리 예약 2명) 각각 `false`, `push_error` 1회, 해시 불변, 이벤트 0 |
+| AU10 | `test_snapshot_roundtrip` | (a) 저녁 중간(도착 대기 남음)과 공연 중간(건너는 사람·`at_bar` 있음) 두 시점에서 `snapshot()` → JSON 왕복 → 새 시스템 `restore()` `true` → 끝까지 진행한 `day_summary`와 이벤트 열이 연속 진행과 같음. 그리고 **복원 직후 경로 질의 동치**: 공연 중간 스냅샷을 바 예정자가 `at_bar`인 틱과 조기 퇴장(P1, AU6 처럼 만든 상황) 직전 틱에서 잡아, 같은 `MapConfig`로 만든 새 시스템에 `restore()`하고 `build.coverage_changed`를 **보내지 않은 채**(`BuildSystem.restore`는 이벤트를 내지 않는다) 진행하면 T11(바 → 관람 자리, SP4)·P1(출구, SP5)이 정한 `target`·`path`가 연속 진행과 같고, 그 `path`의 어떤 타일도 `coverage.blocked_cells`에 없다. (b) `TickLoop` 수준 `systems.audience` 왕복. (c) 거부 사본 ≥ 6건(RU1~RU7 에서: `phase "noon"`, `coverage`에 `blocked_cells` 없음, 모르는 유형, `state "dancing"`, id 가 `next_id` 이상, `queued`인데 `tile` 있음, `progress 5`, 같은 자리 예약 2명) 각각 `false`, `push_error` 1회, 해시 불변, 이벤트 0 |
 | AU11 | `test_audience_perf` | 150명(`capacity` 150 커버리지, AU3 의 상한 조건) 900 공연 틱 + 600 저녁 틱 헤드리스 벽시계 측정. 단언은 한 틱 평균 ≤ 5 ms(목표 ≤ 2 ms, 실측은 qa 리포트) |
 
 ### 데이터·문서 (SE-029, qa·reviewer)
 
 | # | 검증 | 방법 |
 |---|---|---|
-| AU12 | `audience.json` 스키마 통과(`--strict`), 유형 3, `genre_fit_bp` 키 = `artist.json` `mvp_genres` ⊆ `genres.json` id, 가중치 합 10,000, 기준 시나리오 입장 리터럴·배분·다른 시드 범위가 공식으로 재계산한 값과 같음, T5 최소 차 ≥ 17 | 아래 qa 스크립트 exit 0 |
+| AU12 | `audience.json` 스키마 통과(`--strict`), 유형 3, `genre_fit_bp` 키 = `artist.json` `mvp_genres` ⊆ `genres.json` id, 가중치 합 10,000, `pass_override_ticks` < 최소 `patience_ticks`(AL10), 기준 시나리오 입장 리터럴·배분·다른 시드 범위가 공식으로 재계산한 값과 같음, T5 최소 차 ≥ 17 | 아래 qa 스크립트 exit 0 |
 | AU13 | 이 문서의 이벤트 5개(`audience.*` 4 + `economy.sales_reported`)가 events.md 표와 같은 페이로드. `agent_moved`가 배열 중첩만 쓴다(E4) | reviewer |
 | AU14 | 아티스트 id 리터럴 0(슬롯 번호만), 기존 테이블(`artist.json`·`artists.json`·`furniture.json`·`economy.json`·`genres.json`) diff 0 | reviewer(`git diff --stat`) |
 
@@ -565,6 +569,7 @@ if sum(A["satisfaction"]["weights_bp"].values()) != 10000: err.append("weights �
 if A["max_agents"] > SIM["individual_agent_cap"]: err.append("max_agents")
 ev = [p["ticks"] for p in SIM["phases"] if p["id"] == "evening"][0]
 if A["flow"]["arrival_window_ticks"] > ev: err.append("arrival_window")
+if A["flow"]["pass_override_ticks"] >= min(t["patience_ticks"] for t in T): err.append("AL10 pass_override_ticks")
 lay = {l["id"]: l["expected"] for l in MAP["reference_layouts"]}
 J = AD["noise_bp"]
 for sc in A["reference_scenarios"]:
@@ -619,3 +624,4 @@ PY
 |---|---|---|---|
 | 2026-10-09 | audience.md v0, `audience.json` v1 + `audience.schema.json` version 1 | SE-029 | 신규. 유형 3(`regular`·`genre_fan`·`walk_in`, 색·장르 적합·가격 민감·바·인내·자리 선호), 입장 수 AD1~AD12, 자리 선택 SP1~SP5, 상태 기계 UP1~UP6·T1~T15·MV1~MV3·P1, 만족 SF0~SF9, 공연 끝 FN1~FN4, 이벤트 4종(`audience.admissions_decided`·`agent_moved`·`agent_left`·`day_summary`) + `economy.sales_reported` 발행, 결정성 R1~R5, 스냅샷 RU1~RU7, 로드 검사 AL1~AL9, 수용 기준 AU0~AU14·AT1~AT6, 기준 시나리오 4개. 티켓 초안에서 바꾼 것: 이동 속도 틱당 1타일 → 4틱당 1타일(Q4), `agent_moved` 원소에 고정소수 좌표와 `type` 추가(Q5), 4번째 `audience.*` 이벤트로 `audience.agent_left` 신설, 화장실 상태 보류(Q6). 기존 테이블 변경 없음 |
 | 2026-10-09 | audience.md v0 (후속 수정), `audience.json` v1 → **v2**, `audience.schema.json` version 1 → **2** | SE-029-bug (docs/reports/SE-029.md 발견 1·낮음 2~5) | (1) 통로 머리 맞댐 교착 해소: `flow.pass_override_ticks`(10, 스키마 필수 필드 추가 → version 2), 에이전트 레코드 `blocked`(RU6 18 → 19키), T7(연속 막힘이면 밀고 들어감)·T8(`blocked` +1)·T12 설명·MV2, AU4(밀고 들어감 케이스)·AU6(인내 초과를 `queued` 대기·바 실패·복원 레코드로), 변이 문장, Q12. (2) 기준 시나리오: "경로 동점 처리가 달라도 평균은 바뀌지 않는다"를 "범위 안"으로 완화, 만족 범위는 시드 0 한정이라고 명시, 프로토타입 참고 문단을 qa 시뮬 결과로 교체. `expected` 값은 바뀌지 않음(qa 시뮬 `--pass-override 10` 4변형 `MISMATCH: 없음`). (3) `time.day_started`가 `lineup`도 비운다. (4) view 계약에 무대 방향(초점 셀, 모르면 +z, 로드 뒤는 SE-037 가구 복구 경로). (5) 바 방문 수 ↔ economy 바 구매 인원 차이(≤ 15%) 설명. 입장·만족 공식·이벤트 페이로드 변경 없음 |
+| 2026-10-09 | audience.md v0 (후속 수정), `audience.json` v2·`audience.schema.json` version 2 유지 | SE-044 A2 (docs/reviews/SE-029.md 발견 1·2·7, docs/status/2026-W41.md SE-029 결정 로그 "경로 획득 방식 정정") | (1) **경로 획득 정정**(SE-032 Q3 (a) 이벤트 방식에 맞춤): `coverage`에 `blocked_cells`(8번째 필드, 가구 점유 셀 전체)를 저장 — 입력 계약·#상태(새 게임 값 `[]`)·RU2(7키 → 8키, 좌표 맵 안). 파생값에 경로 그래프 `tile_path`(`TilePath.new(map)` + `blocked_cells` 막힘) 추가, 커버리지 수신·복원 성공 뒤 재생성. 공개 API 생성자의 4번째 인자를 `TilePath` 핸들 주입에서 맵으로 바꿈(`new(config, bus, rng, map: MapConfig)`), `BuildSystem`·`BuildSystem.find_path`를 부르지 않는다(원칙 4). #자리-선택 에 "점유를 아는 방법 = `coverage.blocked_cells` 하나뿐"과 복원 직후 경로 문장. AU10(a)에 복원 직후 경로 질의(T11·P1) 동치 단언, AU10(c) 거부 예에 `blocked_cells` 없음, 공통 전제에 "직접 발행 페이로드도 `blocked_cells` 포함". (2) 표시 좌표 표를 "처음 맞는 행"으로 하고 `tile == null`(`queued`에서 바로 `gone`) → `c(entrances[0])` 행 추가. (3) 로드 검사 AL10 `flow.pass_override_ticks < min_t patience_ticks_t`(현재 10 < 150) — AU0 깨는 사본 10건 이상(`pass_override_ticks` 150 추가), API 표 AL1~AL10, qa 스크립트에 같은 검사 1줄(기대 출력 불변). 공식·수치·이벤트 이름·페이로드·`reference_scenarios` 기대값 변경 0, 데이터·스키마 변경 0 |

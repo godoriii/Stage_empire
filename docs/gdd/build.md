@@ -138,7 +138,7 @@ build 가 소유하는 상태. 스냅샷 대상은 `instances`·`next_entity`·`
 |---|---|---|---|
 | `instances` | Array | `[]` | 설치 인스턴스, entity 번호 오름차순(= 설치 순). 원소 `{entity_id: String, furniture_id: String, cell: [x, z], rotation: int, paid: int}`. `paid` = 설치 때 승인된 건설비(철거 환불 기준, economy F3) |
 | `next_entity` | int | 1 | 다음 entity 번호. entity id 는 `"f" + str(n)`(예: `"f1"`). 거절된 배치는 번호를 쓰지 않는다. 철거된 번호는 재사용하지 않는다 |
-| `phase` | String | `"day"` | `time.phase_changed.to`를 따라온 구간(B2·D2 판정). economy `phase`와 같은 방식으로 스냅샷에 넣는다(Q6) |
+| `phase` | String | `"day"` | `time.phase_changed.to`를 따라온 구간(B2·D2 판정). economy `phase`와 같은 방식으로 스냅샷에 넣는다(Q6). `to`가 `sim.json` `phases[].id`가 아니면 `push_error` 1회 후 무시(`phase` 불변, `sync` 없음 — 바꾸면 자기 스냅샷이 RS1 에 걸린다, SE-044) |
 | `occupancy` | 파생 | — | 셀 → entity. `instances`에서 다시 만든다 |
 | `pending` | Dictionary 또는 `null` | `null` | 승인 대기 중인 배치 1건(H1~H4). 같은 경계 안에서 반드시 비워진다 |
 
@@ -502,6 +502,7 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 |---|---|---|---|
 | 2026-10-09 | build.md v0, `furniture.json` v1 + `furniture.schema.json` version 1, `tier1_club.json` v1 + `maps.schema.json` version 1 | SE-028 | 신규. 맵(타일 5종), 가구 20종, 배치 B1~B11·철거 D1~D4·핸드셰이크 H1~H5, 커버리지 C0~C8, 스냅샷 RS1~RS7, 로드 검사 MK1~MK6·FC1~FC5, 수용 기준 BC1~BC31·DT1~DT8. events.md 의 `build.*` "골격" 3행을 6행으로 확정(`build.rejected` 페이로드에 `action`·`rotation`·`entity_id` 추가, 명령 `build.demolish_requested`, 상태 `build.demolished`·`build.coverage_changed` 신규). `economy.json`·`tiers.json`·`sim.json` 변경 없음(가정 목록 합을 economy 값에 맞춤) |
 | 2026-10-09 | build.md, `tier1_club.json`(파일 `version` 1 유지, 항목 추가만), events.md `build.*` | SE-044 | SE-032 리뷰 후속 A·B. `reference_layouts`에 `baseline_plus_two_speakers` 추가(BC21 기대값을 데이터로, `build_oracle.py --layouts` 18키 일치). `build.coverage_changed`·`coverage()`에 `blocked_cells`(C0 점유 셀 전체, G6, 증분 아님, 마지막 키) 추가. 공개 API 표 `Build` → `BuildSystem`, `find_path`·`path_from_entrance` 행 추가(UI·테스트용, sim 시스템은 부르지 않음). `build.rejected` 필드 타입 문장(any / `reason != invalid`이면 좁혀짐). 스키마 변경 없음 |
+| 2026-10-09 | build.md, 데이터·스키마 변경 없음 | SE-044 A2 (SE-044 C 인계 1) | #상태 `phase` 행에 "`to`가 `sim.json` `phases[].id`가 아니면 `push_error` 1회 후 무시(`phase` 불변, `sync` 없음)" 한 줄 — SE-044 C `build_system.gd` `_on_phase_changed`·`test_build_system.gd::test_ac5_unknown_phase_ignored` 와 같은 규칙. 관객이 `blocked_cells`를 스냅샷에 저장하는 쪽 정정은 audience.md(SE-044 A2) |
 
 ## 부록 A. 기준 배치 손계산
 
