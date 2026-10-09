@@ -128,9 +128,10 @@ func test_snapshot_keys_and_values_pinned_to_spec() -> void:
 	var snap: Dictionary = loop.snapshot()
 	var keys: Array = snap.keys()
 	keys.sort()
-	assert_eq(keys, ["day", "pending_commands", "phase", "rng", "schema_version", "seed", "speed", "tick", "tick_in_phase"], "스펙 표의 9개 키")
-	assert_eq([snap["schema_version"], snap["seed"], snap["tick"], snap["day"], snap["phase"], snap["tick_in_phase"], snap["speed"], snap["pending_commands"]],
-		[1, 42, 1801, 1, "evening", 1, 1, []], "값")
+	assert_eq(keys, ["day", "pending_commands", "phase", "rng", "schema_version", "seed", "speed", "systems", "tick", "tick_in_phase"], "스펙 표의 10개 키(SE-011)")
+	# SE-012 2차(sim.json v3 적용) 뒤 아래 _cfg.snapshot_schema_version 을 리터럴 2 로 교체한다.
+	assert_eq([snap["schema_version"], snap["seed"], snap["tick"], snap["day"], snap["phase"], snap["tick_in_phase"], snap["speed"], snap["pending_commands"], snap["systems"]],
+		[_cfg.snapshot_schema_version, 42, 1801, 1, "evening", 1, 1, [], {}], "값")
 	var stream_keys: Array = snap["rng"].keys()
 	stream_keys.sort()
 	assert_eq(stream_keys, ["artist", "audience", "economy", "events", "world"], "rng 스트림 5개(v0)")

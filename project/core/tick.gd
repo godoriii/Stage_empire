@@ -6,6 +6,8 @@ extends RefCounted
 ## 한 틱(경계 T → T+1): 1 명령 처리(bus.dispatch_commands) → 2 시스템 update(ctx) (system_order 순)
 ## → 3 카운터 → 4 구간 전환(time.phase_changed → time.speed_changed) → 5 tick.advanced.
 ## advance()/step() 은 호출 시작(B-call)과 두 번째 이후 틱 직전(B-tick)에만 경계 처리를 한다.
+## 시스템 스냅샷 훅(SE-011 스펙, SE-012 구현): register_system 의 snapshot_hook/restore_hook 으로 시스템 상태가
+## snapshot()["systems"][id] 에 들어가고 restore() 7단계에서 복원된다(실패 시 역순 롤백).
 
 const EV_TICK_ADVANCED: String = "tick.advanced"
 const EV_PHASE_CHANGED: String = "time.phase_changed"
@@ -23,9 +25,10 @@ const REASON_NOT_ALLOWED: String = "not_allowed"
 ## step() 누적기 단위(마이크로초/초, tick.md#틱 상수표).
 const US_PER_S: int = 1000000
 
-## 스냅샷 키(tick.md#스냅샷 표).
+## 스냅샷 최상위 키 10개(tick.md#스냅샷 표, SE-011). 시스템 상태는 systems.<id> 아래에만 들어간다.
 const SNAPSHOT_KEYS: Array[String] = [
 	"schema_version", "seed", "tick", "day", "phase", "tick_in_phase", "speed", "rng", "pending_commands",
+	"systems",
 ]
 
 # 아래 공개 멤버는 읽기 전용으로 취급한다(바꾸는 것은 TickLoop 자신뿐).
@@ -43,9 +46,11 @@ var tick_in_day: int:
 	get:
 		return config.phase_start(phase) + tick_in_phase
 
+## 실행 중 표시: advance/step 의 틱 처리 중, 그리고 snapshot()/restore() 가 시스템 훅을 부르는 중(SH5).
 var _running: bool = false
 var _acc: int = 0                  # step() 누적기 (µs × 틱/초). 상태 아님, 스냅샷 제외
-var _systems: Dictionary = {}      # id -> Callable
+var _systems: Dictionary = {}      # id -> update Callable
+var _hooks: Dictionary = {}        # id -> [snapshot_hook, restore_hook] (훅 시스템만)
 
 
 ## 생성자는 이벤트를 내지 않는다. bus 가 null 이면 자체 생성.
@@ -126,26 +131,44 @@ func step(delta_s: float) -> int:
 	return done                                   # S7
 
 
-## 단계 2 에서 부를 시스템을 등록한다. 호출 순서는 sim.json system_order (등록 순서 무관).
-func register_system(id: String, update: Callable) -> bool:
-	if _reject_if_busy("register_system"):
+## 단계 2 에서 부를 시스템을 등록한다(tick.md#명령-큐와-틱-순서 "시스템 등록", SE-011).
+## 호출 순서는 sim.json system_order (등록 순서 무관). 훅(snapshot_hook/restore_hook)은 둘 다 주거나 둘 다 비운다.
+## 검사 G1~G6 은 위에서부터, 처음 걸린 곳에서 push_error 1회 + false, 아무것도 등록하지 않는다.
+func register_system(id: String, update: Callable, snapshot_hook: Callable = Callable(), restore_hook: Callable = Callable()) -> bool:
+	if _reject_if_busy("register_system"):                                    # G1
 		return false
-	if not config.system_order.has(id):
+	if not config.system_order.has(id):                                       # G2
 		push_error("[TickLoop] register_system: '%s' 는 system_order 에 없다" % id)
 		return false
-	if _systems.has(id):
+	if _systems.has(id):                                                      # G3
 		push_error("[TickLoop] register_system: '%s' 는 이미 등록됐다" % id)
 		return false
-	if not update.is_valid():
+	if not update.is_valid():                                                 # G4
 		push_error("[TickLoop] register_system: '%s' 의 update 가 유효하지 않다" % id)
 		return false
+	var has_hooks: bool = not snapshot_hook.is_null()
+	if has_hooks != (not restore_hook.is_null()):                             # G5
+		push_error("[TickLoop] register_system: '%s' 의 훅은 snapshot_hook·restore_hook 둘 다 주거나 둘 다 비워야 한다" % id)
+		return false
+	if has_hooks and not (snapshot_hook.is_valid() and restore_hook.is_valid()):  # G6
+		push_error("[TickLoop] register_system: '%s' 의 snapshot_hook/restore_hook 이 유효하지 않다" % id)
+		return false
 	_systems[id] = update
+	if has_hooks:
+		_hooks[id] = [snapshot_hook, restore_hook]
 	return true
 
 
-## 경계 상태의 스냅샷(기본형만). 틱 처리 중·디스패치 중이면 push_error, {}.
+## 경계 상태의 스냅샷(기본형만, 최상위 10개 키). 틱 처리 중·훅 실행 중·디스패치 중이면 push_error, {}.
+## 훅 시스템의 snapshot_hook 결과는 system_order 순으로 systems.<id> 에 깊은 복사해 넣는다. 훅이 무효이거나
+## 반환값이 Dictionary/E4 기본형이 아니면 push_error 1회 후 {} (tick.md#스냅샷 snapshot() 절차, D3).
 func snapshot() -> Dictionary:
-	if _reject_if_busy("snapshot"):
+	if _reject_if_busy("snapshot"):                                           # 1
+		return {}
+	_running = true                                                           # 2 (SH5)
+	var systems: Variant = _collect_system_snapshots("snapshot")
+	_running = false                                                          # 3
+	if systems == null:
 		return {}
 	return {
 		"schema_version": config.snapshot_schema_version,
@@ -157,19 +180,21 @@ func snapshot() -> Dictionary:
 		"speed": speed,
 		"rng": rng.get_state(),
 		"pending_commands": bus.get_pending_commands(),
+		"systems": systems,
 	}
 
 
-## 스냅샷을 적용한다(tick.md#스냅샷 restore 1~6). 실패 시 push_error, false, 상태 불변. 이벤트 없음.
+## 스냅샷을 적용한다(tick.md#스냅샷 restore 1~9). 1~6 은 검사(상태 불변), 7 시스템 적용(실패 시 역순 롤백),
+## 8 TickLoop 필드 적용. 실패 시 push_error, false, TickLoop 필드 불변. 이벤트 없음.
 ## 숫자는 JSON 왕복으로 float 가 되어 와도 정수값이면 int 로 정규화한다. pending_commands 페이로드도
 ## 같은 규칙(명령 페이로드는 int 만 허용, EventBus E4 v0).
 func restore(s: Dictionary) -> bool:
-	if _reject_if_busy("restore"):
+	if _reject_if_busy("restore"):                                            # 1
 		return false
-	var ver: Variant = _as_int(s.get("schema_version"))
+	var ver: Variant = _as_int(s.get("schema_version"))                       # 2
 	if ver == null or ver != config.snapshot_schema_version:
 		return _restore_fail("schema_version 불일치: %s (기대 %d)" % [s.get("schema_version"), config.snapshot_schema_version])
-	var n_seed: Variant = _as_int(s.get("seed"))
+	var n_seed: Variant = _as_int(s.get("seed"))                              # 3
 	var n_tick: Variant = _as_int(s.get("tick"))
 	var n_day: Variant = _as_int(s.get("day"))
 	var n_tip: Variant = _as_int(s.get("tick_in_phase"))
@@ -195,16 +220,54 @@ func restore(s: Dictionary) -> bool:
 	var rng_state: Variant = s.get("rng")
 	if not (rng_state is Dictionary):
 		return _restore_fail("rng 가 객체가 아니다")
-	var cmds: Variant = EventBus.normalize_commands(s.get("pending_commands"))
+	var cmds: Variant = EventBus.normalize_commands(s.get("pending_commands"))  # 4 (a)
 	if cmds == null:
 		return _restore_fail("pending_commands 형식 오류(명령 페이로드 숫자는 int 만 허용)")
-	var new_rng: SeededRng = SeededRng.new(n_seed, config.rng_streams)
+	var new_rng: SeededRng = SeededRng.new(n_seed, config.rng_streams)       # 4 (b) 현재 rng 는 그대로
 	if not new_rng.set_state(rng_state):
 		return _restore_fail("rng 상태 적용 실패")
-	if not bus.set_pending_commands(cmds):
-		return _restore_fail("pending_commands 적용 실패")
-	# 여기부터는 실패하지 않는다.
-	rng = new_rng
+	var systems: Variant = s.get("systems")                                   # 5 (D5)
+	if not (systems is Dictionary):
+		return _restore_fail("systems 가 객체가 아니다")
+	var sys_ids: Array = (systems as Dictionary).keys()
+	sys_ids.sort()
+	for k: Variant in sys_ids:
+		if not (systems[k] is Dictionary):
+			return _restore_fail("systems.%s 가 객체가 아니다" % [k])
+	for id: String in config.system_order:
+		if not _hooks.has(id):
+			continue
+		if not (systems as Dictionary).has(id):
+			return _restore_fail("훅 시스템 '%s' 의 항목이 systems 에 없다" % id)
+		var hooks: Array = _hooks[id]
+		if not ((hooks[0] as Callable).is_valid() and (hooks[1] as Callable).is_valid()):
+			return _restore_fail("훅 시스템 '%s' 의 훅이 더 이상 유효하지 않다" % id)
+	for k: Variant in sys_ids:
+		if not _hooks.has(str(k)):
+			push_warning("[TickLoop] restore: 훅 시스템이 아닌 systems.%s 항목을 무시한다" % [k])
+	_running = true                                                           # 6 사전 스냅샷 (SH5)
+	var prev: Variant = _collect_system_snapshots("restore")
+	if prev == null:
+		_running = false
+		return false
+	var applied: Array[String] = []                                          # 7 시스템 적용
+	for id: String in config.system_order:
+		if not _hooks.has(id):
+			continue
+		var rh: Callable = (_hooks[id] as Array)[1]
+		var ok: Variant = rh.call((systems[id] as Dictionary).duplicate(true))
+		if not (ok is bool and ok):
+			push_error("[TickLoop] restore: 시스템 '%s' 의 restore_hook 이 실패했다. 앞서 복원한 시스템을 되돌린다" % id)
+			_rollback_systems(applied, prev)
+			_running = false
+			return false
+		applied.append(id)
+	if not bus.set_pending_commands(cmds):                                    # 8 (a) 4단계가 검사를 끝냄(도달 불가)
+		push_error("[TickLoop] restore: pending_commands 적용 실패. 시스템을 되돌린다")
+		_rollback_systems(applied, prev)
+		_running = false
+		return false
+	rng = new_rng                                                             # 8 (b)
 	master_seed = n_seed
 	tick = n_tick
 	day = n_day
@@ -212,6 +275,7 @@ func restore(s: Dictionary) -> bool:
 	tick_in_phase = n_tip
 	speed = n_speed
 	_acc = 0
+	_running = false                                                          # 9
 	return true
 
 
@@ -302,7 +366,7 @@ func _reject_if_busy(what: String) -> bool:
 		push_error("[TickLoop] %s: config 없이 생성됐다" % what)
 		return true
 	if _running or bus.is_dispatching():
-		push_error("[TickLoop] %s: 틱 처리 중이거나 이벤트 디스패치 중에는 호출할 수 없다(틱 경계에서만)" % what)
+		push_error("[TickLoop] %s: 틱 처리 중·시스템 훅 실행 중·이벤트 디스패치 중에는 호출할 수 없다(틱 경계에서만)" % what)
 		return true
 	return false
 
@@ -310,6 +374,37 @@ func _reject_if_busy(what: String) -> bool:
 func _restore_fail(msg: String) -> bool:
 	push_error("[TickLoop] restore: " + msg)
 	return false
+
+
+## 훅 시스템마다 system_order 순으로 snapshot_hook() 을 불러 검사하고 깊은 복사본을 모은다(snapshot() 2단계,
+## restore() 6단계). 첫 위반에서 push_error(시스템 id 포함) 1회 후 null — 뒤 시스템 훅은 부르지 않는다.
+## 호출자가 _running 을 세운 상태에서 부른다(SH5).
+func _collect_system_snapshots(what: String) -> Variant:
+	var out: Dictionary = {}
+	for id: String in config.system_order:
+		if not _hooks.has(id):
+			continue
+		var sh: Callable = (_hooks[id] as Array)[0]
+		if not sh.is_valid():
+			push_error("[TickLoop] %s: 시스템 '%s' 의 snapshot_hook 이 유효하지 않다" % [what, id])
+			return null
+		var v: Variant = sh.call()
+		if not (v is Dictionary) or not EventBus.is_valid_value(v, true):
+			push_error("[TickLoop] %s: 시스템 '%s' 의 snapshot_hook 반환값이 기본형 Dictionary 가 아니다(SH2)" % [what, id])
+			return null
+		out[id] = (v as Dictionary).duplicate(true)
+	return out
+
+
+## restore 7단계 롤백: 이미 복원한 시스템을 역순으로 사전 스냅샷(prev)으로 되돌린다. 롤백 실패는 시스템마다
+## push_error 1회를 더하고 계속한다(복구 불능, tick.md#스냅샷).
+func _rollback_systems(applied: Array[String], prev: Dictionary) -> void:
+	for i: int in range(applied.size() - 1, -1, -1):
+		var id: String = applied[i]
+		var rh: Callable = (_hooks[id] as Array)[1]
+		var ok: Variant = rh.call((prev[id] as Dictionary).duplicate(true))
+		if not (ok is bool and ok):
+			push_error("[TickLoop] restore: 시스템 '%s' 롤백 실패(복구 불능)" % id)
 
 
 ## int, 또는 정수값인 유한 float 만 int 로. 그 밖(bool·문자열·1.5·null)은 null.
