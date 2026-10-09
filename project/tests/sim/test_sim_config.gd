@@ -35,7 +35,7 @@ func test_loads_sim_json() -> void:
 	assert_eq(cfg.phases[2]["speeds"], [1])
 	assert_eq(cfg.phases[3]["speeds"], [0])
 	assert_eq(cfg.max_ticks_per_step, 30)
-	# SE-011 결정값은 2. sim.json v3 적용(SE-012 game-designer 2차) 뒤 리터럴 1 → 2 로 교체한다.
+	# schema_version 2 는 SE-012 에서 적용됨(tick.md 스냅샷 표)
 	assert_eq(cfg.snapshot_schema_version, 2)  # tick.md 스냅샷: schema_version 2 (SE-011/SE-012)
 	assert_eq(cfg.rng_streams, ["audience", "artist", "events", "economy", "world"] as Array[String])
 	assert_eq(cfg.system_order[0], "build")
