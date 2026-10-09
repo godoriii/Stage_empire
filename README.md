@@ -14,7 +14,7 @@
 git lfs install
 python3 tools/validate_data.py            # 데이터 테이블 검증
 python3 tools/hooks/boundary.py --self-test
-tools/run_tests.sh                        # Godot + GUT 설치 후 (docs/adr/0003)
+tools/run_tests.sh                        # Godot 4.6 이 PATH/GODOT_BIN 에 있어야 함 (docs/adr/0003)
 ```
 
 사람은 Claude Code 메인 세션에서 **producer** 에이전트만 상대한다:
@@ -32,7 +32,6 @@ stage-empire/
 ├─ .claude/skills/           new-ticket, headless-test, register-asset, sheet-export, build
 ├─ .claude/settings.json     hooks: 경계 차단, 커밋 전 검증, main/force push 차단
 ├─ docs/  PRD.md gdd/ adr/ tickets/ reviews/ reports/ status/ style-guide.md
-├─ project/                  Godot 프로젝트: core/ sim/ world/ view/ ui/ data/ assets/
+├─ project/                  Godot 프로젝트: core/ sim/ world/ view/ ui/ data/ assets/ tests/ addons/gut/
 ├─ tools/                    validate_data.py run_tests.sh hooks/ (assets/ bot/ 예정)
-└─ tests/                    sim/ view/ e2e/
 ```

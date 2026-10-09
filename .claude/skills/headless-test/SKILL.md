@@ -1,6 +1,6 @@
 ---
 name: headless-test
-description: GUT 헤드리스 테스트와 JSON 스키마 검증을 CI와 같은 방식으로 실행하고 결과를 요약한다. 사용 - /headless-test [tests/sim|tests/view|tests/e2e]
+description: GUT 헤드리스 테스트와 JSON 스키마 검증을 CI와 같은 방식으로 실행하고 결과를 요약한다. 사용 - /headless-test [project/tests/sim|project/tests/view|project/tests/e2e]
 ---
 
 # 헤드리스 테스트

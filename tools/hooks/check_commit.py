@@ -43,9 +43,9 @@ def staged_files(root: Path) -> list[str]:
 
 
 def missing_tests(root: Path, files: list[str]) -> list[tuple[str, str]]:
-    """시뮬레이션 .gd 파일마다 tests/sim/**/test_<basename>.gd 가 있어야 한다."""
+    """시뮬레이션 .gd 파일마다 project/tests/sim/**/test_<basename>.gd 가 있어야 한다."""
     out = []
-    tests_dir = root / "tests" / "sim"
+    tests_dir = root / "project" / "tests" / "sim"
     existing = {p.name for p in tests_dir.rglob("test_*.gd")} if tests_dir.exists() else set()
     for f in files:
         if not f.endswith(".gd") or not f.startswith(SIM_DIRS):
@@ -55,7 +55,7 @@ def missing_tests(root: Path, files: list[str]) -> list[tuple[str, str]]:
             continue  # 순수 타입/상수 선언 파일은 예외
         want = f"test_{base}.gd"
         if want not in existing:
-            out.append((f, f"tests/sim/{want}"))
+            out.append((f, f"project/tests/sim/{want}"))
     return out
 
 

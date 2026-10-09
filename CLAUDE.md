@@ -6,12 +6,12 @@
 
 ## 결정된 사항 (바꾸려면 ADR 필요)
 
-- 엔진: **Godot 4.x**, GDScript 기본 + 일부 C#. 성능 스파이크(인스턴싱 캐릭터 5,000 + 동적 라이트 32개, 60fps) 실패 시에만 Unity 재검토.
+- 엔진: **Godot 4.6** (4.x 계열), GDScript 기본 + 일부 C#. 성능 스파이크(인스턴싱 캐릭터 5,000 + 동적 라이트 32개, 60fps) 실패 시에만 Unity 재검토.
 - 룩: 3D 로우폴리 모델 + 직교 카메라(피치 ~30°, 요 45°) + 툰 셰이더·외곽선. 카메라 회전은 90° 단위 4방향만.
 - 그리드: 1타일 = 1m. 티어 1은 24×24, 티어 6은 400×400. 32×32 청크 단위 로드.
 - 시뮬레이션: 고정 틱 10 tick/초, 렌더는 보간. 세이브는 틱 경계에서만. RNG는 시드 고정.
 - 팀: 사람 1명 + 에이전트. 사람이 하는 일은 방향 결정, 재미 판단, 아트 디렉션, 최종 검수.
-- 테스트 프레임워크: GUT (`addons/gut`), 헤드리스 실행. 근거는 `docs/adr/0003-test-framework-gut.md`.
+- 테스트 프레임워크: GUT 9.6.1 (`project/addons/gut`, Godot 4.6), 헤드리스 실행. 근거는 `docs/adr/0003-test-framework-gut.md`.
 
 ## 아키텍처 원칙
 
@@ -33,7 +33,7 @@
 | Data | `project/data/` | JSON 테이블, 스키마, 문자열 |
 | Assets | `project/assets/` | 모델, 머티리얼, 오디오. `review-queue/`는 사람 검수 대기 |
 | Tools | `tools/` | 시트→JSON, glTF 임포터, 에셋 린터, 봇 플레이어, hooks |
-| Tests | `tests/sim/ tests/view/ tests/e2e/` | 헤드리스 유닛·리플레이·스크린샷 테스트 |
+| Tests | `project/tests/sim|view|e2e/` | 헤드리스 유닛·리플레이·스크린샷 테스트 |
 
 ## 책임 경계 규칙 (hooks로 강제)
 
@@ -42,7 +42,7 @@
 - 생성 에셋은 사람 검수 없이 `project/assets/{models,materials,audio}`에 들어가지 않는다. art-pipeline과 audio는 `project/assets/review-queue/`까지만 쓴다. 검수 통과 후 사람이 옮긴다.
 - 모든 작업은 티켓 번호(`SE-###`)를 가진다. 티켓에는 **수용 기준**과 **테스트 방법**이 반드시 있다(`docs/tickets/TEMPLATE.md`).
 - 에이전트 간 전달은 대화가 아니라 **파일**로 한다: 티켓(`docs/tickets/`) → 스펙(`docs/gdd/`) → PR 설명 → 리뷰 코멘트(`docs/reviews/`).
-- 게임 상태를 만드는 스크립트(`project/core|sim|world/**/*.gd`)는 짝이 되는 `tests/sim/test_<이름>.gd`가 없으면 커밋 불가. `tools/hooks/check_commit.py`가 막는다.
+- 게임 상태를 만드는 스크립트(`project/core|sim|world/**/*.gd`)는 짝이 되는 `project/tests/sim/test_<이름>.gd`가 없으면 커밋 불가. `tools/hooks/check_commit.py`가 막는다.
 - reviewer는 읽기 전용이다. 승인/반려만 하고 코드를 고치지 않는다. 반려는 새 티켓이 된다.
 - `main`에 직접 push 금지, force push 금지. 모든 변경은 브랜치 → PR → CI 녹색 + reviewer 승인 → producer 병합.
 
@@ -57,11 +57,11 @@
 | producer | `docs/tickets/`, `docs/status/`, 병합 | Fable 5.1 |
 | game-designer | `docs/gdd/`, `project/data/` | Opus 5.5 |
 | content-writer | `project/data/text/`, `project/data/artists/` | Sonnet 5.5 |
-| sim-engineer | `project/core/`, `project/sim/`, `project/world/`, `tests/sim/` | Opus 5.5 |
-| render-engineer | `project/view/`, `project/ui/`, `tests/view/` | Opus 5.5 |
+| sim-engineer | `project/core/`, `project/sim/`, `project/world/`, `project/tests/sim/` | Opus 5.5 |
+| render-engineer | `project/view/`, `project/ui/`, `project/tests/view/` | Opus 5.5 |
 | art-pipeline | `project/assets/review-queue/`, `project/data/furniture/`, `tools/assets/` | Sonnet 5.5 |
 | audio | `project/assets/review-queue/audio/`, `project/data/audio/` | Sonnet 5.5 |
-| qa | `tests/`, `docs/reports/` | Sonnet 5.5 |
+| qa | `project/tests/`, `docs/reports/` | Sonnet 5.5 |
 | reviewer | 없음(읽기 전용), `docs/reviews/`만 | Fable 5.1 |
 
 처음 2주는 producer, reviewer, qa + 엔지니어 1명(최대 3개 동시)으로 제한해 규칙이 작동하는지 확인한다.
@@ -82,7 +82,7 @@
 ```bash
 python3 tools/validate_data.py          # JSON 테이블 스키마 검증 (CI와 커밋 hook이 동일하게 실행)
 tools/run_tests.sh                      # GUT 헤드리스 테스트 전체 (Godot 없으면 SKIP)
-tools/run_tests.sh tests/sim            # 특정 디렉터리만
+tools/run_tests.sh project/tests/sim    # 특정 디렉터리만
 python3 tools/hooks/boundary.py --self-test   # 경계 hook 자체 테스트
 python3 tools/hooks/test_check_commit.py      # 커밋/푸시 가드 hook 자체 테스트
 ```

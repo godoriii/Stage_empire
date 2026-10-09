@@ -42,7 +42,7 @@ def main() -> int:
     try:
         git("add", str(tmp.relative_to(ROOT)))
         rc, err = run("git commit -m test")
-        ok = rc == 2 and "test_zz_hooktest.gd" in err
+        ok = rc == 2 and "project/tests/sim/test_zz_hooktest.gd" in err
         failed += 0 if ok else 1
         print(f"{'PASS' if ok else 'FAIL'} rc={rc} want=2  commit with untested sim script\n   {err.splitlines()[-1] if err else ''}")
     finally:

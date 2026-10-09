@@ -1,11 +1,11 @@
 # ADR-0003 테스트 프레임워크는 GUT
 
 - 날짜: 2026-10-09
-- 상태: 결정 (에이전트 셋업 시점의 선택, 프리프로덕션 중 재검토 가능)
+- 상태: 결정 (에이전트 셋업 시점의 선택, 프리프로덕션 중 재검토 가능). 2026-10-09 GUT 9.6.1 + Godot 4.6 으로 설치 완료.
 
 ## 결정
 
-GUT(Godot Unit Test, `project/addons/gut`)를 쓴다. 실행은 `tools/run_tests.sh`가 `godot --headless -s addons/gut/gut_cmdln.gd`로 한다. 테스트 파일은 `tests/sim|view|e2e/**/test_*.gd`.
+GUT 9.6.1(Godot Unit Test, `project/addons/gut`, MIT, Godot 4.6 대응)을 리포지토리에 포함해 쓴다. 실행은 `tools/run_tests.sh`가 `godot --headless -s addons/gut/gut_cmdln.gd`로 한다. 테스트 파일은 `project/tests/sim|view|e2e/**/test_*.gd` (Godot 은 `res://` 밖의 스크립트를 로드하지 못하므로 프로젝트 안에 둔다).
 
 ## 이유
 
@@ -15,12 +15,12 @@ GUT(Godot Unit Test, `project/addons/gut`)를 쓴다. 실행은 `tools/run_tests
 ## 설치
 
 ```bash
-# Godot Asset Library 또는 GitHub 릴리스에서 GUT 9.x 를 받아 project/addons/gut 에 둔다.
-# 이후 Godot 에디터 Project > Project Settings > Plugins 에서 GUT 활성화 (project.godot 에 기록됨).
-tools/run_tests.sh   # 설치 전에는 SKIP 으로 통과한다
+# 이미 포함되어 있다: project/addons/gut (v9.6.1). 업그레이드는 Godot 버전과 짝을 맞춰 같은 PR에서 한다.
+# Godot 4.6 바이너리를 GODOT_BIN 또는 PATH 의 godot 으로 두면 tools/run_tests.sh 가 실행된다.
+tools/run_tests.sh
 ```
 
 ## 결과
 
-- `tools/hooks/check_commit.py`가 `project/core|sim|world/**/*.gd`마다 `tests/sim/test_<이름>.gd`를 요구한다.
+- `tools/hooks/check_commit.py`가 `project/core|sim|world/**/*.gd`마다 `project/tests/sim/test_<이름>.gd`를 요구한다.
 - CI(`.github/workflows/ci.yml`)는 `SE_REQUIRE_GODOT=1`로 돌아 Godot 없이는 실패한다.

@@ -4,11 +4,11 @@
     "producer":        { "allow": ["docs/tickets", "docs/status", "docs/adr", "docs/reviews"] },
     "game-designer":   { "allow": ["docs/gdd", "project/data", "docs/tickets"] },
     "content-writer":  { "allow": ["project/data/text", "project/data/artists"] },
-    "sim-engineer":    { "allow": ["project/core", "project/sim", "project/world", "tests/sim"] },
-    "render-engineer": { "allow": ["project/view", "project/ui", "tests/view"] },
+    "sim-engineer":    { "allow": ["project/core", "project/sim", "project/world", "project/tests/sim"] },
+    "render-engineer": { "allow": ["project/view", "project/ui", "project/tests/view"] },
     "art-pipeline":    { "allow": ["project/assets/review-queue", "project/data/furniture", "tools/assets"] },
     "audio":           { "allow": ["project/assets/review-queue/audio", "project/data/audio"] },
-    "qa":              { "allow": ["tests", "docs/reports", "tools/bot"] },
+    "qa":              { "allow": ["project/tests", "docs/reports", "tools/bot"] },
     "reviewer":        { "allow": ["docs/reviews"], "readonly": true }
   }
 }
