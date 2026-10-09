@@ -25,9 +25,13 @@ art-pipeline, render-engineer, audio 가 이 문서를 기준으로 일한다.
 | 상태 변형 | 기본/켜짐/고장/철거중 — 머티리얼 또는 이미시브 변화로, 별도 메시 금지 | 초안 |
 | 포맷 | glTF 2.0 (`.glb`), 단위 미터, +Y 업, -Z 전방 | 초안 |
 
-## 생성 프롬프트 템플릿 (art-pipeline 용, 확정 전 임시)
+## 생성 프롬프트 템플릿 (art-pipeline 용, SE-019 슬롯 규약 반영)
 
 ```
 low-poly <object>, flat colors, no texture, clean topology, game asset, isometric-friendly,
-single mesh, origin at bottom center, fits <w>x<d> meter footprint, height <h> m, <accent color> accent
+single mesh with material slots named exactly base, accent (optional), emissive (optional), glass (optional),
+one surface per slot, no vertex colors, origin at bottom center, fits <w>x<d> meter footprint, height <h> m,
+<accent color> accent on the accent slot only
 ```
+
+이미지→3D 생성 도구는 이름 있는 슬롯을 못 만드는 경우가 많다. 프롬프트의 슬롯 요구는 요청일 뿐이고 통과 여부는 린터(`tools/assets/GLTF_SPEC.md` §10)가 정한다. 실패하면 모델링 단계에서 슬롯을 나눈다.
