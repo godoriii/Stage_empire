@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 대기 (qa 가 발견, 2026-10-09) |
+| 상태 | 배정(sim-engineer, 2026-10-09). 추가 요구: test_replay_qa.gd 의 pending 분기 제거(Pending 0), test_tick.gd I2 불변식을 독립 계산으로 바꾸거나 삭제(docs/reviews/SE-001.md 발견 4) |
 | 담당 에이전트 | sim-engineer (수정), game-designer (스펙 문구 확인) |
 | 마일스톤 | 프리프로덕션 |
 | 의존 티켓 | SE-001 (구현), SE-006 (스펙 tick.md#배속 S4~S5) |
