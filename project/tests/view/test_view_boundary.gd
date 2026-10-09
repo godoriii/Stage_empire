@@ -1,6 +1,7 @@
 extends GutTest
 ## SE-002 AC8(키 리터럴), AC9(경계), AC10(스크린샷 파일): 소스 정적 검사.
 ## SE-013 AC4: view/ui 가 tests/ 를 참조하지 않는다(측정 진입점은 tests 쪽에서 view 를 인스턴스화).
+## SE-004 AC11(셰이더·플레이스홀더가 assets/·tests/ 를 참조하지 않는다), AC12(시안 스크린샷 4장 1080p).
 
 const SCREENSHOT_PATH: String = "res://tests/view/screenshots/SE-002/grid_yaw45_zoom2.png"
 const SPIKE_SCRIPT: String = "res://view/perf/spike_crowd.gd"
@@ -81,3 +82,48 @@ func test_screenshot_exists_1080p() -> void:
 	var err: Error = img.load(abs_path)
 	assert_eq(err, OK, "PNG 로드")
 	assert_eq(Vector2i(img.get_width(), img.get_height()), Vector2i(1920, 1080), "1920×1080")
+
+
+# --- SE-004 -----------------------------------------------------------------
+
+const SE004_SHOT_DIR: String = "res://tests/view/screenshots/SE-004"
+const SE004_SHOTS: Array[String] = ["a_yaw45_zoom2.png", "b_yaw45_zoom2.png", "c_yaw45_zoom2.png", "b_yaw45_zoom0.png"]
+
+
+func _all_view_files() -> PackedStringArray:
+	var files: PackedStringArray = PackedStringArray()
+	for ext: String in ["gd", "tscn", "tres", "gdshader"]:
+		files.append_array(ViewTestUtil.list_sources(ViewTestUtil.SOURCE_ROOTS, ext))
+	return files
+
+
+func test_shaders_do_not_reference_assets() -> void:
+	var files: PackedStringArray = _all_view_files()
+	for must: String in ["res://view/shaders/toon.gdshader", "res://view/shaders/outline.gdshader",
+			"res://view/shaders/params/toon_b.tres", "res://view/scenes/shader_placeholders.gd",
+			"res://view/scenes/shader_placeholders.tres"]:
+		assert_true(files.has(must), "검사 대상에 %s 포함" % must)
+	var assets: PackedStringArray = ViewTestUtil.grep(files, "res://assets/")
+	assert_eq(assets.size(), 0, "view/ui 가 assets/ 를 참조하지 않는다(플레이스홀더는 프리미티브만): %s" % ", ".join(assets))
+	var tests_ref: PackedStringArray = ViewTestUtil.grep(files, TESTS_REF_PATTERN)
+	assert_eq(tests_ref.size(), 0, ".gdshader 포함 view/ui 에 res://tests/ 0건: %s" % ", ".join(tests_ref))
+	var data_ref: PackedStringArray = ViewTestUtil.grep(ViewTestUtil.list_sources(["res://view/shaders"], "gd"), "res://data/")
+	assert_eq(data_ref.size(), 0, "셰이더 시안 코드는 data/ 를 읽지 않는다(셰이더 상수는 .tres): %s" % ", ".join(data_ref))
+	# 플레이스홀더 메시는 코드 생성 프리미티브(외부 메시 리소스 로드 없음).
+	var mesh_loads: PackedStringArray = ViewTestUtil.grep(PackedStringArray(["res://view/scenes/shader_placeholders.gd"]),
+		"(load|preload)\\(\\s*\"[^\"]*\\.(glb|gltf|obj|mesh|res)\"")
+	assert_eq(mesh_loads.size(), 0, "외부 메시 로드 없음: %s" % ", ".join(mesh_loads))
+	# 역검증.
+	assert_eq(ViewTestUtil.grep_lines(PackedStringArray(["var m: Mesh = load(\"res://assets/models/bar.glb\")"]), "res://assets/").size(), 1,
+		"대조군: res://assets/ 1건")
+
+
+func test_se004_screenshots_exist_1080p() -> void:
+	for f: String in SE004_SHOTS:
+		var abs_path: String = ProjectSettings.globalize_path(SE004_SHOT_DIR.path_join(f))
+		assert_true(FileAccess.file_exists(abs_path), "스크린샷 존재: %s" % f)
+		if not FileAccess.file_exists(abs_path):
+			continue
+		var img: Image = Image.new()
+		assert_eq(img.load(abs_path), OK, "%s PNG 로드" % f)
+		assert_eq(Vector2i(img.get_width(), img.get_height()), Vector2i(1920, 1080), "%s 1920×1080" % f)

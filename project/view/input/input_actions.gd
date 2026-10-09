@@ -15,6 +15,10 @@ const CAMERA_PAN_RIGHT: StringName = &"camera_pan_right"
 const CAMERA_PAN_UP: StringName = &"camera_pan_up"
 const CAMERA_PAN_DOWN: StringName = &"camera_pan_down"
 const CAMERA_PAN_DRAG: StringName = &"camera_pan_drag"
+## SE-004 셰이더 시안 전환(샌드박스 --material= 실행 중에만 동작). 인덱스 = ShaderVariants.SELECTABLE_IDS.
+const SHADER_VARIANT_1: StringName = &"shader_variant_1"
+const SHADER_VARIANT_2: StringName = &"shader_variant_2"
+const SHADER_VARIANT_3: StringName = &"shader_variant_3"
 
 const ALL: Array[StringName] = [
 	CAMERA_ROTATE_CW, CAMERA_ROTATE_CCW,
@@ -23,11 +27,23 @@ const ALL: Array[StringName] = [
 	CAMERA_PAN_DRAG,
 ]
 
+## SE-004 시안 전환 액션. 카메라 액션(ALL)과 따로 둔다: SE-002 의 ALL·register() 의 의미(카메라 9개)를 바꾸지 않는다.
+const SHADER_VARIANT_ACTIONS: Array[StringName] = [SHADER_VARIANT_1, SHADER_VARIANT_2, SHADER_VARIANT_3]
+
 
 ## 모든 액션을 등록한다. 여러 번 불러도 안전하다. 새로 등록한 액션 수를 돌려준다.
 static func register() -> int:
+	return _register_list(ALL)
+
+
+## SE-004 시안 전환 액션(shader_variant_1/2/3)을 등록한다. 규칙은 register() 와 같다. 새로 등록한 수.
+static func register_shader_variants() -> int:
+	return _register_list(SHADER_VARIANT_ACTIONS)
+
+
+static func _register_list(actions: Array[StringName]) -> int:
 	var added: int = 0
-	for action: StringName in ALL:
+	for action: StringName in actions:
 		if InputMap.has_action(action):
 			continue
 		InputMap.add_action(action)
@@ -75,6 +91,12 @@ static func default_events(action: StringName) -> Array[InputEvent]:
 			out.append(_joy_axis(JOY_AXIS_LEFT_Y, 1.0))
 		CAMERA_PAN_DRAG:
 			out.append(_mouse_button(MOUSE_BUTTON_MIDDLE))
+		SHADER_VARIANT_1:
+			out.append(_key(KEY_1))
+		SHADER_VARIANT_2:
+			out.append(_key(KEY_2))
+		SHADER_VARIANT_3:
+			out.append(_key(KEY_3))
 	return out
 
 

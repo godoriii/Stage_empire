@@ -9,6 +9,8 @@ extends CanvasLayer
 var _label: Label
 var _camera: IsoCamera
 var _cursor: TileCursor
+## SE-004 현재 셰이더 시안 id. 비어 있으면 줄을 표시하지 않는다(--material= 없이 실행하면 SE-002 와 같은 화면).
+var _shader_variant: String = ""
 
 
 func _ready() -> void:
@@ -25,6 +27,12 @@ func bind(camera: IsoCamera, cursor: TileCursor) -> void:
 
 func get_text() -> String:
 	return _label.text
+
+
+## SE-004: 현재 시안을 한 줄로 표시한다("시안: a"). 빈 문자열이면 줄을 숨긴다.
+func set_shader_variant(id: String) -> void:
+	_shader_variant = id
+	_refresh()
 
 
 func _on_hover_changed(_tile: Vector2i, _inside: bool) -> void:
@@ -50,6 +58,11 @@ func _refresh() -> void:
 		_key_name(InputActions.CAMERA_PAN_UP), _key_name(InputActions.CAMERA_PAN_LEFT),
 		_key_name(InputActions.CAMERA_PAN_DOWN), _key_name(InputActions.CAMERA_PAN_RIGHT),
 		_key_name(InputActions.CAMERA_PAN_DRAG)])
+	if not _shader_variant.is_empty():
+		var keys: PackedStringArray = PackedStringArray()
+		for action: StringName in InputActions.SHADER_VARIANT_ACTIONS:
+			keys.append(_key_name(action))
+		lines.append("시안: %s   전환 %s" % [_shader_variant, " / ".join(keys)])
 	_label.text = "\n".join(lines)
 
 

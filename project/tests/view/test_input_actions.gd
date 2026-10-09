@@ -1,5 +1,5 @@
 extends GutTest
-## SE-002 AC8: 런타임 InputMap 액션 등록.
+## SE-002 AC8: 런타임 InputMap 액션 등록. SE-004 AC10: shader_variant_1/2/3.
 
 const EXPECTED: Array[StringName] = [
 	&"camera_rotate_cw", &"camera_rotate_ccw",
@@ -75,3 +75,24 @@ func _has_mouse(action: StringName, button: MouseButton) -> bool:
 		if ev is InputEventMouseButton and (ev as InputEventMouseButton).button_index == button:
 			return true
 	return false
+
+
+const SHADER_VARIANT_EXPECTED: Array[StringName] = [&"shader_variant_1", &"shader_variant_2", &"shader_variant_3"]
+
+
+func test_shader_variant_actions_registered() -> void:
+	for a: StringName in SHADER_VARIANT_EXPECTED:
+		if InputMap.has_action(a):
+			InputMap.erase_action(a)
+	assert_eq(InputActions.register_shader_variants(), SHADER_VARIANT_EXPECTED.size(), "새로 등록한 시안 액션 수")
+	assert_eq(InputActions.SHADER_VARIANT_ACTIONS, SHADER_VARIANT_EXPECTED, "InputActions.SHADER_VARIANT_ACTIONS 와 티켓 목록 일치")
+	for a: StringName in SHADER_VARIANT_EXPECTED:
+		assert_true(InputMap.has_action(a), "%s 등록됨" % a)
+		assert_false(InputActions.ALL.has(a), "%s 는 카메라 액션 목록(ALL)에 섞이지 않는다" % a)
+	assert_true(_has_key(&"shader_variant_1", KEY_1), "1 = 시안 a")
+	assert_true(_has_key(&"shader_variant_2", KEY_2), "2 = 시안 b")
+	assert_true(_has_key(&"shader_variant_3", KEY_3), "3 = 시안 c")
+	assert_eq(InputActions.register_shader_variants(), 0, "재등록은 0")
+	for a: StringName in SHADER_VARIANT_EXPECTED:
+		assert_eq(InputMap.action_get_events(a).size(), 1, "%s 이벤트 중복 없음" % a)
+	assert_eq(ShaderVariants.SELECTABLE_IDS, PackedStringArray(["a", "b", "c"]), "액션 순서 = 시안 a/b/c")

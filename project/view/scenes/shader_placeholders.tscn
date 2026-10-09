@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://view/scenes/shader_placeholders.gd" id="1_placeholders"]
+[ext_resource type="Resource" path="res://view/scenes/shader_placeholders.tres" id="2_set"]
+
+[node name="ShaderPlaceholders" type="Node3D"]
+script = ExtResource("1_placeholders")
+placeholder_set = ExtResource("2_set")

@@ -6,6 +6,9 @@ extends Node
 ##   godot --path project res://tests/view/perf/measure_spike.tscn -- --config=E [--out=<경로.json>] [--commit=<해시>]
 ##
 ## 구성 결정: @export config_id > 명령줄 --config= > settings.default_config_id. 없는 구성이면 종료 코드 2.
+## SE-004 시안: @export material_id > 명령줄 --material= > "default"(ShaderVariants). 없는 시안이면 종료 코드 2.
+##   JSON 에 material 키. ticket 값은 SE-013 그대로(SE-004 결과는 --out 파일명과 material 키로 구분).
+##   기본 출력 파일명: default 면 SE-013 과 같은 user://perf/SE-013_<config>.json, 그 밖은 SE-013_<config>_<material>.json.
 ## 절차: VSync 끄기 + max_fps 0 + 창 resolution(spike_configs.tres) → 예열(warmup_sec 이상 그리고 warmup_min_frames 이상)
 ## → measure_sec 동안 프레임마다 벽시계 프레임 시간(Time.get_ticks_usec 차이, delta 스무딩 영향 없음)과
 ## Performance/RenderingServer 수치 수집 → PerfStats → JSON 저장 + 콘솔 표 → 종료.
@@ -24,6 +27,8 @@ const ARG_WARMUP_SEC: String = "--warmup-sec="
 const ARG_WARMUP_FRAMES: String = "--warmup-frames="
 const ARG_MEASURE_SEC: String = "--measure-sec="
 const DEFAULT_OUT_PATTERN: String = "user://perf/SE-013_%s.json"
+## SE-004: default 가 아닌 시안의 기본 출력 파일명(구성, 시안).
+const DEFAULT_OUT_PATTERN_MATERIAL: String = "user://perf/SE-013_%s_%s.json"
 ## 티켓 측정 조건: forward_plus 렌더러.
 const REQUIRED_RENDERER: String = "forward_plus"
 ## 종료 코드: 없는 구성(또는 스파이크 씬 없음).
@@ -48,6 +53,8 @@ enum Phase { WARMUP, MEASURE, DONE }
 @export var spike_scene: PackedScene
 ## 비워 두면 명령줄 --config=<id>, 그것도 없으면 settings.default_config_id.
 @export var config_id: String = ""
+## SE-004 셰이더 시안. 비워 두면 명령줄 --material=<id>, 그것도 없으면 "default".
+@export var material_id: String = ""
 
 ## false 면 끝나도(또는 구성 오류여도) 종료하지 않는다(테스트용).
 var auto_quit: bool = true
@@ -81,7 +88,7 @@ func setup(spike: SpikeCrowd, settings: SpikeConfigSet, config: SpikeConfig) -> 
 	warmup_sec = settings.warmup_sec
 	warmup_min_frames = settings.warmup_min_frames
 	measure_sec = settings.measure_sec
-	out_path = DEFAULT_OUT_PATTERN % config.id
+	out_path = default_out_path(config.id, spike.get_material_id())
 	for a: String in OS.get_cmdline_user_args():
 		if a.begins_with(ARG_OUT):
 			out_path = a.trim_prefix(ARG_OUT)
@@ -107,6 +114,8 @@ func _ready() -> void:
 	_last_usec = Time.get_ticks_usec()
 	print("SpikeMeasure: 구성 %s, 예열 %.1fs/%d프레임, 측정 %.1fs → %s" % [
 		_config.id, warmup_sec, warmup_min_frames, measure_sec, ProjectSettings.globalize_path(out_path)])
+	if _spike.get_material_id() != ShaderVariants.DEFAULT_ID:
+		print("SpikeMeasure: 셰이더 시안 %s (SE-004)" % _spike.get_material_id())
 
 
 ## spike_scene 을 자식으로 인스턴스화한다. 구성이 없으면 false(auto_quit 이면 종료 코드 2).
@@ -125,8 +134,16 @@ func _spawn_spike() -> bool:
 		spike.free()
 		_quit(EXIT_BAD_SETUP)
 		return false
+	var wanted_material: String = ShaderVariants.resolve_material_id(material_id, OS.get_cmdline_user_args(), ShaderVariants.DEFAULT_ID)
+	if not ShaderVariants.is_valid_id(wanted_material):
+		push_error("SpikeMeasure: 시안 '%s' 없음 (가능: %s)" % [wanted_material, ", ".join(ShaderVariants.IDS)])
+		spike.free()
+		_quit(EXIT_BAD_SETUP)
+		return false
 	config_id = wanted
+	material_id = wanted_material
 	spike.config_id = wanted
+	spike.material_id = wanted_material
 	spike.measure_mode = true
 	add_child(spike)
 	setup(spike, settings, spike.config)
@@ -223,7 +240,8 @@ func _finish() -> void:
 		"stage_prop_tris": _spike.get_stage_prop_triangle_count(),
 	}
 	var report: Dictionary = build_report(stats, _config, _settings,
-		collect_environment(get_window(), _settings.resolution, resolve_commit(OS.get_cmdline_user_args())), monitors)
+		collect_environment(get_window(), _settings.resolution, resolve_commit(OS.get_cmdline_user_args())), monitors,
+		_spike.get_material_id())
 	var ok: bool = write_report(report, out_path)
 	print(format_table_row(report))
 	print("SpikeMeasure: 관문(%s 평균 ≥ %.0f fps): %s" % [_settings.gate_config_id, _settings.gate_min_avg_fps, report["gate"]["verdict"]])
@@ -238,11 +256,13 @@ func _finish() -> void:
 
 # --- 순수 함수(테스트 대상) ------------------------------------------------
 
-## 측정 결과 JSON 본문. REQUIRED_KEYS + SE013_KEYS 전부 + 관문 판정 + 보조 수치.
-static func build_report(stats: PerfStats, config: SpikeConfig, settings: SpikeConfigSet, env: Dictionary, monitors: Dictionary) -> Dictionary:
+## 측정 결과 JSON 본문. REQUIRED_KEYS + SE013_KEYS 전부 + 관문 판정 + 보조 수치 + SE-004 material(시안 id).
+static func build_report(stats: PerfStats, config: SpikeConfig, settings: SpikeConfigSet, env: Dictionary, monitors: Dictionary,
+		material: String = ShaderVariants.DEFAULT_ID) -> Dictionary:
 	var r: Dictionary = {
 		"ticket": TICKET,
 		"config": config.id,
+		"material": material,
 		"note": config.note,
 		"instances": config.instances,
 		"lights": config.lights,
@@ -336,6 +356,13 @@ static func bound_hint(gpu_ms: float, script_ms: float, render_cpu_ms: float) ->
 	if gpu_ms <= 0.0:
 		return "unknown"
 	return "gpu" if gpu_ms > script_ms + render_cpu_ms else "cpu"
+
+
+## SE-004: 기본 출력 경로. default 시안은 SE-013 과 같은 이름, 그 밖은 시안 id 를 붙인다.
+static func default_out_path(config_id_value: String, material: String) -> String:
+	if material == ShaderVariants.DEFAULT_ID:
+		return DEFAULT_OUT_PATTERN % config_id_value
+	return DEFAULT_OUT_PATTERN_MATERIAL % [config_id_value, material]
 
 
 ## 결과 표(project/tests/view/perf/results/SE-0xx.md) 한 행.

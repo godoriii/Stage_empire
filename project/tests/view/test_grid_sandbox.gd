@@ -1,5 +1,6 @@
 extends GutTest
 ## SE-002 샌드박스 구조 검증(헤드리스라 화면 캡처 대신): 노드 트리, 초기 카메라, 액션 → 카메라 반응.
+## SE-004 AC9: --se-zoom=<0..3> 시작 줌 인덱스.
 
 const SANDBOX_SCENE: String = "res://view/scenes/grid_sandbox.tscn"
 const EPS: float = 0.0001
@@ -72,3 +73,22 @@ func test_drag_pan_keeps_ground_point_under_mouse() -> void:
 	var after: Variant = IsoGridMath.ray_to_ground(cam3d.project_ray_origin(motion.position), cam3d.project_ray_normal(motion.position))
 	assert_true((after as Vector3).is_equal_approx(before as Vector3), "드래그 후 같은 지면 점이 마우스 아래에 있다")
 	assert_eq(_sandbox.iso_camera.position.y, 0.0, "피벗 y 불변")
+
+
+func test_se_zoom_arg_sets_zoom_index() -> void:
+	var cam: IsoCamera = _sandbox.iso_camera
+	var default_index: int = cam.params.default_zoom_index
+	assert_false(_sandbox.apply_zoom_args(PackedStringArray(["--material=a"])), "--se-zoom 없으면 그대로")
+	assert_eq(cam.get_zoom_index(), default_index)
+	assert_true(_sandbox.apply_zoom_args(PackedStringArray(["--material=b", "--se-zoom=0"])), "--se-zoom=0 적용")
+	assert_eq(cam.get_zoom_index(), 0, "줌 인덱스 0")
+	assert_almost_eq(cam.get_camera().size, cam.params.zoom_sizes[0], EPS, "size = iso_camera_params.tres 의 첫 값")
+	assert_string_contains(_sandbox.hud.get_text(), "줌 1/4", "HUD 가 따른다")
+	# 범위 밖·숫자 아님: 기본 줌 유지 + push_warning.
+	cam.set_zoom_index(default_index)
+	for bad: String in ["4", "-1", "x"]:
+		assert_false(_sandbox.apply_zoom_args(PackedStringArray(["--se-zoom=%s" % bad])), "--se-zoom=%s 무시" % bad)
+		assert_eq(cam.get_zoom_index(), default_index, "--se-zoom=%s: 기본 줌 유지" % bad)
+	assert_push_warning_count(3, "범위 밖 3건 경고")
+	assert_true(_sandbox.apply_zoom_args(PackedStringArray(["--se-zoom=3"])), "최대 인덱스 3")
+	assert_eq(cam.get_zoom_index(), cam.get_zoom_level_count() - 1)
