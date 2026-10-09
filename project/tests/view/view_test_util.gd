@@ -75,13 +75,19 @@ static func _walk(dir_path: String, ext: String, out: PackedStringArray) -> void
 
 ## 파일들에서 정규식에 걸리는 "경로:줄번호: 내용" 목록.
 static func grep(paths: PackedStringArray, pattern: String, exclude_suffix: String = "") -> PackedStringArray:
-	var re: RegEx = RegEx.create_from_string(pattern)
 	var hits: PackedStringArray = PackedStringArray()
 	for p: String in paths:
 		if not exclude_suffix.is_empty() and p.ends_with(exclude_suffix):
 			continue
-		var lines: PackedStringArray = FileAccess.get_file_as_string(p).split("\n")
-		for i: int in lines.size():
-			if re.search(lines[i]) != null:
-				hits.append("%s:%d: %s" % [p, i + 1, lines[i].strip_edges()])
+		hits.append_array(grep_lines(FileAccess.get_file_as_string(p).split("\n"), pattern, p))
+	return hits
+
+
+## 줄 배열에서 정규식에 걸리는 "라벨:줄번호: 내용" 목록. grep() 이 파일마다 이것을 쓴다(검사 역검증용으로 직접도 호출).
+static func grep_lines(lines: PackedStringArray, pattern: String, label: String = "<lines>") -> PackedStringArray:
+	var re: RegEx = RegEx.create_from_string(pattern)
+	var hits: PackedStringArray = PackedStringArray()
+	for i: int in lines.size():
+		if re.search(lines[i]) != null:
+			hits.append("%s:%d: %s" % [label, i + 1, lines[i].strip_edges()])
 	return hits

@@ -1,6 +1,6 @@
 class_name SpikeConfig
 extends Resource
-## SE-003 성능 스파이크 구성 한 행(티켓 표 A~D). 값은 spike_configs.tres 에 있다.
+## 성능 스파이크 구성 한 행(SE-003 표 A~D + SE-013 구성 E). 값은 spike_configs.tres 에 있다.
 ## 게임 밸런스가 아니라 렌더 측정 설정이므로 data/ 가 아닌 view 리소스에 둔다.
 
 ## 구성 이름. 명령줄 --config=<id> 로 고른다.
@@ -13,6 +13,9 @@ extends Resource
 @export var shadow_lights: int = 0
 ## 뷰포트 positional_shadow_atlas_size(px). 2의 거듭제곱.
 @export var shadow_atlas_size: int = 0
+## 군중(MultiMesh)이 그림자를 드리우는지. false 면 cast_shadow = OFF(style-guide 2026-10-09 결정, SE-013 구성 E).
+## 셰도우 라이트·아틀라스는 그대로라 무대 프록시 등 다른 캐스터의 셰도우 패스는 계속 돈다.
+@export var crowd_shadows: bool = true
 ## 사람이 읽는 비고(결과 표 "비고" 열).
 @export var note: String = ""
 

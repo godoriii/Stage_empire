@@ -2,6 +2,7 @@ extends GutTest
 ## SE-003 AC1~AC4: 스파이크 씬 구조(인스턴스·라이트·셰도우 수 = 설정값, 메시 삼각형 예산, 카메라),
 ## 가시성(최대 줌아웃에서 전 인스턴스가 프러스텀 안), 인스턴스·라이트 애니메이션.
 ## 헤드리스라 RenderingServer 는 더미지만 MultiMesh.buffer 는 그대로 돌려준다 → 버퍼를 직접 해석해 검사한다.
+## SE-013 AC1(군중 cast_shadow 가 구성을 따름, E = B 와 같은 수), AC2(무대 프록시 셰도우 캐스터).
 
 const SPIKE_SCENE: String = "res://view/perf/spike_crowd.tscn"
 const SETTINGS_PATH: String = "res://view/perf/spike_configs.tres"
@@ -12,6 +13,10 @@ const MOVED_RATIO_MIN: float = 0.99
 const LIGHT_MOVE_MIN_M: float = 0.01
 const FLOAT_EPS: float = 1e-6
 const ANGLE_TOL_DEG: float = 0.5
+const ALL_CONFIGS: Array[String] = ["A", "B", "C", "D", "E"]
+## SE-013 AC2: 무대 프록시 최소 개수, 합계 삼각형 상한.
+const STAGE_PROP_MIN_COUNT: int = 4
+const STAGE_PROP_TRI_MAX: int = 1000
 
 var _settings: SpikeConfigSet
 
@@ -20,7 +25,7 @@ func before_all() -> void:
 	_settings = load(SETTINGS_PATH) as SpikeConfigSet
 
 
-## 1080p SubViewport 안에 스파이크 씬을 띄운다. config_id 가 비면 기본 구성(B).
+## 1080p SubViewport 안에 스파이크 씬을 띄운다. config_id 가 비면 기본 구성(관문 구성 E).
 func _spawn(config_id: String = "") -> SpikeCrowd:
 	var vp: SubViewport = ViewTestUtil.make_viewport(self)
 	autofree(vp)
@@ -62,9 +67,9 @@ func _count_outside_frustum(spike: SpikeCrowd, cam: Camera3D, top_m: float) -> i
 # --- AC1 ------------------------------------------------------------------
 
 func test_counts_match_spec() -> void:
-	var spike: SpikeCrowd = _spawn()
+	var spike: SpikeCrowd = _spawn("B")
 	var b: SpikeConfig = _settings.get_config("B")
-	assert_eq(spike.config.id, "B", "인자 없으면 기본 구성 = 관문 구성 B")
+	assert_eq(spike.config.id, "B")
 	assert_false(spike.measure_mode, "테스트에서는 측정 모드가 아니다")
 	assert_eq(spike.crowd.multimesh.instance_count, 5000, "AC1: instance_count == 5000")
 	assert_eq(spike.crowd.multimesh.instance_count, b.instances, "= 설정값")
@@ -89,11 +94,107 @@ func test_counts_match_spec() -> void:
 	assert_gt(spot, 0, "Spot(무빙 헤드) 포함")
 	assert_lte(spike.get_viewport().positional_shadow_atlas_size, 2048, "B: 셰도우 아틀라스 ≤ 2048")
 	assert_eq(spike.get_viewport().positional_shadow_atlas_size, b.shadow_atlas_size)
-	assert_eq(spike.crowd.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_ON, "군중이 그림자를 드리운다(셰도우 비용 포함)")
+
+
+func test_default_config_is_gate_config() -> void:
+	var spike: SpikeCrowd = _spawn()
+	assert_eq(spike.config.id, _settings.gate_config_id, "인자 없으면 기본 구성 = 관문 구성")
+	assert_eq(spike.config.id, "E")
+
+
+# --- SE-013 AC1 -----------------------------------------------------------
+
+func test_crowd_shadow_follows_config() -> void:
+	for id: String in ALL_CONFIGS:
+		var spike: SpikeCrowd = _spawn(id)
+		var expected: GeometryInstance3D.ShadowCastingSetting = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if id == "E" \
+			else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		assert_eq(spike.crowd.cast_shadow, expected, "%s: 군중 cast_shadow (E 만 OFF)" % id)
+		assert_eq(spike.is_crowd_casting_shadows(), id != "E", "%s: is_crowd_casting_shadows" % id)
+	# E 의 나머지는 B 와 같다(리터럴 + 씬 실측 대조).
+	var b: SpikeCrowd = _spawn("B")
+	var e: SpikeCrowd = _spawn("E")
+	assert_eq(e.get_instance_count(), 5000, "E instance_count == 5000")
+	assert_eq(_lights_in_tree(e).size(), 32, "E Light3D 32")
+	assert_eq(e.get_shadow_light_count(), 8, "E shadow_enabled 8")
+	assert_eq(e.get_viewport().positional_shadow_atlas_size, 2048, "E 아틀라스 2048")
+	assert_eq(e.get_instance_count(), b.get_instance_count(), "E 인스턴스 = B")
+	assert_eq(_lights_in_tree(e).size(), _lights_in_tree(b).size(), "E 라이트 = B")
+	assert_eq(e.get_shadow_light_count(), b.get_shadow_light_count(), "E 셰도우 라이트 = B")
+	assert_eq(e.get_viewport().positional_shadow_atlas_size, b.get_viewport().positional_shadow_atlas_size, "E 아틀라스 = B")
+	assert_eq(e.get_instance_mesh_triangle_count(), b.get_instance_mesh_triangle_count(), "E 메시 = B (708 tri 그대로)")
+	assert_almost_eq(e.get_crowd_side_m(), b.get_crowd_side_m(), FLOAT_EPS, "E 군중 영역 = B")
+
+
+# --- SE-013 AC2 -----------------------------------------------------------
+
+## 박스 메시의 로컬 꼭짓점 8개를 월드로.
+func _box_corners(mi: MeshInstance3D) -> Array[Vector3]:
+	var aabb: AABB = mi.mesh.get_aabb()
+	var out: Array[Vector3] = []
+	for i: int in range(8):
+		out.append(mi.global_transform * aabb.get_endpoint(i))
+	return out
+
+
+func test_stage_props_cast_shadows_and_are_visible() -> void:
+	assert_gte(_settings.stage_prop_count, STAGE_PROP_MIN_COUNT, "settings.stage_prop_count ≥ 4")
+	for id: String in ALL_CONFIGS:
+		var spike: SpikeCrowd = _spawn(id)
+		var root: Node = spike.get_node(^"StageProps")
+		assert_true(root is Node3D, "%s: StageProps(Node3D) 존재" % id)
+		var props: Array[MeshInstance3D] = []
+		for n: Node in root.get_children():
+			if n is MeshInstance3D and not n.is_queued_for_deletion():
+				props.append(n as MeshInstance3D)
+		assert_eq(props.size(), _settings.stage_prop_count, "%s: MeshInstance3D = stage_prop_count" % id)
+		assert_eq(spike.get_stage_prop_nodes().size(), props.size(), "%s: 조회 함수 일치" % id)
+		var cam: Camera3D = spike.iso_camera.get_camera()
+		assert_eq(spike.iso_camera.get_zoom_index(), spike.iso_camera.get_zoom_level_count() - 1, "최대 줌아웃")
+		var inv_yaw: Basis = Basis(Vector3.UP, deg_to_rad(spike.iso_camera.params.base_yaw_deg)).inverse()
+		var half: float = spike.get_crowd_side_m() * 0.5 + _settings.wander_radius_m
+		var crowd_aabb: AABB = spike.crowd.global_transform * spike.crowd.multimesh.custom_aabb
+		var tris: int = 0
+		for mi: MeshInstance3D in props:
+			assert_true(mi.mesh is BoxMesh, "%s/%s: BoxMesh" % [id, mi.name])
+			assert_eq(mi.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_ON, "%s/%s: cast_shadow ON" % [id, mi.name])
+			var height: float = mi.mesh.get_aabb().size.y
+			assert_lt(mi.global_position.y + height, _settings.light_height_m, "%s/%s: y + 높이 < light_height_m" % [id, mi.name])
+			assert_true(crowd_aabb.has_point(mi.global_position), "%s/%s: 군중 AABB 안" % [id, mi.name])
+			tris += mi.mesh.get_faces().size() / 3
+			for corner: Vector3 in _box_corners(mi):
+				# 군중 정사각형(요 회전) 안: 레이아웃 좌표로 되돌려 |u|, |v| ≤ 반 변.
+				var local: Vector3 = inv_yaw * (corner - spike.get_crowd_center())
+				assert_true(absf(local.x) <= half and absf(local.z) <= half, "%s/%s: 꼭짓점 %s 군중 영역 안" % [id, mi.name, corner])
+				assert_gte(corner.y, -FLOAT_EPS, "%s/%s: 바닥 위" % [id, mi.name])
+			# 4방향 회전 모두에서 8개 꼭짓점 전부 프러스텀 안.
+			for r: int in range(IsoCamera.ROTATION_STEPS):
+				for corner: Vector3 in _box_corners(mi):
+					assert_true(cam.is_position_in_frustum(corner), "%s/%s: 꼭짓점 프러스텀 안 (요 %.0f°)" % [id, mi.name, spike.iso_camera.get_yaw_deg()])
+				spike.iso_camera.rotate_cw()
+		assert_lte(tris, STAGE_PROP_TRI_MAX, "%s: 무대 프록시 합계 %d tri ≤ 1000" % [id, tris])
+		assert_eq(spike.get_stage_prop_triangle_count(), tris, "%s: 삼각형 조회 함수 일치" % id)
+		if id == "E":
+			gut.p("무대 프록시 %d개, 합계 %d tri" % [props.size(), tris])
+
+
+func test_stage_props_are_inside_shadow_light_range() -> void:
+	# 군중 그림자가 꺼져도 셰도우 패스가 비지 않는다: 프록시마다 셰도우 라이트 하나 이상의 범위 안에 있다.
+	var spike: SpikeCrowd = _spawn("E")
+	for mi: MeshInstance3D in spike.get_stage_prop_nodes():
+		var reached: bool = false
+		for l: Light3D in spike.get_light_nodes():
+			if not l.shadow_enabled:
+				continue
+			var reach: float = (l as OmniLight3D).omni_range if l is OmniLight3D else (l as SpotLight3D).spot_range
+			if l.global_position.distance_to(mi.global_position) <= reach:
+				reached = true
+				break
+		assert_true(reached, "%s: 셰도우 라이트 범위 안" % mi.name)
 
 
 func test_counts_for_every_config() -> void:
-	for id: String in ["A", "B", "C", "D"]:
+	for id: String in ALL_CONFIGS:
 		var cfg: SpikeConfig = _settings.get_config(id)
 		assert_not_null(cfg, "구성 %s 존재" % id)
 		var spike: SpikeCrowd = _spawn(id)
