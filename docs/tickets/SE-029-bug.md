@@ -59,4 +59,14 @@ T8 에 "연속으로 K 틱 막히면 그 틱부터 `pass_tile_cap`을 무시하�
 
 (해결되면 기록. 재현 안 됨으로 닫지 않는다.)
 
+game-designer, 2026-10-09. producer 결정 = 제안 (a) K = 10(audience.md Q12).
+
+- 규칙: T7 에 "`blocked ≥ pass_override_ticks`이면 `pass_tile_cap`을 무시하고 건너기 시작(`blocked = 0`)", T8 에 "`blocked += 1`, 대기 +1". 에이전트 레코드 `blocked`(RU6 18 → 19키). MV2·점유 설명·T12 설명, AU4(밀고 들어감 케이스), AU6(인내 초과 유발을 `queued` 대기 T3·바 실패·복원 레코드로), 변이 문장, 기준 시나리오의 "평균은 바뀌지 않는다" → "범위 안"(시드 0 한정 명시), 설계 프로토타입 참고 문단을 qa 시뮬 결과로 교체.
+- 데이터: `audience.json` `flow.pass_override_ticks: 10`, `version` 1 → 2. `audience.schema.json` 필수 필드 추가, `version` enum `[2]`.
+- `expected` 변경 없음: `python3 tools/bot/audience_spec_check.py --bfs-order {x,z,rev,revz} --pass-override 10` 네 변형 모두 `MISMATCH: 없음`, 기준 시나리오 시드 0~39 조기 퇴장 0·미착석 0. 시드 0 평균 x 우선 4,600 / 6,731 / 6,725 / 5,727, z 우선 4,599 / 6,703 / 6,695 / 5,715(전부 `avg_satisfaction_bp_range` 안). 150명 스트레스 시드 0·1 조기 퇴장 0, 최대 대기 x 16·14 / z 40·34.
+- qa 낮음 2~5 도 문서로 처리: `time.day_started`가 `lineup = null`(2), view 계약 "무대 방향"(초점 셀, 모르면 +z, 로드 뒤 SE-037 가구 복구 경로)(3), 만족 범위 시드 0 한정(4), 바 방문 수 ↔ economy 바 구매 인원 4개 시나리오 수치와 차이 이유(5).
+- **남은 일(qa — game-designer 경계 밖):**
+  - `project/tests/sim/test_audience_data.gd` 2곳. 405행 `assert_eq(int(_a["version"]), 1)` → `2`, 420~421행 `flow` 기대 사전에 `"pass_override_ticks": 10` 추가. 이 두 단언 때문에 현재 `tools/run_tests.sh project/tests/sim` 결과는 127 중 125 통과다. 수정 시도를 경계 hook 이 막았다(`project/tests/`는 qa 범위).
+  - `tools/bot/audience_spec_check.py` 의 `--pass-override` 기본값을 `flow.pass_override_ticks`에서 읽게 갱신(qa 재검증 방법 문구대로).
+
 - qa 재검증 방법: 수정 후 `python3 tools/bot/audience_spec_check.py --bfs-order z`(과 `--bfs-order x`, `--bfs-order rev`, `--bfs-order revz`) 가 `MISMATCH: 없음`이고 150명 스트레스 두 시드 조기 퇴장 0 이면 닫는다. `--pass-override`는 권고안 실험 옵션이라 규칙이 바뀌면 스크립트를 같이 갱신한다.

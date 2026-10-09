@@ -5,7 +5,7 @@
 | 상태 | v0 |
 | 스펙 티켓 | SE-029 (game-designer) |
 | 구현 티켓 | SE-034 (sim-engineer) — `project/sim/audience_config.gd`(`AudienceConfig`), `project/sim/audience_system.gd`(`AudienceSystem`), 짝 테스트 `project/tests/sim/test_audience_config.gd`, `project/tests/sim/test_audience_system.gd`, 성능 `project/tests/sim/test_audience_perf.gd`. 렌더는 SE-038 (render-engineer, `project/view/crowd/`) |
-| 데이터 | [`project/data/audience/audience.json`](../../project/data/audience/audience.json) (version 1), 스키마 [`audience.schema.json`](../../project/data/schemas/audience.schema.json). 읽기 참조: [`artist.json`](../../project/data/artist/artist.json) `mvp_genres`·`roster_plan`, [`genres.json`](../../project/data/genres/genres.json) `rows[].id`, [`economy.json`](../../project/data/economy/economy.json) `rate_scale`·`rows[tier_1].ticket_price_default`, [`sim.json`](../../project/data/sim/sim.json) `phases`·`individual_agent_cap`·`rng_streams`·`system_order`, [`tier1_club.json`](../../project/data/maps/tier1_club.json) 입구 타일·`reference_layouts` |
+| 데이터 | [`project/data/audience/audience.json`](../../project/data/audience/audience.json) (version 2), 스키마 [`audience.schema.json`](../../project/data/schemas/audience.schema.json). 읽기 참조: [`artist.json`](../../project/data/artist/artist.json) `mvp_genres`·`roster_plan`, [`genres.json`](../../project/data/genres/genres.json) `rows[].id`, [`economy.json`](../../project/data/economy/economy.json) `rate_scale`·`rows[tier_1].ticket_price_default`, [`sim.json`](../../project/data/sim/sim.json) `phases`·`individual_agent_cap`·`rng_streams`·`system_order`, [`tier1_club.json`](../../project/data/maps/tier1_club.json) 입구 타일·`reference_layouts` |
 | 이벤트 | [events.md](events.md)의 `audience.*` 4행과 `economy.sales_reported`(발행 주체 audience). 이 문서에 나오는 이벤트 이름은 전부 거기 표에 있다(`reputation.changed`·`show.ended`는 SE-030, `session.loaded`는 SE-036 이 등록) |
 | 근거 | PRD "핵심 시스템 상세"(관객 행: 취향 분포 에이전트, 입장 → 이동 → 관람 → 소비 → 퇴장, 입력 라인업·티켓 가격·명성·홍보, 출력 입장 수·소비·만족도·혼잡), "콘텐츠 범위"(MVP 관객 유형 3, 관객 150), "기술 요구사항" 원칙 5(티어 3 까지 개별 에이전트), [economy.md](economy.md) #입력-계약·#수익-바·Q4, [build.md](build.md) #커버리지, [artist.md](artist.md) #라인업·T5, [tick.md](tick.md) #결정성과-rng·#명령-큐와-틱-순서 |
 
@@ -55,7 +55,7 @@ audience 가 구독하는 이벤트. 구독 순서는 `system_order`(build, staf
 | `reputation.changed {total, …}` (SE-030) | `total`이 `int ≥ 0`이면 `reputation_total = total`, 아니면 `push_warning` 후 무시 |
 | `economy.ticket_price_changed {price, from}` | `price`가 `int ≥ 1`이면 `ticket_price = price`, 아니면 `push_warning` 후 무시. 새 게임 값은 `economy.json` `rows[tier_1].ticket_price_default`(20) |
 | `time.phase_changed {from, to, day, tick}` | `phase = to`, `day = day`. `to == "close"`인데 에이전트·도착 대기가 남아 있으면 계약 위반(공연 끝 처리 누락)이라 `push_warning` 후 비운다 |
-| `time.day_started {day}` | `day = day`, `today = null`, `arrivals = []`, `agents = []`(이미 비어 있어야 한다) |
+| `time.day_started {day}` | `day = day`, `lineup = null`, `today = null`, `arrivals = []`, `agents = []`(에이전트·도착은 이미 비어 있어야 한다). `lineup`도 비워서 LS3 로 결정이 없던 날에 전날 라인업이 스냅샷에 남지 않게 한다 |
 
 라인업 수신 판정 — 위에서부터 처음 맞는 행.
 
@@ -102,6 +102,7 @@ AudienceSystem 이 소유하는 상태. 파생값(자리 순위, 타일 점유 �
 | `bar_left` | int | `at_bar` 남은 틱 |
 | `bar_planned` | bool | 아직 바에 들를 예정 |
 | `wait` | int | 누적 대기 틱 |
+| `blocked` | int | **연속으로** 막힌 틱 수(T8 에서 +1, 건너기를 시작하면 0). `pass_override_ticks`에 닿으면 다음 시도에서 `pass_tile_cap`을 무시한다(T7) |
 | `show_ticks`, `sound_ticks`, `sight_ticks` | int | 공연 구간 집계(SF1) |
 | `left_early` | bool | 조기 퇴장 여부 |
 | `sat` | int | 확정 만족 bp. 확정 전 −1 |
@@ -174,24 +175,24 @@ LS4 에서 한 번 계산한다(저녁 진입 틱, tick.md 단계 4 의 `time.ph
 | T4 | `entering` | `enter_left > 1` | `entering` | `enter_left −= 1` | — |
 | T5 | `entering` | `enter_left == 1` | `moving` | `enter_left = 0`. `bar_planned`면 SP4 로 바 자리. 바 자리가 없으면 `bar_planned = false`, 대기 +`bar_fail_wait_ticks`. (떠나지 않았으면) 바 자리가 정해지지 않았을 때 SP4 로 관람 자리. 둘 다 없으면 P1 과 같은 조기 퇴장(`reason "no_spot"`) | 대기 ↑(바 실패) |
 | T6 | `moving`·`leaving` | `next != null` | 같은 상태 | `progress += 1`. `progress == move_ticks_per_tile`이면 `tile = next`, `next = null`, `progress = 0` 후 **같은 틱에 T9 검사** | — |
-| T7 | `moving` | `next == null`, `path` 비어 있지 않음, `occ(path[0]) < pass_tile_cap` | `moving` | 건너기 시작: `next = path.pop_front()`, `progress = 1` | — |
-| T8 | `moving` | `next == null`, `path` 비어 있지 않음, `occ(path[0]) ≥ pass_tile_cap` | `moving` | 제자리. 대기 +1 | 대기 ↑ |
+| T7 | `moving` | `next == null`, `path` 비어 있지 않음, 그리고 `occ(path[0]) < pass_tile_cap` **또는** `blocked ≥ pass_override_ticks` | `moving` | 건너기 시작: `next = path.pop_front()`, `progress = 1`, `blocked = 0`. 두 번째 조건(밀고 들어감)이면 그 칸의 `occ`가 `pass_tile_cap`을 넘을 수 있다 | — |
+| T8 | `moving` | `next == null`, `path` 비어 있지 않음, `occ(path[0]) ≥ pass_tile_cap`, `blocked < pass_override_ticks` | `moving` | 제자리. `blocked += 1`, 대기 +1. 연속 `pass_override_ticks`(10)틱 막히면 다음 틱에 T7 로 밀고 들어간다(SE-029-bug, Q12) | 대기 ↑(최대 10틱 연속) |
 | T9 | `moving` | `next == null`, `path` 빔(도착) | `target_kind`가 `"bar"`면 `at_bar`, `"spot"`이면 `watching` | `at_bar`면 `bar_left = bar_ticks` | 공연 중이면 SF0 의 음향·시야 집계 시작 |
 | T10 | `at_bar` | `bar_left > 1` | `at_bar` | `bar_left −= 1` | 공연 중이면 바 자리 타일로 음향·시야 집계 |
 | T11 | `at_bar` | `bar_left == 1` | `moving` | 구매 확정: `today.bar_buyers += 1`, `bar_planned = false`, 바 예약 해제, SP4 로 관람 자리. 없으면 조기 퇴장(`"no_spot"`) | — |
-| T12 | `leaving` | `next == null`, `path` 비어 있지 않음 | `leaving` | `pass_tile_cap`을 **무시하고** 건너기 시작(T7 과 같은 동작). 나가는 사람은 막히지 않는다 → 교착은 인내로 반드시 풀린다 | — |
+| T12 | `leaving` | `next == null`, `path` 비어 있지 않음 | `leaving` | `pass_tile_cap`을 **무시하고** 건너기 시작(T7 과 같은 동작). 나가는 사람은 막히지 않는다(들어오는 사람은 T7 의 `pass_override_ticks`로 풀린다) | — |
 | T13 | `leaving` | `next == null`, `path` 빔 | `gone` | 입구에 도착 | — |
 | T14 | `watching` | (항상) | `watching` | 제자리. 공연 끝(FN3)까지 | 음향·시야 집계 |
 | T15 | `gone` | — | — | UP5 에서 한 번 발행된 뒤 제거 | — |
 
 - **T6 연쇄**: 건너기를 끝낸 틱에 경로가 비었으면 같은 틱에 T9(`moving`) 또는 T13(`leaving`)을 적용한다. 그 밖에는 한 틱에 한 행이다. 행이 상태를 바꾸면(T5 `entering → moving`, T11 등) 새 상태의 행은 **다음 틱**에 적용된다.
 - **이동 속도**: 타일 하나에 `move_ticks_per_tile`(4) 틱 = 초속 2.5 m(Q4). 건너기를 시작한 틱이 `progress 1`, 4 번째 틱에 도착.
-- **점유**: 건너기를 시작하는 순간 점유 타일이 `next`로 바뀐다(MV1). 그래서 `pass_tile_cap`(2)은 "서 있는 사람 1 + 지나가는 사람 1"을 허용하고, 두 사람이 같은 칸으로 동시에 들어가지는 못한다.
+- **점유**: 건너기를 시작하는 순간 점유 타일이 `next`로 바뀐다(MV1). 그래서 `pass_tile_cap`(2)은 "서 있는 사람 1 + 지나가는 사람 1"을 허용하고, 두 사람이 같은 칸으로 동시에 들어가지는 못한다. 예외는 연속 `pass_override_ticks`틱 막힌 사람(T7)과 나가는 사람(T12)뿐이다.
 
 | # | 이동 규칙 |
 |---|---|
 | MV1 | 점유 타일 = `next ?? tile`. `queued`·`gone`은 점유하지 않는다 |
-| MV2 | 혼잡 = 다음 칸의 `occ ≥ pass_tile_cap`. 이때 기다리고(T8) 대기가 쌓인다. 경로는 다시 구하지 않는다(v0) |
+| MV2 | 혼잡 = 다음 칸의 `occ ≥ pass_tile_cap`. 이때 기다리고(T8) 대기가 쌓인다. 경로는 다시 구하지 않는다(v0). 다른 에이전트는 경로를 막지 않으므로 반대로 가는 두 무리가 인접한 두 칸에서 서로 막을 수 있다(머리 맞댐). 그래서 **연속 `pass_override_ticks`틱 막히면 `pass_tile_cap`을 무시하고 들어간다**(T7). 교착은 늦어도 10틱 안에 풀리고, 칸의 순간 점유는 `pass_tile_cap`을 넘을 수 있다(RU 의 하지 않는 검사). 막힌 사람은 대기를 최대 10씩 받는다 |
 | MV3 | 자리 예약(`claims`)은 `spot_tile_cap`(1)까지. 관람·바 자리는 한 칸에 한 사람(입석 1 m²) |
 
 **P1 조기 퇴장(인내 초과).** `wait > patience_ticks_type`이 되는 순간, 또는 T5·T11 에서 자리가 없을 때:
@@ -237,7 +238,7 @@ LS4 에서 한 번 계산한다(저녁 진입 틱, tick.md 단계 4 의 `time.ph
 
 - `economy.sales_reported`는 **하루 정확히 1회**, 입장 0 이어도(`{0, 0}`) 낸다. 결정이 없던 날(LS3·artist 미등록)도 0 으로 낸다.
 - `audience`(관람 인원) = 끝까지 남은 사람. 조기 퇴장자는 티켓값은 냈지만(`admissions`) 바 매출 기준(economy S2 `ledger.audience`)에서 빠진다.
-- **바 매출은 economy 공식 그대로**(economy S2: `audience × bar_purchase_rate_bp`). audience 가 센 `bar_buyers`(바에 실제로 들른 사람)는 요약·리포트용이고 economy 에 보내지 않는다(Q3, 결정 로그). 기준 배치에서 둘은 비슷하다(시뮬 46 vs economy ⌊83 × 0.6⌋ = 49).
+- **바 매출은 economy 공식 그대로**(economy S2: `audience × bar_purchase_rate_bp`). audience 가 센 `bar_buyers`(바에 실제로 들른 사람)는 요약·리포트용이고 economy 에 보내지 않는다(Q3, 결정 로그). 둘은 15% 안에서 다르다(기준 시나리오 4개: 시뮬 8 / 46 / 64 / 28 vs economy ⌊audience × 0.6⌋ 7 / 49 / 72 / 31). 차이는 유형 섞임 때문이다 — 팬(`bar_visit_bp` 4,000)이 많은 신인 공연일수록 시뮬 쪽이 작다(−11%).
 - 이벤트 순서(공연 마지막 틱): [단계 2 앞 시스템] → `audience.agent_left`*(그 틱에 떠난 사람) → `audience.agent_moved` → `audience.day_summary` → (그 구독자 연쇄: `show.ended` → `artist.grown`·`reputation.*` 등, SE-030) → `economy.sales_reported` → [단계 2 뒤 시스템] → 단계 4 `time.phase_changed {to:"close"}` → `economy.cash_changed` → `economy.day_settled` → … → `tick.advanced`. SE-035 AC2("`show.ended`는 `audience.day_summary` 뒤·`economy.day_settled` 앞")와 맞는다.
 
 ### 이벤트
@@ -290,7 +291,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | RU3 | `lineup`이 `null` 또는 5키(장르가 `genre_fit_bp` 키, 인기·실력 0~100) |
 | RU4 | `today`가 `null` 또는 9키, `by_type` 키 = 유형 id 전부, `0 ≤ left_early ≤ admissions ≤ max_agents` |
 | RU5 | `arrivals`·`agents`의 id 가 둘을 합쳐 엄격히 증가하고 전부 `< next_id`, 합 개수 ≤ `max_agents` |
-| RU6 | 에이전트마다 18키·타입, `type`이 유형 id, `state`가 7종 중 하나, 좌표가 맵 안, `queued`면 `tile == null`, 그 밖은 `tile != null`, `0 ≤ progress ≤ move_ticks_per_tile`, `next == null ⇔ progress == 0`, `sat`이 −1 또는 0~10,000 |
+| RU6 | 에이전트마다 19키·타입(`blocked` ≥ 0 포함), `type`이 유형 id, `state`가 7종 중 하나, 좌표가 맵 안, `queued`면 `tile == null`, 그 밖은 `tile != null`, `0 ≤ progress ≤ move_ticks_per_tile`, `next == null ⇔ progress == 0`, `sat`이 −1 또는 0~10,000 |
 | RU7 | 예약 수 `claims(t) ≤ spot_tile_cap`(모든 `t`) |
 
 - 하지 않는 의미 검사: 경로가 실제로 이어지는지, `occ ≤ pass_tile_cap`인지(나가는 사람은 넘을 수 있다), `today`와 에이전트 수의 관계.
@@ -302,7 +303,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 
 | # | 검사 |
 |---|---|
-| AL1 | `version == 1`, `economy.json` `rate_scale == 10000` |
+| AL1 | `version == 2`, `economy.json` `rate_scale == 10000` |
 | AL2 | `types` 3행, `id` 유일 |
 | AL3 | 모든 유형의 `genre_fit_bp` 키 집합 == `artist.json` `mvp_genres`, 그 값이 전부 `genres.json` `rows[].id`에 있음 |
 | AL4 | `max_agents ≤ sim.json individual_agent_cap` |
@@ -334,13 +335,14 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | 인스턴스 | `audience.agent_moved.agents`의 원소 하나 = 인스턴스 하나. 키는 `id`(index 0). 보이는 수 = `state != "gone"`인 원소 수 |
 | 위치 | `[px, pz]` ÷ `pos_scale`(`audience.json`) = 월드 m(`× tile_size_m`). 직전 틱 → 현재 틱 선형 보간(`t = acc ÷ tick_len`). 새 id 는 첫 틱에 보간 없이 놓는다 |
 | 색 | `type`(index 4) → `audience.json` `types[].color`. 알파 1.0(materials.md M3) |
-| 상태 | `state`(index 3): `watching` 은 무대 방향(무대 위치는 build 이벤트에서), `at_bar`·`watching`·`queued` 정지, `gone`은 숨김(그 틱 이후 원소가 오지 않는다). 반투명 금지 |
+| 상태 | `state`(index 3): `at_bar`·`watching`·`queued` 정지, `gone`은 숨김(그 틱 이후 원소가 오지 않는다). 반투명 금지 |
+| 무대 방향 | `watching`은 무대 쪽을 본다. 무대 위치는 view 가 `build.placed`·`build.demolished`(카테고리 `stage` 가구)로 따로 알고, 방향 = 에이전트 → 무대 초점 셀(build.md C0 의 `g`: 정면 가장자리 가운데 셀). 무대를 모르면(무대 없음, 또는 `session.loaded` 직후 가구 정보가 아직 없을 때) **+z 를 기본**으로 본다(기준 배치 무대는 남쪽, 회전 0). 로드 뒤 무대 위치 복구는 SE-037 의 가구 복구 경로(로드 때 가구 목록을 다시 받는 방법)를 그대로 쓴다. audience 이벤트에는 무대 좌표를 싣지 않는다 |
 | 복구 | `session.loaded` 뒤 다음 `agent_moved` 한 번으로 전체를 다시 만든다(유형이 원소에 들어 있는 이유, Q5) |
 | 그 밖 | `audience.admissions_decided`로 "오늘 N 명" 표시 가능. view 는 audience 상태를 읽지 않는다 |
 
 ## 수치표
 
-모든 값은 [`audience.json`](../../project/data/audience/audience.json) (version 1). 이 절의 숫자는 그 파일 값이거나 그 값으로 계산한 파생값이다.
+모든 값은 [`audience.json`](../../project/data/audience/audience.json) (version 2). 이 절의 숫자는 그 파일 값이거나 그 값으로 계산한 파생값이다.
 
 ### 유형
 
@@ -372,6 +374,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | `flow.move_ticks_per_tile` | 4 | 초속 2.5 m(Q4) |
 | `flow.spot_tile_cap` / `pass_tile_cap` | 1 / 2 | 입석 1칸 1명, 지나가는 사람 1명 더 |
 | `flow.bar_ticks` / `bar_fail_wait_ticks` | 50 / 30 | 바 5초, 자리 없어 포기하면 3초 대기로 친다 |
+| `flow.pass_override_ticks` | 10 | 1초 막히면 밀고 들어간다(Q12). qa 시뮬에서 K = 10/20/40 모두 교착 0, 10 이 대기가 가장 작다(기준 시나리오 최대 대기 x 우선 11 / z 우선 33) |
 | `satisfaction.weights_bp` 라인업 / 음향 / 시야 / 가격 | 4,000 / 1,500 / 1,500 / 3,000 | 합 10,000(AL7). 라인업이 가장 크다 |
 | `satisfaction.penalty_weights_bp` 혼잡 / 대기 | 500 / 2,000 | |
 | `skill_base_bp` / `skill_bp_per_point` | 5,000 / 50 | 실력 18 → 5,900, 60 → 8,000, 100 → 10,000 |
@@ -429,7 +432,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | `local_top_price30` | s07 | 0 | **30** | 5,316 | 〃 | +42 | 53 | **53** | 8 / 30 / 15 | 47~58 | 5,430~5,730 (손계산 5,730) |
 
 - **다른 시드 범위** = `[min(⌊E × (10000 − J) ÷ 10⁶⌋, cap), min(⌊E × (10000 + J) ÷ 10⁶⌋, cap)]`(노이즈 양 끝). 시드 1~100 의 입장은 전부 이 안이다(qa 스크립트가 확인).
-- **평균 만족 범위** = `[손계산 − 300, 손계산]`. 손계산은 "대기 0, 모두 공연 시작 전에 자리에 섬"의 값이고, 실제 실행은 대기(SF4)만큼 낮을 수 있다. 상한을 넘으면 공식 구현이 틀린 것이다. 경로 동점 처리(`AStarGrid2D`)가 달라도 평균은 바뀌지 않는다(아래 B2 — 누가 어느 칸을 차지하든 합이 같다).
+- **평균 만족 범위** = `[손계산 − 300, 손계산]`, **시드 0 의 입장 수에서만** 정의한다(다른 시드는 입장 수가 달라 손계산 값 자체가 다르다 — 예: `rookie_baseline` 시드 0~39 의 평균 6,608~7,007). 손계산은 "대기 0, 모두 공연 시작 전에 자리에 섬"의 값이고, 실제 실행은 대기(SF4)만큼 낮을 수 있다. 시드 0 에서 상한을 넘으면 공식 구현이 틀린 것이다. 자리 배정의 합은 누가 어느 칸을 차지하든 같지만(아래 B2) 대기는 경로 동점 처리(`AStarGrid2D`)에 따라 달라지므로, 평균은 동점 처리에 따라 수십 bp 움직이고 **범위 안**에 든다(T7 의 `pass_override_ticks` 적용 시 qa 시뮬 4변형 시드 0: x 우선 6,731 / 6,725 / 5,727, z 우선 6,703 / 6,695 / 5,715).
 - 시드 0 리터럴의 출처: Godot `RandomNumberGenerator`(PCG32, `inc = PCG_DEFAULT_INC_64`)를 Python 으로 다시 구현해 계산했다(참조 벡터 `pcg32_srandom_r(42, 54)` → `0xa15c02b7 …` 일치 확인). 메인 세션이 Godot 4.7.2 헤드리스로 `SeededRng` 를 직접 실행해 확인(파생 시드 1688486501, 첫 randi 3230427448). SE-034 첫 테스트도 같은 값을 단언한다.
 
 ### 부록 B. 손계산
@@ -472,7 +475,7 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 - `rookie_baseline`: (67 × 7,341 + 53 × 6,701 − 1,500 × (120 − 94)) ÷ 120 = (491,847 + 355,153 − 39,000) ÷ 120 = 808,000 ÷ 120 = ⌊6,733.3⌋ = **6,733**.
 - `local_top_price30`: (30 × 6,060 + 8 × 5,888 + 15 × 4,988) ÷ 53 = (181,800 + 47,104 + 74,820) ÷ 53 = 303,724 ÷ 53 = ⌊5,730.6⌋ = **5,730**.
 
-참고(설계 확인용 프로토타입): 위 규칙을 Python 으로 옮긴 시뮬(BFS 경로, 시드 0)은 4,600 / 6,731 / 6,725 / 5,727 이고 조기 퇴장 0, 최대 대기 12 틱, 공연 시작 때 자리에 없는 사람 0 이었다. 150명 스트레스(수용 150 가정, 인기 55, 명성 500)에서도 조기 퇴장 0, 최대 대기 12 틱이었다. 이 값들은 수용 기준이 아니다(경로 동점 처리가 구현과 다를 수 있다).
+참고(설계 확인 시뮬, 수용 기준 아님): qa 의 독립 시뮬레이터 `tools/bot/audience_spec_check.py`(스펙 본문만으로 옮긴 것)에 `pass_override_ticks` 10 을 적용하면, 경로 동점 4변형(`--bfs-order x`·`z`·`rev`·`revz`) 모두 기준 시나리오 시드 0~39 조기 퇴장 0·공연 시작 때 자리에 없는 사람 0, 최대 대기 x 계열 18 / z 계열 38 틱이고, 150명 스트레스(수용 150·인기 100·명성 2,000, 시드 0·1)도 조기 퇴장 0·최대 대기 ≤ 40 틱이다. 이 규칙이 없던 v0 초판(SE-029 9d43c4a)은 z 우선에서 기준 시나리오 조기 퇴장 5 / 28 / 5명, x 우선 150명 스트레스 시드 1 에서 7명이었다(SE-029-bug). 초판의 "150명 스트레스 조기 퇴장 0, 최대 대기 12 틱"은 설계자 프로토타입 한 시드의 값이라 재현되지 않았고 이 문장으로 대체한다.
 
 ## 수용 기준
 
@@ -486,9 +489,9 @@ tick.md #결정성과-rng 스트림 표의 `audience` 행은 단계 2 와 단계
 | AU1 | `test_reference_admissions_seed0` | 4개 시나리오 각각: `expected_by_type`가 `e_centi`, 첫 `randi()`가 `first_draw`, `audience.admissions_decided`의 `admissions`·`noise_bp`·`capped_by`·`by_type`·`expected`(= `expected_centi ÷ 100`)가 `expected`와 같음. `no_lineup`은 `by_type`의 팬·뜨내기 0 |
 | AU2 | `test_admissions_other_seeds_in_range` | 시드 1~100 각각 같은 시나리오의 `admissions`가 `admissions_range_other_seeds` 안, `by_type` 합 == `admissions` |
 | AU3 | `test_admissions_cap` | `capacity` 를 40 으로 바꾼 커버리지 → `admissions == 40`, `capped_by "capacity"`. `capacity` 150·인기 100·명성 2,000 → `admissions == 150`, 에이전트 최대 동시 수 150. `has_stage false` → 0·`"no_stage"`이고 이때도 `audience` 스트림 상태가 정확히 1 뽑기만큼 진행 |
-| AU4 | `test_state_transitions`(행마다 1건, T1~T14) | 작은 커버리지(관람 타일 몇 칸)와 손으로 만든 상황: 도착(T1), 입구 비었을 때 입장(T2)·찼을 때 대기(T3), `entering` 4틱(T4·T5), 바 예정자의 바 → `at_bar` 50틱 → 관람 자리(T5·T9·T10·T11, `bar_buyers` +1), 건너기 4틱과 표시 좌표 25 씩 증가(T6·T7), 혼잡 대기(T8 — 다음 칸 `occ 2`), 도착 → `watching`(T9·T14), 조기 퇴장 → 입구 → `gone`(T12·T13), `gone`은 한 번 발행 후 사라짐(T15) |
+| AU4 | `test_state_transitions`(행마다 1건, T1~T14) | 작은 커버리지(관람 타일 몇 칸)와 손으로 만든 상황: 도착(T1), 입구 비었을 때 입장(T2)·찼을 때 대기(T3), `entering` 4틱(T4·T5), 바 예정자의 바 → `at_bar` 50틱 → 관람 자리(T5·T9·T10·T11, `bar_buyers` +1), 건너기 4틱과 표시 좌표 25 씩 증가(T6·T7), 혼잡 대기(T8 — 다음 칸 `occ 2`, `blocked` 1 씩 증가)와 `pass_override_ticks`(10)틱 연속으로 막힌 다음 틱에 `occ 2`인 칸으로 밀고 들어감(T7, `blocked` 0 으로, 그 칸 `occ 3`), 도착 → `watching`(T9·T14), 조기 퇴장 → 입구 → `gone`(T12·T13), `gone`은 한 번 발행 후 사라짐(T15) |
 | AU5 | `test_price_lowers_admissions` | `local_top_price30.admissions` < `local_top_baseline.admissions`(53 < 83)이고 각 유형 `e_t`도 감소. 가격 10 은 20 보다 많음. 평균 만족도 30 < 20 |
-| AU6 | `test_early_leave_patience` | 다음 칸을 계속 막아(`pass_tile_cap` 사람 배치) `walk_in` 대기가 `patience_ticks` 를 넘는 틱에 `audience.agent_left {reason:"patience"}` 1건, `state "leaving"`, 그 사람 `sat`이 확정되어 이후 불변, 공연 끝 `left_early` 1·`audience == admissions − 1`. 관람 자리를 다 예약해 둔 상태의 입장자 → `reason "no_spot"`. `queued`에서 인내 초과 → 바로 `gone` |
+| AU6 | `test_early_leave_patience` | (통로 막힘은 T7 의 `pass_override_ticks`로 풀리므로 인내 초과를 만들지 못한다.) 입구 두 칸을 계속 차 있게 두어(`entering` 상태로 고정한 에이전트 또는 `occ`를 채운 상황) `queued` 대기(T3)가 `walk_in`의 `patience_ticks` 를 넘는 틱에 `audience.agent_left {reason:"patience"}` 1건, 맵에 들어온 적이 없으므로 바로 `gone`. 맵 안 인내 초과는 바 자리 실패(T5, 대기 +30)를 반복하거나 `wait`을 미리 채운 레코드를 `restore`한 뒤 T8 한 번으로 만든다: 그 틱에 `audience.agent_left {reason:"patience"}` 1건, `state "leaving"`, 그 사람 `sat`이 확정되어 이후 불변, 공연 끝 `left_early` 1·`audience == admissions − 1`. 관람 자리를 다 예약해 둔 상태의 입장자 → `reason "no_spot"`. `queued`에서 인내 초과 → 바로 `gone` |
 | AU7 | `test_day_events_once` | `TickLoop` 하루(3,300틱): `audience.admissions_decided` 1회(저녁 진입 틱, `artist.lineup_set` 뒤), `audience.agent_moved` 정확히 1,500회(저녁·공연 틱마다, 낮 0), 각 페이로드의 원소 수 == 그 틱의 에이전트 수, 원소 5개 타입 `[int, int, int, String, String]`, id 오름차순. 공연 마지막 틱에 `agent_moved`(전원 `gone`) → `audience.day_summary` → `economy.sales_reported {admissions, audience}` 각 1회, 그 틱의 `time.phase_changed {to:"close"}`보다 먼저. `economy.day_settled.admissions`·`.audience`가 보고값과 같음 |
 | AU8 | `test_reference_satisfaction` | 4개 시나리오를 하루 돌린 `day_summary.avg_satisfaction_bp`가 `avg_satisfaction_bp_range` 안, `crowd_bp`·`left_early`·`audience`가 `expected`와 같음. `agent_satisfaction` 순수 함수로 부록 B2 표의 유형별 값 재현 |
 | AU9 | `test_determinism` | 같은 시드·입력 두 번 → `audience.*`·`economy.sales_reported` 이벤트 열 해시와 `snapshot()` 해시 같음. `audience` 외 스트림 상태 불변. 저녁 진입 틱의 `audience` 뽑기 수 == `max(1, admissions)`(1 + N − 1), 다른 틱 0(스트림 상태 비교) |
@@ -589,7 +592,7 @@ PY
   기대 출력: `T5 기대 입장: {'s04': 122, 's08': 120, 's11': 122, 's12': 122, 's03': 85, 's07': 92, 's10': 87} 최소 차 28` / `AU OK`, exit 0.
 - 손계산(reviewer): 부록 B 를 이 문서의 공식과 `audience.json` 값만으로 다시 계산한다.
 - 헤드리스(SE-034): `tools/run_tests.sh project/tests/sim` → AU0~AU11. Godot 이 없으면 SKIP → CI(`godot-tests`).
-- 변이(qa, SE-034): "AD9 의 `min(…, max_agents)` 제거" 패치 → AU3 의 150 상한 케이스만 실패. "T12 의 `pass_tile_cap` 무시 제거"(나가는 사람도 막힘) → AU6 만 실패하거나 교착으로 시간 초과.
+- 변이(qa, SE-034): "AD9 의 `min(…, max_agents)` 제거" 패치 → AU3 의 150 상한 케이스만 실패. "T7 의 `blocked ≥ pass_override_ticks` 조건 제거"(들어오는 사람 밀고 들어가기 없음) → AU4 의 밀고 들어감 케이스만 실패(기준 시나리오는 경로 동점 처리에 따라 AU8 도 실패할 수 있다 — SE-029-bug 재현). "T12 의 `pass_tile_cap` 무시 제거"(나가는 사람도 막힘) → AU4 의 T12 케이스가 실패하거나 교착으로 시간 초과.
 
 ## 열린 질문
 
@@ -608,9 +611,11 @@ PY
 | Q9 | 혼잡 측정 | (a) 공통: 남은 관객 ÷ 수용(공연 끝 1회) (b) 에이전트별 이웃 수 | **(a).** 손계산이 되고 "수용을 꽉 채우면 대가가 있다"를 바로 보여 준다. 길목 혼잡은 대기(SF4)가 따로 잡는다. 혼잡 히트맵(PRD 출력)은 `agent_moved`의 위치로 오버레이가 그린다 | 데이터 필드 추가(스키마 version 2) |
 | Q10 | 조기 퇴장자의 집계 | (a) `admissions`(티켓값)에는 넣고 `audience`(바 매출 기준)에서는 뺀다 (b) 환불 | **(a).** 환불 규칙은 events_crisis.md(민원). 만족 평균에는 넣는다(낮은 점수로 끌어내린다) | — |
 | Q11 | 성능 예산 | 목표 ≤ 2 ms/틱(티켓), 단언 ≤ 5 ms(SE-034) | 그대로. 비용이 큰 곳은 자리 고르기(순위 앞에서부터 훑기)와 경로 질의(에이전트당 하루 2~3회)이고, 틱마다 하는 일은 에이전트당 상수 | — |
+| Q12 | 통로 머리 맞댐 교착(SE-029-bug — 반대로 가는 두 무리가 인접 두 칸에 2명씩 서서 서로 막음) | (a) 연속 K 틱 막히면 `pass_tile_cap` 무시(`flow.pass_override_ticks`) (b) 서로 막은 두 사람 자리 교환(스왑 검출, 3자 이상 사이클은 못 잡음) (c) 경로 비용에 서 있는 사람 칸을 더함(SP 절 "다른 에이전트는 경로를 막지 않는다" 번복 + `TilePath` 비용 지원 필요) | **(a) K = 10**(producer 결정, 2026-10-09). 구현이 가장 단순하고 결정적이며(에이전트당 정수 1개, 나가는 사람 T12 와 같은 방식), qa 시뮬로 경로 동점 4변형 모두 기준 시나리오·150명 스트레스 조기 퇴장 0. 기준 시나리오 `expected`(입장·배분·만족 손계산·범위)는 바뀌지 않았다 | 데이터만(`pass_override_ticks`). (b)·(c)는 규칙 개정 |
 
 ## 변경 이력
 
 | 날짜 | 버전 | 티켓 | 내용 |
 |---|---|---|---|
 | 2026-10-09 | audience.md v0, `audience.json` v1 + `audience.schema.json` version 1 | SE-029 | 신규. 유형 3(`regular`·`genre_fan`·`walk_in`, 색·장르 적합·가격 민감·바·인내·자리 선호), 입장 수 AD1~AD12, 자리 선택 SP1~SP5, 상태 기계 UP1~UP6·T1~T15·MV1~MV3·P1, 만족 SF0~SF9, 공연 끝 FN1~FN4, 이벤트 4종(`audience.admissions_decided`·`agent_moved`·`agent_left`·`day_summary`) + `economy.sales_reported` 발행, 결정성 R1~R5, 스냅샷 RU1~RU7, 로드 검사 AL1~AL9, 수용 기준 AU0~AU14·AT1~AT6, 기준 시나리오 4개. 티켓 초안에서 바꾼 것: 이동 속도 틱당 1타일 → 4틱당 1타일(Q4), `agent_moved` 원소에 고정소수 좌표와 `type` 추가(Q5), 4번째 `audience.*` 이벤트로 `audience.agent_left` 신설, 화장실 상태 보류(Q6). 기존 테이블 변경 없음 |
+| 2026-10-09 | audience.md v0 (후속 수정), `audience.json` v1 → **v2**, `audience.schema.json` version 1 → **2** | SE-029-bug (docs/reports/SE-029.md 발견 1·낮음 2~5) | (1) 통로 머리 맞댐 교착 해소: `flow.pass_override_ticks`(10, 스키마 필수 필드 추가 → version 2), 에이전트 레코드 `blocked`(RU6 18 → 19키), T7(연속 막힘이면 밀고 들어감)·T8(`blocked` +1)·T12 설명·MV2, AU4(밀고 들어감 케이스)·AU6(인내 초과를 `queued` 대기·바 실패·복원 레코드로), 변이 문장, Q12. (2) 기준 시나리오: "경로 동점 처리가 달라도 평균은 바뀌지 않는다"를 "범위 안"으로 완화, 만족 범위는 시드 0 한정이라고 명시, 프로토타입 참고 문단을 qa 시뮬 결과로 교체. `expected` 값은 바뀌지 않음(qa 시뮬 `--pass-override 10` 4변형 `MISMATCH: 없음`). (3) `time.day_started`가 `lineup`도 비운다. (4) view 계약에 무대 방향(초점 셀, 모르면 +z, 로드 뒤는 SE-037 가구 복구 경로). (5) 바 방문 수 ↔ economy 바 구매 인원 차이(≤ 15%) 설명. 입장·만족 공식·이벤트 페이로드 변경 없음 |

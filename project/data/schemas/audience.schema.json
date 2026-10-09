@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "schema version 1 (SE-029). 변경 이력: docs/gdd/audience.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 audience.md 변경 이력에 적는다.",
+  "$comment": "schema version 2 (SE-029-bug: flow.pass_override_ticks 추가). version 1 = SE-029. 변경 이력: docs/gdd/audience.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 audience.md 변경 이력에 적는다.",
   "title": "audience",
   "description": "관객 시스템 수치(입장 수 공식 계수, 유형 3종, 흐름·이동, 만족 가중치, 기준 시나리오). 규칙: docs/gdd/audience.md. 비율은 economy.json rate_scale(10000) 분의 정수 bp. 수치 변경은 game-designer 만.",
   "type": "object",
@@ -35,7 +35,7 @@
     }
   },
   "properties": {
-    "version": { "type": "integer", "enum": [1] },
+    "version": { "type": "integer", "enum": [2] },
     "max_agents": {
       "description": "동시에 존재하는 에이전트 상한이자 하루 입장 상한(PRD MVP 관객 150). sim.json individual_agent_cap 이하(로더 AL4)",
       "type": "integer", "minimum": 1
@@ -60,7 +60,7 @@
     "flow": {
       "description": "에이전트 흐름(상태 기계 T1~T13)의 틱 수·인원 상한",
       "type": "object",
-      "required": ["arrival_window_ticks", "entry_ticks", "move_ticks_per_tile", "spot_tile_cap", "pass_tile_cap", "bar_ticks", "bar_fail_wait_ticks"],
+      "required": ["arrival_window_ticks", "entry_ticks", "move_ticks_per_tile", "spot_tile_cap", "pass_tile_cap", "bar_ticks", "bar_fail_wait_ticks", "pass_override_ticks"],
       "additionalProperties": false,
       "properties": {
         "arrival_window_ticks": { "description": "저녁 구간 시작부터 도착을 퍼뜨리는 틱 수. 저녁 구간 틱 수 이하(AL6)", "type": "integer", "minimum": 1 },
@@ -69,7 +69,8 @@
         "spot_tile_cap": { "description": "관람·바 자리로 한 타일을 점유(claim)할 수 있는 에이전트 수", "type": "integer", "minimum": 1 },
         "pass_tile_cap": { "description": "한 타일에 동시에 있을 수 있는 에이전트 수(서 있는 사람 + 지나가는 사람). leaving 은 무시", "type": "integer", "minimum": 1 },
         "bar_ticks": { "description": "at_bar 체류 틱 수(구매 1회)", "type": "integer", "minimum": 1 },
-        "bar_fail_wait_ticks": { "description": "바 자리가 없어 구매를 포기할 때 대기에 더하는 틱 수", "type": "integer", "minimum": 0 }
+        "bar_fail_wait_ticks": { "description": "바 자리가 없어 구매를 포기할 때 대기에 더하는 틱 수", "type": "integer", "minimum": 0 },
+        "pass_override_ticks": { "description": "연속으로 이만큼 막힌(T8) 뒤의 다음 시도에서는 pass_tile_cap 을 무시하고 들어간다(T7, 통로 교착 해소, SE-029-bug)", "type": "integer", "minimum": 1 }
       }
     },
     "satisfaction": {

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "max_agents": 150,
   "pos_scale": 100,
   "admission": {
@@ -16,7 +16,8 @@
     "spot_tile_cap": 1,
     "pass_tile_cap": 2,
     "bar_ticks": 50,
-    "bar_fail_wait_ticks": 30
+    "bar_fail_wait_ticks": 30,
+    "pass_override_ticks": 10
   },
   "satisfaction": {
     "weights_bp": { "lineup": 4000, "sound": 1500, "sight": 1500, "value": 3000 },
