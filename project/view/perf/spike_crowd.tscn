@@ -26,6 +26,8 @@ params = ExtResource("4_gridparams")
 
 [node name="Crowd" type="MultiMeshInstance3D" parent="."]
 
+[node name="StageProps" type="Node3D" parent="."]
+
 [node name="Lights" type="Node3D" parent="."]
 
 [node name="IsoCamera" parent="." instance=ExtResource("5_camera")]

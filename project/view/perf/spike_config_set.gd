@@ -1,18 +1,18 @@
 class_name SpikeConfigSet
 extends Resource
-## SE-003 성능 스파이크 설정 전체: 구성 A~D, 측정 절차(예열·측정 시간, 해상도, 관문), 군중·라이트 연출 상수.
+## 성능 스파이크 설정 전체: 구성 A~E, 측정 절차(예열·측정 시간, 해상도, 관문), 군중·무대 프록시·라이트 연출 상수.
 ## 렌더 측정 설정이라 data/ 가 아닌 view 리소스(spike_configs.tres)에 둔다. 코드에는 숫자를 두지 않는다.
 
 # --- 구성 -----------------------------------------------------------------
 
-## 측정 구성들(티켓 표 A~D).
+## 측정 구성들(SE-003 표 A~D + SE-013 구성 E).
 @export var configs: Array[SpikeConfig] = []
 ## --config 가 없을 때 쓰는 구성 id.
 @export var default_config_id: String = ""
 
 # --- 측정 절차 ------------------------------------------------------------
 
-## 관문 판정 대상 구성 id(티켓: B).
+## 관문 판정 대상 구성 id(SE-013: E = B 와 같되 군중 그림자 off).
 @export var gate_config_id: String = ""
 ## 관문: 이 구성의 평균 fps 가 이 값 이상이면 통과(PRD: 60fps).
 @export var gate_min_avg_fps: float = 0.0
@@ -53,6 +53,21 @@ extends Resource
 ## 상하 흔들림(점프/바운스) 높이(m)와 빈도(Hz).
 @export var bob_height_m: float = 0.0
 @export var bob_freq_hz: float = 0.0
+
+# --- 무대 프록시(셰도우 캐스터) ------------------------------------------
+# 군중이 그림자를 안 드리워도 셰도우 라이트의 그림자 패스가 비지 않도록, 모든 구성에 같은 박스 캐스터를 둔다(SE-013).
+# 박스는 레이아웃 좌표(카메라 기준 요로 돌린 군중 정사각형)에서 한 줄로 놓인다:
+#   u(가로) = 군중 한 변 × stage_prop_span_ratio 를 stage_prop_count 칸으로 나눈 칸 중심,
+#   v(깊이) = 군중 반 변 × stage_prop_offset_ratio (음수 = 화면 안쪽, 셰도우 라이트가 놓인 앞줄 쪽).
+
+## 박스 개수(≥ 4). 모든 구성에서 같다.
+@export var stage_prop_count: int = 0
+## 박스 크기(m, x·y·z). 바닥에 놓인다(중심 높이 = y / 2).
+@export var stage_prop_size_m: Vector3 = Vector3.ZERO
+## 줄 길이 = 군중 한 변 × 이 비율(0 < r ≤ 1).
+@export var stage_prop_span_ratio: float = 0.0
+## 줄 위치 = 군중 중심에서 깊이 방향으로 군중 반 변 × 이 비율(-1 < r < 1).
+@export var stage_prop_offset_ratio: float = 0.0
 
 # --- 라이트 ---------------------------------------------------------------
 
@@ -140,4 +155,14 @@ func get_errors() -> PackedStringArray:
 		errs.append("라이트 배치·궤도 값 양수 (모든 라이트가 매 프레임 움직여야 한다)")
 	if omni_range_m <= 0.0 or spot_range_m <= 0.0 or spot_angle_deg <= 0.0 or spot_angle_deg >= 90.0:
 		errs.append("라이트 범위·스폿 각도")
+	if stage_prop_count <= 0:
+		errs.append("stage_prop_count > 0")
+	if stage_prop_size_m.x <= 0.0 or stage_prop_size_m.y <= 0.0 or stage_prop_size_m.z <= 0.0:
+		errs.append("stage_prop_size_m 양수")
+	if stage_prop_size_m.y >= light_height_m:
+		errs.append("무대 프록시는 라이트보다 낮아야 한다")
+	if stage_prop_span_ratio <= 0.0 or stage_prop_span_ratio > 1.0:
+		errs.append("0 < stage_prop_span_ratio ≤ 1")
+	if stage_prop_offset_ratio <= -1.0 or stage_prop_offset_ratio >= 1.0:
+		errs.append("-1 < stage_prop_offset_ratio < 1")
 	return errs
