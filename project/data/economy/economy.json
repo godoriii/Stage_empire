@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "rate_scale": 10000,
+  "starting_cash": 5000,
+  "bailout_count": 2,
+  "demolish_refund_rate_bp": 7000,
+  "guarantee_by_grade": {
+    "local": 400,
+    "rookie": 800
+  },
+  "charge_reasons": {
+    "build": "capital",
+    "guarantee": "operating"
+  },
+  "rows": [
+    {
+      "id": "tier_1",
+      "tier": 1,
+      "rent_per_day": 600,
+      "tax_rate_bp": 1000,
+      "ticket_price_default": 20,
+      "ticket_price_min": 5,
+      "ticket_price_max": 40,
+      "bar_purchase_rate_bp": 6000,
+      "bar_avg_spend": 12,
+      "bar_cost_rate_bp": 3500,
+      "bailout_loan_amount": 3000,
+      "bailout_interest_bp": 1000,
+      "bailout_repay_days": 10
+    }
+  ],
+  "reference_scenarios": [
+    {
+      "id": "tier1_baseline",
+      "tier": 1,
+      "admissions": 100,
+      "audience": 100,
+      "guarantee_grade": "local",
+      "booking_policy": "book_if_affordable",
+      "upkeep_per_day": 200,
+      "initial_build_spend": 3000,
+      "expected": {
+        "ticket_revenue": 2000,
+        "bar_buyers": 60,
+        "bar_revenue": 720,
+        "bar_cost": 252,
+        "revenue": 2720,
+        "rent": 600,
+        "upkeep": 200,
+        "guarantee": 400,
+        "operating_costs": 1452,
+        "pretax": 1268,
+        "tax": 126,
+        "net": 1142,
+        "loan_repayment": 0,
+        "settlement_delta": 1542,
+        "day_cash_delta": 1142,
+        "days_to_tier2_cash": 25
+      },
+      "checks": {
+        "net_to_rent_min_bp": 15000,
+        "net_to_rent_max_bp": 25000,
+        "tier2_max_days": 30
+      }
+    },
+    {
+      "id": "tier1_bankrupt",
+      "tier": 1,
+      "admissions": 20,
+      "audience": 20,
+      "guarantee_grade": "local",
+      "booking_policy": "book_if_affordable",
+      "upkeep_per_day": 200,
+      "initial_build_spend": 0,
+      "expected": {
+        "ticket_revenue": 400,
+        "bar_buyers": 12,
+        "bar_revenue": 144,
+        "bar_cost": 50,
+        "revenue": 544,
+        "rent": 600,
+        "upkeep": 200,
+        "guarantee": 400,
+        "operating_costs": 1250,
+        "pretax": -706,
+        "tax": 0,
+        "net": -706,
+        "bailout_offered_days": [8, 11],
+        "bankrupt_day": 14,
+        "cash_by_day": [4294, 3588, 2882, 2176, 1470, 764, 58, -742, 1882, 764, -354, 1513, 26, -1555],
+        "bailout_amounts": [3742, 3354]
+      }
+    }
+  ]
+}
