@@ -3,9 +3,9 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | v0 |
-| 스펙 티켓 | SE-006 (game-designer), SE-011 (시스템 스냅샷 훅 — #명령-큐와-틱-순서 "시스템 등록", #스냅샷) |
+| 스펙 티켓 | SE-006 (game-designer), SE-011 (시스템 스냅샷 훅 — #명령-큐와-틱-순서 "시스템 등록", #스냅샷), SE-057 (#세이브-설정-savejson) |
 | 구현 티켓 | SE-001 (sim-engineer) — `project/core/{sim_config,event_bus,rng,tick}.gd`. SE-012 (sim-engineer) — `tick.gd` 시스템 스냅샷 훅 |
-| 데이터 | [`project/data/sim/sim.json`](../../project/data/sim/sim.json) (version 3. SE-011 결정, 적용됨(SE-012) — #수치표), 스키마 [`sim.schema.json`](../../project/data/schemas/sim.schema.json) |
+| 데이터 | [`project/data/sim/sim.json`](../../project/data/sim/sim.json) (version 3. SE-011 결정, 적용됨(SE-012) — #수치표), 스키마 [`sim.schema.json`](../../project/data/schemas/sim.schema.json) · [`project/data/save/save.json`](../../project/data/save/save.json) (version 1, SE-057 — #세이브-설정-savejson), 스키마 [`save.schema.json`](../../project/data/schemas/save.schema.json) |
 | 이벤트 | [`docs/gdd/events.md`](events.md) — 이 문서에 나오는 이벤트 이름은 전부 거기 표에 있다 |
 | 근거 | PRD "핵심 게임플레이 루프"(세션 구조 표), "기술 요구사항"(아키텍처 원칙 2·4, 세이브), ADR-0002 |
 
@@ -415,6 +415,25 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 **오토세이브 시점.** PRD "하루 마감마다" = close 진입 틱이 끝난 경계. 그 틱의 단계 4 에서 `time.phase_changed {to:"close"}`가 나고, close 는 홀드라 `advance`/`step`이 그 경계에서 반환한다(뒤따르는 경계 처리 없음).
 세이브 시스템(후속 티켓)은 `time.phase_changed {to:"close"}`를 구독해 플래그만 세우고, 구동기가 `advance`/`step` 반환 뒤 `snapshot()`을 찍는다. 파일 포맷(JSON → gzip)·마이그레이션은 후속 세이브 티켓.
 
+#### 세이브 설정 (save.json)
+
+[`save.json`](../../project/data/save/save.json)(version 1, SE-057)은 슬롯 수와 오토세이브 보관 수만 담는다. 파일 형식(JSON → gzip, SE-036 `SaveFile`)과 스냅샷 버전(`sim.json` `snapshot_schema_version`)은 이 테이블 밖이다. 난수를 쓰지 않고 게임 상태(스냅샷)에 들어가지 않는다 — 값을 바꿔도 상태 해시·리플레이 기준값은 불변이다.
+
+| 필드 | 값 | 범위 | 뜻 |
+|---|---|---|---|
+| `manual_slots` | 3 | 1~9 | 수동 저장 슬롯 수. 슬롯 이름 `"1"` … `str(manual_slots)`(events.md SN1 형식). 상한 9 는 메뉴 한 화면·한 자리 이름 기준 |
+| `autosave_keep` | 3 | 0~99, 0 = 무제한 | 보관할 오토세이브(`autosave_day<N>`) 파일 수 |
+
+| # | 규칙 |
+|---|---|
+| SV1 | **읽는 쪽.** `GameSession`(core)이 `new_game`·`load_configs` 때 `<data_root>/save/save.json` 을 읽는다. `manual_slots` 는 메뉴(SE-039/SE-040, AC-39d)가 읽는다. 둘 다 읽기 전용 |
+| SV2 | **수동 슬롯은 UI 목록일 뿐.** sim 은 `manual_slots` 로 저장·불러오기를 거부하지 않는다(SN1 형식만 검사). 슬롯 수를 줄여도 기존 `"4"` 파일은 지우지 않고, 메뉴에 안 보일 뿐이다 |
+| SV3 | **보관 수 적용.** 오토세이브 파일을 쓴 직후(close 홀드 경계, 위 "오토세이브 시점") `autosave_keep > 0` 이면 `autosave_day<N>` 파일을 `N` 오름차순으로 지워 `autosave_keep` 개만 남긴다. 방금 쓴 파일은 가장 큰 `N` 이라 항상 남는다. 수동 슬롯 파일과 그 밖의 파일은 세지도 지우지도 않는다. `autosave_keep == 0` 이면 지우지 않는다. 오토세이브 쓰기가 실패한 경계에서는 지우지 않는다 |
+| SV4 | **파일·필드 없음.** `save/save.json` 이 없거나 `autosave_keep` 키가 없으면 무제한(0, SE-036 의 현재 기본과 같음). `manual_slots` 가 없으면 메뉴 기본값(`ui_params.tres`, SE-040 AC-39d) |
+| SV5 | **잘못된 값.** `autosave_keep` 이 `int` 가 아니거나 0 미만이면 `push_error` 1회 후 무제한(0) — 잘못된 데이터로 세이브를 지우지 않는 쪽이 안전하다. `manual_slots` 가 `int` 가 아니거나 1 미만이면 메뉴가 SV4 기본값을 쓴다. 스키마(`validate_data.py --strict`)가 CI 에서 먼저 막으므로 런타임 경로는 손상 대비다 |
+
+수용 기준(SE-057): `autosave_keep: 2` 를 주입한 데이터 루트로 3일 진행하면 3일차 close 뒤 `autosave_day1.sav` 가 없고 `day2`·`day3` 이 있다. 데이터 루트에 `save/` 가 없으면 3일 뒤 세 파일이 다 있다. 수동 슬롯 `"1"` 파일은 어느 경우에도 남는다. → `test_game_session.gd`(sim-engineer).
+
 ### 이벤트 순서
 
 | # | 규칙 |
@@ -559,3 +578,4 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-017 (docs/reviews/SE-012.md 발견 5·참고 4·후속 제안 D, docs/reports/SE-012.md 리뷰어에게 6) | #스냅샷 `restore` 문단의 "`push_error`는 정확히 1회"를 "**`TickLoop` 자신의** `push_error` 1회, 하위 구성 요소(4(b) `SeededRng.set_state`, 6·7단계 시스템 훅 자신)와 7단계 롤백 실패분은 별도"로 고쳤다. restore 표 4단계에 `set_state` 실패 조건(이름이 문자열 아님·값이 10진 정수 문자열 아님, 값 검사가 스트림 이름 확인보다 먼저)과 합계 2회를 적었다. "복구 불능" 뒤에 "`push_error` 횟수 (SE-017)" 블록(세 항 (i)~(iii), 실패 경로별 합계 표 7행, 결정 근거)을 더했다. 수용 기준 머리말에 "restore 행의 횟수는 누적 합계, '1회' 행은 `TickLoop` 자신 1회와 같다, economy.md EC16 (c) 2회와 모순 없음"을 한 번 적고, AC10 `test_restore_rejects_bad_snapshot` 행에 `rng["audience"] = "x"` → `false`·해시 불변·`push_error` 누적 +2 케이스를 더했다. 기존 단언(I4·`seed` 범위 +1, "seed max passes" +0, `systems` 불일치 +1, 롤백 (a) 1·(b) +2, EC16 (c) +2)은 모두 새 규칙과 일치해 그대로다. economy.md 변경 0. 수치·이벤트·스냅샷 키 변경 0, 코드·데이터 변경 0 |
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-016 (docs/reviews/SE-012.md 발견 4·후속 제안 C) | 공개 API 표 `EventBus`에 `static is_valid_value(v: Variant, allow_float: bool) -> bool`(E4 기본형 재귀 검사, SH2 용, `project/core/event_bus.gd`)을 더했다. 이미 있던 공개 멤버를 표에 올린 것뿐이라 코드·규칙·이벤트·리플레이 기준값 변경 없음 |
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-022 (docs/reviews/SE-017.md 발견 1·후속 E) | #스냅샷 "`push_error` 횟수 (SE-017)" 표 2행의 "고정하는 테스트" 열을 바로잡았다. 기존 `test_restore_rejects_bad_snapshot`은 5단계 ①②③만 때리므로 그 범위를 `(5단계 ①②③)`로 적고, 5단계 ④(훅 시스템 객체 해제로 `Callable.is_valid()`가 아님)를 고정하는 `test_restore_rejects_invalid_hook`(SE-022 1차 sim-engineer 추가)을 덧붙였다. 이 케이스는 `snapshot()`이 같은 무효 훅 때문에 `{}`를 돌려주므로 상태 해시 대신 `TickLoop` 필드 비교로 불변을 단언하고, ④ 분기를 변이에서 구별하는 것은 메시지 단언 "더 이상 유효하지 않다"다(분기를 지우면 6단계 사전 스냅샷이 같은 횟수로 실패한다). 표의 (i)(ii)(iii)·합계 열(1·0·0·1)과 다른 행은 변경 없음. 규칙·수치·이벤트·스냅샷 키 변경 0, 코드·데이터 변경 0 |
+| 2026-10-10 | `save.json` v1 + `save.schema.json` version 1 (신규), tick.md v0 (후속 수정) | SE-057 (docs/reviews/SE-036.md 후속 제안, docs/tickets/SE-036.md 결과 절 "game-designer 요청 필드") | #스냅샷 아래 "세이브 설정 (save.json)" 절(SV1~SV5)을 새로 썼다. 필드 `manual_slots` 3(1~9), `autosave_keep` 3(0~99, 0 = 무제한). SE-036 결과 절 제안 이름 `save_slot_count` 는 SE-057 티켓의 `manual_slots` 로 바꿨다(SE-040 AC-39d 가 이미 이 이름을 참조). `sim.json` 에 넣지 않고 새 테이블로 둔 이유: 세이브 설정은 시뮬레이션 상수가 아니고 상태 해시에 영향이 없으며, `sim.json` 은 버전을 올리면 리플레이 기준값 검토가 따라온다. `sim.json`·스냅샷 키·이벤트 변경 0 |
