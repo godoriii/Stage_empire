@@ -9,10 +9,10 @@ var _tiers: Dictionary
 
 
 func before_all() -> void:
-	_raw = MapConfig.read_json(FurnitureConfig.DEFAULT_PATH)
-	_econ = MapConfig.read_json(BuildConfig.ECONOMY_PATH)
-	_map = MapConfig.read_json(MapConfig.DEFAULT_PATH)
-	_tiers = MapConfig.read_json(MapConfig.TIERS_PATH)
+	_raw = JsonUtil.read_json(FurnitureConfig.DEFAULT_PATH)
+	_econ = JsonUtil.read_json(BuildConfig.ECONOMY_PATH)
+	_map = JsonUtil.read_json(MapConfig.DEFAULT_PATH)
+	_tiers = JsonUtil.read_json(MapConfig.TIERS_PATH)
 
 
 func _scale() -> int:

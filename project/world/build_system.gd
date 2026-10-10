@@ -181,7 +181,7 @@ func _on_charge_resolved(p: Dictionary) -> void:
 		var reason: String = DECLINE_TO_REASON.get(decline, R_CHARGE_INVALID)
 		_reject_place(pend["furniture_id"], pend["cell"], pend["rotation"], reason)
 		return
-	var amount: Variant = MapConfig.as_int(p.get("amount"))                                    # H2
+	var amount: Variant = JsonUtil.as_int(p.get("amount"))                                    # H2
 	var paid: int = amount if amount != null else int(pend["cost"])
 	var eid: String = ENTITY_PREFIX + str(next_entity)
 	instances.append({
@@ -233,11 +233,15 @@ func _on_demolish_requested(p: Dictionary) -> void:
 	_publish_coverage(CAUSE_DEMOLISHED)
 
 
-## 구간 추적. evening 진입이면 sync 1회.
+## 구간 추적. evening 진입이면 sync 1회. `to` 가 구간 id(SimConfig.PHASE_IDS = sim.json phases)가 아니면 push_error 1회 후
+## 무시한다 — phase 를 바꾸면 자기 snapshot() 을 restore() 가 RS1 로 거부해 SH3 이 깨진다(SE-044, SE-032 리뷰 발견 4).
 func _on_phase_changed(p: Dictionary) -> void:
 	var to: Variant = p.get("to")
 	if not (to is String):
 		push_warning("[BuildSystem] time.phase_changed 페이로드 무시: %s" % [p])
+		return
+	if not SimConfig.PHASE_IDS.has(to):
+		push_error("[BuildSystem] time.phase_changed 의 to '%s' 가 구간 id %s 가 아니다(무시)" % [to, SimConfig.PHASE_IDS])
 		return
 	phase = to
 	if phase == PHASE_SYNC:
@@ -388,7 +392,7 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 	var raw: Variant = d["instances"]
 	if not (raw is Array):
 		return "RS1 instances 가 배열이 아니다"
-	var ne: Variant = MapConfig.as_int(d["next_entity"])
+	var ne: Variant = JsonUtil.as_int(d["next_entity"])
 	if ne == null or ne < FIRST_ENTITY:
 		return "RS1 next_entity 가 %d 이상 정수가 아니다: %s" % [FIRST_ENTITY, d["next_entity"]]
 	var ph: Variant = d["phase"]
@@ -406,9 +410,9 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 				return "RS1 instances[] 필드 누락: %s" % key
 		var eid: Variant = e["entity_id"]
 		var fid: Variant = e["furniture_id"]
-		var cell: Variant = MapConfig.as_int_pair(e["cell"])
-		var rot: Variant = MapConfig.as_int(e["rotation"])
-		var paid: Variant = MapConfig.as_int(e["paid"])
+		var cell: Variant = JsonUtil.as_int_pair(e["cell"])
+		var rot: Variant = JsonUtil.as_int(e["rotation"])
+		var paid: Variant = JsonUtil.as_int(e["paid"])
 		if not (eid is String) or not (fid is String) or cell == null or rot == null or paid == null:
 			return "RS1 instances[] 타입 오류: %s" % [e]
 		var n: int = _entity_number(eid)                                                        # RS2
