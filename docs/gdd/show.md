@@ -96,7 +96,7 @@ ShowSystem 이 소유하는 상태. 전부 스냅샷 대상이다(#스냅샷).
 
 ### 공연 시작
 
-`time.phase_changed {to: "show"}`(evening → show, 공연 첫 틱 경계 = 하루 2,400 틱째의 단계 4) 수신 시. 위에서부터 처음 맞는 행.
+`time.phase_changed {to: "show"}`(evening → show, 저녁 마지막 틱(2,400) 단계 4 에서 전환. [tick.md #명령 큐와 틱 순서](tick.md#명령-큐와-틱-순서) — 공연 구간의 첫 틱은 2,401) 수신 시. 위에서부터 처음 맞는 행.
 
 | # | 조건 | 결과 |
 |---|---|---|
@@ -141,7 +141,7 @@ v0 의 show 는 공연 구간에 하는 일이 없다. 만족은 audience 가 �
 | CL1 | `time.phase_changed {to: "close"}` 수신 시 `status == "running"` | `push_warning`(요약 누락 — audience 미등록 등), `status = "ended"`. `show.ended`는 내지 않는다(만족을 모르는 공연을 등급으로 접지 않는다) |
 
 **이벤트 순서**(같은 틱, tick.md E2·E6).
-- 공연 첫 틱(2,400) 단계 4: `time.phase_changed {evening→show}` → `show.started` 또는 `show.skipped` → (`reputation`이 `show.started` 수신) → `tick.advanced`. (배속은 show 진입에서 1 로 유지되어 보통 `time.speed_changed`가 없다.)
+- 저녁 마지막 틱(2,400) 단계 4 에서 전환: `time.phase_changed {evening→show}` → `show.started` 또는 `show.skipped` → (`reputation`이 `show.started` 수신) → `tick.advanced`. (배속은 show 진입에서 1 로 유지되어 보통 `time.speed_changed`가 없다.)
 - 공연 마지막 틱(3,300) 단계 2: … → `audience.agent_moved`(전원 `gone`) → `audience.day_summary` → `show.ended` → `artist.grown` → `reputation.changed` → `economy.sales_reported` → (단계 4) `time.phase_changed {show→close}` → `economy.cash_changed` → `economy.day_settled` → (`reputation.tier_unlocked`) → `time.speed_changed {speed:0}` → `tick.advanced`.
 - `show.ended`의 구독자 순서는 `system_order`대로 artist(성장) → reputation(명성). 그래서 `artist.grown`이 `reputation.changed`보다 먼저 나온다. SE-035 AC2("`show.ended`는 `audience.day_summary` 뒤·`economy.day_settled` 앞")와 audience.md #공연-끝 순서와 맞는다.
 
@@ -151,8 +151,8 @@ v0 의 show 는 공연 구간에 하는 일이 없다. 만족은 audience 가 �
 
 | 이벤트 | 페이로드 | 발행 시점 | 1일 횟수 |
 |---|---|---|---|
-| `show.started` | `{day: int, artist_id: String, genre: String, expected_admissions: int}` — `genre`는 `artist.json` `mvp_genres` 중 하나, `expected_admissions` = 그날 `audience.admissions_decided.admissions`(못 받았으면 0) | ST3, 공연 첫 틱 단계 4 | 0~1 |
-| `show.skipped` | `{day: int, reason: "no_lineup"\|"no_stage"}` | ST1·ST2, 공연 첫 틱 단계 4 | 0~1 |
+| `show.started` | `{day: int, artist_id: String, genre: String, expected_admissions: int}` — `genre`는 `artist.json` `mvp_genres` 중 하나, `expected_admissions` = 그날 `audience.admissions_decided.admissions`(못 받았으면 0) | ST3, 저녁 마지막 틱(2,400) 단계 4 에서 전환 | 0~1 |
+| `show.skipped` | `{day: int, reason: "no_lineup"\|"no_stage"}` | ST1·ST2, 저녁 마지막 틱(2,400) 단계 4 에서 전환 | 0~1 |
 | `show.ended` | `{day: int, artist_id: String, satisfaction_bp: int, grade: "disaster"\|"poor"\|"ok"\|"good"\|"rave", admissions: int, audience: int, revenue_hint: int, incidents: Array}` — `grade`는 영문 id(`artist.json` `show_grades`, artist.md Q10), `incidents`는 v0 항상 `[]` | DS5, 공연 마지막 틱 단계 2(`audience.day_summary` 처리 중) | 0~1 |
 
 - 하루에 `show.started`와 `show.skipped` 중 정확히 하나가 나온다(공연 구간에 들어간 날, show 등록 시). `show.ended`는 `show.started`가 나온 날에만, 정확히 1회(audience 등록 시).
@@ -341,10 +341,10 @@ PRD "마감: 수익·만족도·명성 리포트, 아티스트 관계 변화, �
 
 | # | 목표 | 현재 값 |
 |---|---|---|
-| ST1 | 기준 배치 + 로컬 상위(`local_top_baseline`)의 평균 만족 범위 전체가 `good` | 6,432~6,732 → good |
-| ST2 | 가격 30(`local_top_price30`)은 가격 20 보다 정확히 한 단계 낮음 | good → ok |
-| ST3 | 각 기준 시나리오의 만족 범위가 등급 경계에서 200 bp 이상 떨어짐(시드·경로 동점에 등급이 흔들리지 않음) | 최소 270(price30 상한 5,730 ↔ 6,000) |
-| ST4 | 단골만 온 영업일 수준(`no_lineup` 4,600)은 `poor` 구간 — 아티스트를 불러 이 수준이면 실패로 친다 | 3,000 ≤ 4,600 < 5,000 |
+| SG1 | 기준 배치 + 로컬 상위(`local_top_baseline`)의 평균 만족 범위 전체가 `good` | 6,432~6,732 → good |
+| SG2 | 가격 30(`local_top_price30`)은 가격 20 보다 정확히 한 단계 낮음 | good → ok |
+| SG3 | 각 기준 시나리오의 만족 범위가 등급 경계에서 200 bp 이상 떨어짐(시드·경로 동점에 등급이 흔들리지 않음) | 최소 270(price30 상한 5,730 ↔ 6,000) |
+| SG4 | 단골만 온 영업일 수준(`no_lineup` 4,600)은 `poor` 구간 — 아티스트를 불러 이 수준이면 실패로 친다 | 3,000 ≤ 4,600 < 5,000 |
 
 ## 테스트 방법
 
@@ -396,7 +396,7 @@ PY
 | # | 질문 | 선택지 | 채택(추천) | 바꾸면 |
 |---|---|---|---|---|
 | Q1 | 공연 만족도의 진실의 출처 | (a) 관객 평균 `audience.day_summary.avg_satisfaction_bp`가 최종, show 는 등급만 (b) show.md 가 PRD 곱 공식을 따로 계산(커버리지 비율 × 라인업 …) (c) 둘을 섞음(평균 × show 보정) | **(a)**(audience.md Q7 과 같은 결정). 한 공식만 두면 가중치 조정이 한 파일(`audience.json`)에서 끝나고, 에이전트별 위치(음향·시야)·대기를 반영한 값이 커버리지 비율보다 정확하다. (b)는 두 값이 갈라질 때 어느 쪽이 맞는지 정할 수 없다. (c)는 같은 요소를 두 번 센다 | (b)·(c)는 audience SF2 를 빼고 이 문서에 공식을 옮기는 개정(audience.json·show.json 스키마 version 2) |
-| Q2 | 등급 임계 | (a) 0 / 3,000 / 5,000 / 6,000 / 7,500 (b) 0 / 3,000 / 5,000 / 6,500 / 8,000 (c) 균등 2,000 간격 | **(a).** 기준 시나리오 평균 범위(6,432~6,733)가 호평 안에 경계에서 400 bp 이상 떨어져 들어간다. (b)는 6,432 가 보통으로 떨어져 같은 배치가 시드에 따라 등급이 바뀐다(ST3 위반). (c)는 "라인업 없는 영업일"(4,600)과 기준 공연(6,732)이 한 등급이 된다 | 데이터만(`grades[].min_bp`) + reputation 기준 시나리오 재계산 |
+| Q2 | 등급 임계 | (a) 0 / 3,000 / 5,000 / 6,000 / 7,500 (b) 0 / 3,000 / 5,000 / 6,500 / 8,000 (c) 균등 2,000 간격 | **(a).** 기준 시나리오 평균 범위(6,432~6,733)가 호평 안에 경계에서 400 bp 이상 떨어져 들어간다. (b)는 6,432 가 보통으로 떨어져 같은 배치가 시드에 따라 등급이 바뀐다(SG3 위반). (c)는 "라인업 없는 영업일"(4,600)과 기준 공연(6,732)이 한 등급이 된다 | 데이터만(`grades[].min_bp`) + reputation 기준 시나리오 재계산 |
 | Q3 | 라인업은 있는데 무대가 없는 날 | (a) `show.skipped {reason:"no_stage"}`(명성 변화 0, 성장 없음) (b) 공연으로 치고 관객 0 → 참사(명성 감소) | **(a).** 관객 0 명의 평균은 의미가 없고, 개런티·임대료 손실이 이미 벌칙이다. 무대 철거는 낮에만 되므로 플레이어가 고르기 어려운 상황도 아니다 | (b)는 ST2 삭제, DS1 의 `admissions == 0` 처리 추가 |
 | Q4 | `show.ended`에 `genre` 를 넣나 | (a) 티켓 페이로드 그대로, reputation 이 `show.started.genre`를 기억 (b) `show.ended`에 `genre` 추가 | **(a)**(티켓 범위 페이로드 유지). reputation 상태에 `show_genre` 1개가 더 생긴다. 리포트(SE-039)는 장르를 `artist.lineup_set`에서 읽는다 | (b)는 events.md 페이로드 1키 추가 + reputation 상태 1개 삭제 |
 | Q5 | `revenue_hint`의 뜻 | (a) 티켓 매출 = `admissions × ticket_price`(economy S1 과 같은 값) (b) 바 매출 추정까지 포함 (c) 0(예약) | **(a).** 정산 전에 확정되는 유일한 매출이고 economy 공식과 같은 곱이라 갈라지지 않는다. 바·비용은 정산 리포트가 보여 준다 | (b)는 economy S2~S4 를 show 가 복제하게 되어 피한다 |
@@ -406,5 +406,6 @@ PY
 
 | 날짜 | 버전 | 티켓 | 내용 |
 |---|---|---|---|
+| 2026-10-10 | show.md v0.1 (데이터·스키마 변경 없음) | SE-048 A | 문구만. 공연 진입 시점 4곳(#공연-시작, #이벤트 순서 목록, 이벤트 표 `show.started`·`show.skipped`)을 tick.md 기준 "저녁 마지막 틱(2,400) 단계 4 에서 전환"으로 고침(공연 구간 첫 틱은 2,401). 수치 목표 ID 접두어 ST → SG(SG1~SG4, 규칙 ST0~ST3 와 접두어 충돌 해소), 본문 참조(Q2 "SG3 위반")와 SE-030 이력 행 갱신. 규칙 ST0~ST3·"ST2 제거"(변이, Q3)는 규칙을 가리키므로 그대로. 규칙·수치·이벤트 계약 변경 없음 |
 | 2026-10-10 | show.md v0.1 (데이터 변경 없음) | SE-039 2차 | 마감 리포트 표시 순서 확정(#표시-순서-se-039-2차-확정): R13 을 R8 바로 아래로. Q6(등급 표시 이름)은 (a) 유지 — `ui_ko.json` 으로 옮기려면 UI 코드가 `ui.show.grade.<id>` 를 읽어야 해 후속 티켓으로 미룬다 |
-| 2026-10-09 | show.md v0, `show.json` v1 + `show.schema.json` version 1 | SE-030 | 신규. 만족도 진실의 출처 SR1~SR3(관객 평균 → 등급, PRD 항 대응표), 입력 계약 7개 이벤트·라인업 LN1~LN3, 상태 8필드, 공연 시작 ST0~ST3(`no_lineup`·`no_stage`), 공연 끝 DS1~DS5·SE1~SE4·CL1, 이벤트 3종(`show.started`·`show.skipped`·`show.ended`), 결정성(난수 없음), 스냅샷 SS1~SS4, 로드 검사 SL1~SL4, 마감 리포트 필드 R1~R13(SE-039 인계), 등급 임계 5단계, 기준 시나리오 5개, 수용 기준 SH1~SH13·ST1~ST4. 티켓 초안에서 바꾼 것: 구독에 `audience.admissions_decided`(`expected_admissions`)·`economy.ticket_price_changed`(`revenue_hint`)·`time.day_started`(리셋) 추가, `show.skipped` 페이로드 `{day, reason}` 확정(티켓은 이름만), 무대 없는 날도 `show.skipped`(Q3) |
+| 2026-10-09 | show.md v0, `show.json` v1 + `show.schema.json` version 1 | SE-030 | 신규. 만족도 진실의 출처 SR1~SR3(관객 평균 → 등급, PRD 항 대응표), 입력 계약 7개 이벤트·라인업 LN1~LN3, 상태 8필드, 공연 시작 ST0~ST3(`no_lineup`·`no_stage`), 공연 끝 DS1~DS5·SE1~SE4·CL1, 이벤트 3종(`show.started`·`show.skipped`·`show.ended`), 결정성(난수 없음), 스냅샷 SS1~SS4, 로드 검사 SL1~SL4, 마감 리포트 필드 R1~R13(SE-039 인계), 등급 임계 5단계, 기준 시나리오 5개, 수용 기준 SH1~SH13·수치 목표 SG1~SG4(SE-048 에서 개명, 이전 접두어는 규칙 ST0~ST3 와 겹쳤다). 티켓 초안에서 바꾼 것: 구독에 `audience.admissions_decided`(`expected_admissions`)·`economy.ticket_price_changed`(`revenue_hint`)·`time.day_started`(리셋) 추가, `show.skipped` 페이로드 `{day, reason}` 확정(티켓은 이름만), 무대 없는 날도 `show.skipped`(Q3) |

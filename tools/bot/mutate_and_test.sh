@@ -99,11 +99,13 @@ esac
 mkdir -p -- "$BASE_PRE" || exit 5
 # 3) 사후 검사(방어선): 만든 뒤의 실경로가 리포지토리 안이거나 '/' 이면 이번에 만든 빈 디렉터리를 정리하고 거부한다.
 undo_created_dirs() {
-  local d="$EXIST_PRE" c rest="$REST_PRE" list=() i
+  local d="$EXIST_PRE" c rest="$REST_PRE" list=() parts=() i
   rest="${rest#/}"
   [ -n "$rest" ] || return 0
-  local IFS=/
-  for c in $rest; do d="${d%/}/$c"; list+=("$d"); done
+  # '/' 로 나눌 때 pathname expansion(glob)이 일어나면 꼬리 성분의 *?[ 가 현재 디렉터리의 다른 이름으로 풀려
+  # 이미 있던 빈 디렉터리를 rmdir 할 수 있다 (SE-047 리뷰 [낮음] 1). read -r -a 는 glob 을 하지 않는다.
+  IFS=/ read -r -a parts <<< "$rest"
+  for c in "${parts[@]}"; do d="${d%/}/$c"; list+=("$d"); done
   for ((i=${#list[@]}-1; i>=0; i--)); do rmdir -- "${list[$i]}" 2>/dev/null || true; done
 }
 BASE="$(cd -P "$BASE_PRE" && pwd -P)" || { undo_created_dirs; echo "사본 상위 디렉터리로 이동할 수 없다 (cd 실패): $BASE_PRE" >&2; exit 2; }

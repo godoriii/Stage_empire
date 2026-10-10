@@ -28,7 +28,7 @@
   "properties": {
     "version": { "type": "integer", "enum": [1] },
     "base_by_grade": {
-      "description": "공연 등급별 기본 명성 변화(RP2). 키 = artist.json show_grades 전부(로더 RL2). show_grades 순서로 엄격히 증가, 실패 등급(disaster·poor)은 음수, 나머지는 양수(RL4)",
+      "description": "공연 등급별 기본 명성 변화(RG2). 키 = artist.json show_grades 전부(로더 RL2). show_grades 순서로 엄격히 증가, 실패 등급(disaster·poor)은 음수, 나머지는 양수(RL4)",
       "type": "object",
       "required": ["disaster", "poor", "ok", "good", "rave"],
       "additionalProperties": false,
@@ -41,18 +41,18 @@
       }
     },
     "admission_factor": {
-      "description": "입장 계수(RP3): clamp(admissions × 10000 ÷ admissions_ref, min_bp, max_bp)",
+      "description": "입장 계수(RG3): clamp(admissions × 10000 ÷ admissions_ref, min_bp, max_bp)",
       "type": "object",
       "required": ["admissions_ref", "min_bp", "max_bp"],
       "additionalProperties": false,
       "properties": {
-        "admissions_ref": { "description": "계수 10000 이 되는 입장 수(economy 기준 공연 100명)", "type": "integer", "minimum": 1 },
+        "admissions_ref": { "description": "계수 10000 이 되는 입장 수. economy 기준 시나리오와 독립인 튜닝값(현재 100 은 economy tier1_baseline 입장과 같게 잡았지만 교차 검사 없음, economy 시나리오가 바뀌면 재검토)", "type": "integer", "minimum": 1 },
         "min_bp": { "description": "계수 하한. 실패 등급 Δ 가 0 이 되지 않게 ⌊|base| × min_bp ÷ 10000⌋ ≥ 1(RL4)", "type": "integer", "minimum": 1, "maximum": 10000 },
         "max_bp": { "description": "계수 상한(≥ min_bp, RL5)", "type": "integer", "minimum": 1, "maximum": 50000 }
       }
     },
     "focus": {
-      "description": "장르 집중(정체성)/확산(관객 폭) 보정(RP4). 양수 Δ 에만 곱한다",
+      "description": "장르 집중(정체성)/확산(관객 폭) 보정(RG4, FC1~FC4). 양수 Δ 에만 곱한다",
       "type": "object",
       "required": ["min_genre_sum", "identity_share_bp", "identity_bonus_bp", "breadth_min_share_bp", "breadth_bonus_bp"],
       "additionalProperties": false,
@@ -70,7 +70,7 @@
       "required": ["max_tier"],
       "additionalProperties": false,
       "properties": {
-        "max_tier": { "description": "알림을 낼 수 있는 가장 높은 티어. MVP 는 2(티어 2 맵은 버티컬 슬라이스). tiers.json tier 범위 안(RL7)", "type": "integer", "minimum": 1, "maximum": 6 }
+        "max_tier": { "description": "알림을 낼 수 있는 가장 높은 티어. MVP 는 2(티어 2 맵은 버티컬 슬라이스). tiers.json tier 범위 안, 2 이상(RL7)", "type": "integer", "minimum": 2, "maximum": 6 }
       }
     },
     "checks": {
@@ -113,7 +113,7 @@
               "grade": { "description": "날마다(공연 없는 날 null)", "type": "array", "items": { "oneOf": [{ "$ref": "#/$defs/show_grade" }, { "type": "null" }] } },
               "factor_bp": { "type": "array", "items": { "type": ["integer", "null"] } },
               "focus": { "type": "array", "items": { "oneOf": [{ "$ref": "#/$defs/focus_kind" }, { "type": "null" }] } },
-              "computed_delta": { "description": "RP5 의 Δ(하한 적용 전)", "type": "array", "items": { "type": ["integer", "null"] } },
+              "computed_delta": { "description": "RG5 의 Δ(하한 적용 전)", "type": "array", "items": { "type": ["integer", "null"] } },
               "delta": { "description": "reputation.changed.delta(하한 적용 뒤 실제 변화)", "type": "array", "items": { "type": ["integer", "null"] } },
               "total": { "description": "그날 끝의 종합 명성", "type": "array", "items": { "type": "integer", "minimum": 0 } },
               "by_genre_final": {
