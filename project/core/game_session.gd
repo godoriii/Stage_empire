@@ -311,6 +311,17 @@ func show_active() -> bool:
 	return _show.status == ShowSystem.STATUS_RUNNING
 
 
+## 배치 미리보기 판정(build.md Q4 읽기 전용 쿼리, SE-040 AC-37a): BuildSystem.check_place 위임.
+## B1·B3~B10 판정만(구간 B2·자금 제외), 통과면 "", 아니면 build.rejected 의 reason 과 같은 문자열.
+## 상태 불변, 이벤트 0, push_error 0 — 커서 이동마다 불러도 된다. 새 게임 전(세계 없음)이면 BuildSystem.R_INVALID.
+## 시그니처는 PlacementGhost validator(estimate_reason 과 같은 (String, Vector2i, int) -> String)에 맞췄다:
+## view 는 Callable(session, "check_place") 를 그대로 주입한다. cell 은 [x, z] 로 바꿔 넘긴다(Vector2i.y = 그리드 z).
+func check_place(furniture_id: String, cell: Vector2i, rotation_deg: int) -> String:
+	if _build == null:
+		return BuildSystem.R_INVALID
+	return _build.check_place(furniture_id, [cell.x, cell.y], rotation_deg)
+
+
 ## HUD 가 로드 직후(session.loaded) 한 번에 읽는 값.
 func hud_state() -> Dictionary:
 	return {
