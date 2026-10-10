@@ -6,6 +6,8 @@ extends UiPanel
 ##   reputation.changed(R9·R10), artist.grown(R11), reputation.tier_unlocked + tiers.json(R12), economy.bailout_offered·
 ##   economy.bankrupt(R13), time.phase_changed(close 에서만 보임), time.day_started(그날 값 초기화), session.loaded.
 ## 공연 없는 날(show.ended 없음): R3·R5·R11 숨김, R9 "변화 없음"(SE-030 인계).
+## SE-040 AC-39a: 불러오기 직후 close 면 day_settled 가 재발행되지 않는다 — R8·R12 의 현금은 메인 씬이 set_session_cash 로
+##   넣은 sim 값(GameSession.hud_state().cash)을 쓴다. R6·R7·R8 순이익은 그날 정산 페이로드뿐(결과 절 열린 질문).
 ## 발행: time.next_day_requested {}("다음 날" 버튼, tick.md: close 는 이 명령으로만 이탈).
 
 signal next_day_pressed
@@ -46,6 +48,9 @@ var _tier: int = 0
 var _unlocked_tier: int = 0
 ## session.loaded 의 day(불러오기 직후 close 면 정산 이벤트가 재발행되지 않는다 — SE-049, R1·제목 폴백).
 var _loaded_day: int = 0
+## sim 읽기 전용 현금(set_session_cash). day_settled 가 없을 때 R8·R12 의 현금.
+var _session_cash: int = 0
+var _has_session_cash: bool = false
 
 
 func _event_handlers() -> Dictionary:
@@ -89,6 +94,21 @@ func _on_setup() -> void:
 func set_reputation(total: int) -> void:
 	_rep_total = total
 	_refresh()
+
+
+## SE-040 AC-39a: sim 의 현재 현금(GameSession.hud_state().cash). 그날 정산 페이로드가 없을 때 R8·R12 에 쓴다.
+func set_session_cash(cash: int) -> void:
+	_session_cash = cash
+	_has_session_cash = true
+	_refresh()
+
+
+## R8·R12 의 현금: 그날 정산 페이로드, 없으면 set_session_cash 값, 그것도 없으면 0.
+func _report_cash() -> int:
+	var s: Dictionary = _st(S_SETTLED)
+	if s.has("cash"):
+		return int(s["cash"])
+	return _session_cash if _has_session_cash else 0
 
 
 ## R2 아티스트 이름 출처(ArtistConfig.artist(id).name — SE-033 인계 멤버). null 이면 id 표시.
@@ -270,7 +290,7 @@ func row_text(id: String) -> String:
 			return t("ui.report.r7", {"rent": int(s.get("rent", 0)), "upkeep": int(s.get("upkeep", 0)), "guarantee": int(s.get("guarantee", 0)),
 				"bar_cost": int(s.get("bar_cost", 0)), "tax": int(s.get("tax", 0)), "loan_repayment": int(s.get("loan_repayment", 0))})
 		"R8":
-			return t("ui.report.r8", {"net": int(s.get("net", 0)), "cash": int(s.get("cash", 0))})
+			return t("ui.report.r8", {"net": int(s.get("net", 0)), "cash": _report_cash()})
 		"R9":
 			if rep_change.is_empty() or int(rep_change.get("delta", 0)) == 0:
 				return t("ui.report.r9_none", {"total": _rep_total})
@@ -307,7 +327,7 @@ func _unlock_text() -> String:
 	return t("ui.report.r12", {
 		"tier": int(next.get("tier", 0)),
 		"reputation": _rep_total, "reputation_need": rep_need, "reputation_pct": _pct(_rep_total, rep_need),
-		"cash": int(_st(S_SETTLED).get("cash", 0)), "cash_need": cash_need, "cash_pct": _pct(int(_st(S_SETTLED).get("cash", 0)), cash_need),
+		"cash": _report_cash(), "cash_need": cash_need, "cash_pct": _pct(_report_cash(), cash_need),
 	})
 
 

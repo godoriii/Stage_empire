@@ -585,6 +585,61 @@ func test_se056_ac5_new_game_bad_seed_ignored() -> void:
 	assert_eq(_hash(s.snapshot()), before)
 
 
+# --- SE-040 선행: check_place 읽기 전용 위임(build.md Q4, AC-37a) ------------------------------------
+
+## 상태 불변·이벤트 0 확인용으로 기록하는 이벤트(재발행·하루 진행·build 결과 전부).
+const CHECK_EVENTS: Array[String] = [
+	"session.saved", "session.loaded", "session.load_failed", "build.placed", "build.rejected", "build.removed",
+	"build.coverage_changed", "build.charge_requested", "tick.advanced", "time.phase_changed", "time.day_started",
+	"economy.cash_changed", "reputation.changed", "audience.admissions_decided", "show.started", "artist.lineup_set",
+]
+
+
+## [결과, 상태 해시 불변, 이벤트 수, 대기 명령 불변]. 비교 기준 BuildSystem.check_place 는 호출 뒤에 따로 부른다.
+func _probe_check(s: GameSession, fid: String, cell: Vector2i, rot: int) -> Array:
+	var before: String = _hash(s.snapshot())
+	var pending: String = _hash(s.bus.get_pending_commands())
+	var rec: EventRecorder = EventRecorder.new(s.bus, CHECK_EVENTS)
+	var got: String = s.check_place(fid, cell, rot)
+	return [got, _hash(s.snapshot()) == before, rec.events.size(), _hash(s.bus.get_pending_commands()) == pending]
+
+
+## 유효 위치: 빈 세계에 레이아웃 첫 가구 → "" 이고 BuildSystem.check_place 와 같다. 상태·큐 불변, 이벤트 0.
+func test_se040_check_place_valid_matches_build_system() -> void:
+	var s: GameSession = _session(false)
+	var bcfg: BuildConfig = _cfgs["build"]
+	var p: Dictionary = bcfg.layout(LAYOUT)["placements"][0]
+	var cell: Vector2i = Vector2i(int(p["cell"][0]), int(p["cell"][1]))
+	var rot: int = int(p["rotation"])
+	var r: Array = _probe_check(s, p["furniture_id"], cell, rot)
+	assert_eq(r[0], "", "빈 세계의 레이아웃 첫 배치는 유효")
+	assert_eq(r[0], s.build.check_place(p["furniture_id"], [cell.x, cell.y], rot), "BuildSystem.check_place 와 같다")
+	assert_eq(r.slice(1), [true, 0, true], "상태 해시 불변, 이벤트 0, 대기 명령 불변")
+	assert_push_error_count(0)
+
+
+## 무효 위치: 겹침(overlap)·범위 밖(out_of_bounds)·모르는 가구 → BuildSystem.check_place 와 같은 reason.
+## 상태·큐 불변, 이벤트 0. 새 게임 전 세션은 "invalid".
+func test_se040_check_place_invalid_matches_build_system() -> void:
+	var s: GameSession = _session(true)
+	var bcfg: BuildConfig = _cfgs["build"]
+	var p: Dictionary = bcfg.layout(LAYOUT)["placements"][0]
+	var fid: String = p["furniture_id"]
+	var rot: int = int(p["rotation"])
+	var cases: Array = [
+		[fid, Vector2i(int(p["cell"][0]), int(p["cell"][1])), rot, BuildSystem.R_OVERLAP],
+		[fid, Vector2i(-1, -1), rot, BuildSystem.R_OUT_OF_BOUNDS],
+		["no_such_furniture", Vector2i(int(p["cell"][0]), int(p["cell"][1])), rot, BuildSystem.R_UNKNOWN_FURNITURE],
+	]
+	for c: Array in cases:
+		var r: Array = _probe_check(s, c[0], c[1], c[2])
+		var cell: Vector2i = c[1]
+		assert_eq(r[0], c[3], "%s %s → %s" % [c[0], cell, c[3]])
+		assert_eq(r[0], s.build.check_place(c[0], [cell.x, cell.y], c[2]), "BuildSystem.check_place 와 같다")
+		assert_eq(r.slice(1), [true, 0, true], "상태 해시 불변, 이벤트 0, 대기 명령 불변")
+	assert_eq(GameSession.new().check_place(fid, Vector2i.ZERO, rot), BuildSystem.R_INVALID, "새 게임 전 → invalid")
+	assert_push_error_count(0)
+
 # --- SE-057 save.json autosave_keep (docs/gdd/tick.md #세이브-설정-savejson SV1~SV5) --------------------------
 
 ## res://data 를 dst 로 복사한다. save/ 는 복사하지 않고, save_json 이 비어 있지 않으면 dst/save/save.json 으로 쓴다.

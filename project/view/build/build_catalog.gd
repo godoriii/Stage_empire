@@ -43,14 +43,6 @@ func row_count() -> int:
 	return _rows.size()
 
 
-## 행 사본 목록(테이블 순서).
-func rows() -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	for r: Dictionary in _rows:
-		out.append(r.duplicate(true))
-	return out
-
-
 func has_furniture(id: String) -> bool:
 	return _by_id.has(id)
 
@@ -102,10 +94,6 @@ static func footprint_of(row: Dictionary) -> Vector2i:
 
 
 # --- 맵 ---------------------------------------------------------------------
-
-func get_map_id() -> String:
-	return str(_map.get("id", ""))
-
 
 func get_map_size() -> Vector2i:
 	return _map_size

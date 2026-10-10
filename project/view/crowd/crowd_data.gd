@@ -2,11 +2,14 @@ class_name CrowdData
 extends RefCounted
 ## SE-038: 군중 표시에 필요한 데이터 값(읽기 전용). 수치는 전부 JSON 에서 읽는다(코드 리터럴 금지).
 ##   audience.json: pos_scale(표시 좌표 1/P m), max_agents(MultiMesh 인스턴스 수), types[].id·color(유형 색).
-##   sim.json:      ticks_per_second(보간 틱 길이 = 1 / tps), tile_size_m(월드 m).
+##   sim.json:      ticks_per_second(보간 틱 길이 = 1 / tps), tile_size_m(월드 m),
+##                  phases[0].default_speed(새 게임 배속 — 보간 초기 speed, audience.md view 계약 "위치", SE-040 AC-38a).
 ## GridDataLoader·BuildCatalog 과 같은 방식(FileAccess READ). res://sim·core·world 를 로드하지 않는다.
 
 const AUDIENCE_PATH: String = "res://data/audience/audience.json"
 const SIM_PATH: String = "res://data/sim/sim.json"
+## tick.md #배속 단위 정의: speed 1 = 실시간(수치가 아니라 배속의 단위).
+const SPEED_REALTIME: int = 1
 
 ## 표시 좌표 단위(px ÷ pos_scale = 타일 단위).
 var pos_scale: int = 0
@@ -16,6 +19,8 @@ var max_agents: int = 0
 var tick_len_sec: float = 0.0
 ## 타일 한 변(m).
 var tile_m: float = 0.0
+## 새 게임 배속(sim.json phases[0].default_speed). phases 가 없는 사본(테스트 고정 데이터)이면 SPEED_REALTIME.
+var default_speed: int = SPEED_REALTIME
 ## 유형 id(audience.json types 순서).
 var type_ids: PackedStringArray = PackedStringArray()
 ## 유형 id → 인스턴스 색(알파 1.0 고정, materials.md M3).
@@ -42,6 +47,9 @@ static func from_dicts(audience: Dictionary, sim: Dictionary) -> CrowdData:
 		push_error("CrowdData: pos_scale·max_agents(audience.json), ticks_per_second·tile_size_m(sim.json) 은 양수여야 한다")
 		return null
 	d.tick_len_sec = 1.0 / tps
+	var phases: Variant = sim.get("phases", [])
+	if phases is Array and not (phases as Array).is_empty() and (phases as Array)[0] is Dictionary:
+		d.default_speed = int(((phases as Array)[0] as Dictionary).get("default_speed", SPEED_REALTIME))
 	for t: Variant in audience.get("types", []):
 		if not (t is Dictionary):
 			continue
