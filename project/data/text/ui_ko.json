@@ -6,6 +6,7 @@
     "ui.hud.reputation": "명성 {reputation}",
     "ui.hud.day": "{day}일차",
     "ui.hud.speed": "{speed}x",
+    "ui.hud.pause": "일시정지",
     "ui.hud.ticket_price": "티켓 가격",
     "ui.hud.artists": "섭외",
     "ui.hud.menu": "메뉴",
