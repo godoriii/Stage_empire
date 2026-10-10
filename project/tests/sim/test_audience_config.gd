@@ -279,4 +279,7 @@ func test_crowd_bp_of() -> void:
 	assert_eq(AudienceConfig.crowd_bp_of(_cfg, sc["expected"]["audience"], 122), sc["expected"]["crowd_bp"], "rookie 9,180")
 	assert_eq(AudienceConfig.crowd_bp_of(_cfg, 83, 122), 0, "편안 구간")
 	assert_eq(AudienceConfig.crowd_bp_of(_cfg, 122, 122), 10000, "만석 → 상한")
-	assert_eq(AudienceConfig.crowd_bp_of(_cfg, 0, 0), 10000, "capacity 0 → ratio 10,000 (SF5 문자 그대로)")
+	# AU15 (SE-052 SF5 관객 0): 관객 0 이면 capacity 와 무관하게 0. 관객 > 0·수용 0 은 기존 분기(ratio 10,000).
+	assert_eq(AudienceConfig.crowd_bp_of(_cfg, 0, 0), 0, "관객 0·capacity 0 → 0 (SF5 관객 0)")
+	assert_eq(AudienceConfig.crowd_bp_of(_cfg, 0, 122), 0, "관객 0·capacity 122 → 0")
+	assert_eq(AudienceConfig.crowd_bp_of(_cfg, 1, 0), 10000, "관객 1·capacity 0 → ratio 10,000 → 상한")
