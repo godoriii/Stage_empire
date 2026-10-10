@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CrowdViewParams" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://view/crowd/crowd_view_params.gd" id="1_crowdparams"]
+
+[resource]
+script = ExtResource("1_crowdparams")
+body_radius_m = 0.22
+body_height_m = 1.45
+body_radial_segments = 16
+body_rings = 6
+head_size_m = 0.28
+arm_size_m = Vector3(0.1, 0.5, 0.1)
+unknown_type_color = Color(1, 0, 1, 1)
+preset_seed = 38
+preset_light_offset_cells = 2

@@ -1,0 +1,13 @@
+# SE-030 QA 변이 m09_identity_share_8000: 정체성 임계 8,000 [RP4 FC3]
+# 사용: tools/bot/mutate_and_test.sh tools/bot/mutations/se030_m09_identity_share_8000.diff
+--- a/project/data/reputation/reputation.json
++++ b/project/data/reputation/reputation.json
+@@ -4,7 +4,7 @@
+   "admission_factor": {"admissions_ref": 100, "min_bp": 5000, "max_bp": 10000},
+   "focus": {
+     "min_genre_sum": 50,
+-    "identity_share_bp": 7000,
++    "identity_share_bp": 8000,
+     "identity_bonus_bp": 2000,
+     "breadth_min_share_bp": 1500,
+     "breadth_bonus_bp": 2000

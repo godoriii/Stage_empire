@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="StageLightParams" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://view/stage/stage_light_params.gd" id="1_stageparams"]
+
+[resource]
+script = ExtResource("1_stageparams")
+max_spots = 4
+spot_height_m = 5.0
+spot_forward_m = 3.0
+spot_spread_ratio = 0.8
+aim_height_m = 1.2
+spot_range_m = 12.0
+spot_angle_deg = 22.0
+spot_energy = 2.0
+spot_attenuation = 0.0
+spot_shadows = false
+show_colors = PackedColorArray(1, 0.85, 0.6, 1, 0.55, 0.65, 1, 1, 1, 0.5, 0.75, 1, 0.6, 1, 0.85, 1)
+grade_colors = {
+"disaster": Color(0.85, 0.15, 0.15, 1),
+"good": Color(0.4, 0.9, 0.5, 1),
+"ok": Color(0.95, 0.9, 0.75, 1),
+"poor": Color(0.55, 0.45, 0.75, 1),
+"rave": Color(1, 0.8, 0.25, 1)
+}
+grade_fallback_color = Color(1, 1, 1, 1)
+finale_sec = 2.0
