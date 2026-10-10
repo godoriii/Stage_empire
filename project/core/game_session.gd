@@ -327,6 +327,7 @@ func hud_state() -> Dictionary:
 	return {
 		"day": _loop.day, "phase": _loop.phase, "speed": _loop.speed, "cash": cash(), "ticket_price": ticket_price(),
 		"reputation_total": reputation_total(), "show_active": show_active(), "bankrupt": _economy.bankrupt,
+		"last_settlement": _economy.last_settlement.duplicate(true),   # SE-062: 마감 리포트 R6~R8(깊은 복사본)
 	}
 
 

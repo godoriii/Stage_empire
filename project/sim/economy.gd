@@ -50,11 +50,23 @@ const NEW_GAME_DAY: int = 1
 const LEDGER_ADMISSIONS: String = EconomyConfig.LEDGER_ADMISSIONS
 const LEDGER_AUDIENCE: String = EconomyConfig.LEDGER_AUDIENCE
 const LEDGER_GUARANTEE: String = EconomyConfig.LEDGER_GUARANTEE
-## snapshot() 의 키(economy.md #상태 표).
+## restore() 가 반드시 요구하는 스냅샷 키(economy.md #스냅샷 "필수 12개"). snapshot() 은 여기에
+## 선택 키 SNAPSHOT_OPTIONAL_LAST_SETTLEMENT 를 더해 13키를 쓴다(SE-062).
 const SNAPSHOT_FIELDS: Array[String] = [
 	"cash", "tier", "day", "phase", "ticket_price", "upkeep_per_day", "ledger", "last_settled_day",
 	"bailouts_left", "pending_bailout", "loans", "bankrupt",
 ]
+## 선택 키(SE-062 LS1: 없으면 {}로 복원). SNAPSHOT_FIELDS 에 넣지 않는다.
+const SNAPSHOT_OPTIONAL_LAST_SETTLEMENT: String = "last_settlement"
+## economy.day_settled 페이로드 = last_settlement 의 키 19개(값 전부 int). 페이로드 생성(_settle)과 복원 검사 ⑦이
+## 함께 쓰는 유일한 목록이다. 앞 17개는 compute_settlement 반환 키와 같은 순서.
+const SETTLEMENT_KEYS: Array[String] = [
+	"ticket_price", "admissions", "audience", "ticket_revenue", "bar_buyers", "bar_revenue", "bar_cost", "revenue",
+	"rent", "upkeep", "guarantee", "operating_costs", "pretax", "tax", "net", "loan_repayment", "settlement_delta",
+	"day", "cash",
+]
+const SETTLEMENT_DAY: String = "day"
+const SETTLEMENT_CASH: String = "cash"
 const PENDING_INT_FIELDS: Array[String] = ["day", "deficit", "amount", "interest", "total_due", "repay_days"]
 const LOAN_INT_FIELDS: Array[String] = ["day_taken", "amount", "total_due", "paid"]
 
@@ -76,6 +88,8 @@ var pending_bailout: Variant = null
 ## 원소 {day_taken, amount, total_due, installments: Array(int), paid: int}, 받은 순서.
 var loans: Array = []
 var bankrupt: bool = false
+## 마지막 economy.day_settled 페이로드(SETTLEMENT_KEYS 19키, int). 새 게임 {}. 표시용 — 공식에 쓰지 않는다(SE-062).
+var last_settlement: Dictionary = {}
 
 
 ## 새 게임 상태로 만들고 입력 이벤트를 구독한다. 이벤트를 내지 않는다.
@@ -97,6 +111,7 @@ func _init(p_config: EconomyConfig, p_bus: EventBus) -> void:
 	pending_bailout = null
 	loans = []
 	bankrupt = false
+	last_settlement = {}
 	bus.subscribe(EV_CHARGE_PROPOSED, _on_charge_proposed)
 	bus.subscribe(EV_REFUND_PROPOSED, _on_refund_proposed)
 	bus.subscribe(EV_SALES_REPORTED, _on_sales_reported)
@@ -127,11 +142,13 @@ func snapshot() -> Dictionary:
 		"pending_bailout": (pending_bailout as Dictionary).duplicate(true) if pending_bailout != null else null,
 		"loans": loans.duplicate(true),
 		"bankrupt": bankrupt,
+		SNAPSHOT_OPTIONAL_LAST_SETTLEMENT: last_settlement.duplicate(true),
 	}
 
 
-## snapshot() 결과(JSON 왕복 포함)를 적용한다. 정수값 float 는 int 로 정규화. 필드가 빠졌거나 타입·범위가
-## 틀리면 push_error 1회, false, 상태 불변. 이벤트를 내지 않는다(SH3, SH4).
+## snapshot() 결과(JSON 왕복 포함)를 적용한다. 정수값 float 는 int 로 정규화. 필수 필드가 빠졌거나 타입·범위가
+## 틀리면 push_error 1회, false, 상태 불변. 이벤트를 내지 않는다(SH3, SH4). 선택 키 last_settlement 가 없으면 {}
+## (SE-062 LS1, 구버전 세이브 하위 호환), 있으면 LS2~LS4·⑦~⑨ 를 다른 필드와 함께 검사한 뒤 일괄 적용한다.
 func restore(d: Dictionary) -> bool:
 	var parsed: Variant = _parse_snapshot(d)
 	if parsed is String:
@@ -150,6 +167,7 @@ func restore(d: Dictionary) -> bool:
 	pending_bailout = s["pending_bailout"]
 	loans = s["loans"]
 	bankrupt = s["bankrupt"]
+	last_settlement = s[SNAPSHOT_OPTIONAL_LAST_SETTLEMENT]
 	return true
 
 
@@ -371,6 +389,7 @@ func _settle(d: int) -> void:
 	var delta: int = r["settlement_delta"]
 	cash += delta                                                                              # S15
 	last_settled_day = d                                                                       # S16
+	last_settlement = _settlement_payload(r, d, cash)
 	ledger = _new_ledger()
 	var offer: Dictionary = {}                                                                 # S17
 	var went_bankrupt: bool = false
@@ -383,10 +402,7 @@ func _settle(d: int) -> void:
 			went_bankrupt = true
 	if delta != 0:
 		bus.publish(EV_CASH_CHANGED, {"cash": cash, "delta": delta, "reason": REASON_SETTLEMENT})
-	var settled: Dictionary = r.duplicate()
-	settled["day"] = d
-	settled["cash"] = cash
-	bus.publish(EV_DAY_SETTLED, settled)
+	bus.publish(EV_DAY_SETTLED, last_settlement.duplicate(true))
 	if not offer.is_empty():
 		var inst: Array = offer["installments"]
 		bus.publish(EV_BAILOUT_OFFERED, {
@@ -435,6 +451,44 @@ func _accept_bailout(auto: bool) -> void:
 
 static func _new_ledger() -> Dictionary:
 	return {LEDGER_ADMISSIONS: 0, LEDGER_AUDIENCE: 0, LEDGER_GUARANTEE: 0}
+
+
+## S16: compute_settlement 결과 + day + cash(S15)를 SETTLEMENT_KEYS 순서로 담은 19키 Dictionary.
+static func _settlement_payload(r: Dictionary, d: int, cash_now: int) -> Dictionary:
+	var out: Dictionary = {}
+	for key: String in SETTLEMENT_KEYS:
+		if key == SETTLEMENT_DAY:
+			out[key] = d
+		elif key == SETTLEMENT_CASH:
+			out[key] = cash_now
+		else:
+			out[key] = r[key]
+	return out
+
+
+## SE-062 LS1~LS4·⑦~⑨. 키 없음 → {}. 성공이면 정규화한 Dictionary, 실패면 오류 문자열.
+static func _parse_last_settlement(d: Dictionary, last_settled: int) -> Variant:
+	if not d.has(SNAPSHOT_OPTIONAL_LAST_SETTLEMENT):                                          # LS1
+		return {}
+	var raw: Variant = d[SNAPSHOT_OPTIONAL_LAST_SETTLEMENT]
+	if not (raw is Dictionary):                                                                # LS2
+		return "last_settlement 가 객체가 아니다: %s" % [raw]
+	var ls: Dictionary = raw
+	if ls.is_empty():                                                                          # LS3
+		return {}
+	if ls.size() != SETTLEMENT_KEYS.size():                                                    # ⑦
+		return "last_settlement 키가 day_settled 페이로드 %d키와 다르다: %s" % [SETTLEMENT_KEYS.size(), ls.keys()]
+	var out: Dictionary = {}
+	for key: String in SETTLEMENT_KEYS:
+		if not ls.has(key):                                                                    # ⑦
+			return "last_settlement 키가 day_settled 페이로드 %d키와 다르다: %s 없음" % [SETTLEMENT_KEYS.size(), key]
+		var v: Variant = JsonUtil.as_int(ls[key])                                              # ⑧
+		if v == null:
+			return "last_settlement.%s 가 정수가 아니다: %s" % [key, ls[key]]
+		out[key] = v
+	if out[SETTLEMENT_DAY] != last_settled:                                                    # ⑨
+		return "last_settlement.day(%d) 가 last_settled_day(%d) 와 다르다" % [out[SETTLEMENT_DAY], last_settled]
+	return out
 
 
 static func _str_or_empty(v: Variant) -> String:
@@ -503,6 +557,10 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 			return "loans[].paid 가 0 이상 installments 개수 미만이 아니다"
 		new_loans.append(loan)
 	out["loans"] = new_loans
+	var ls: Variant = _parse_last_settlement(d, out["last_settled_day"])                       # SE-062
+	if ls is String:
+		return ls
+	out[SNAPSHOT_OPTIONAL_LAST_SETTLEMENT] = ls
 	return out
 
 

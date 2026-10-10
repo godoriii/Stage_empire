@@ -817,3 +817,41 @@ func test_se057_sv3_no_prune_on_autosave_write_failure() -> void:
 	_to_close(s)
 	assert_eq(s.list_autosave_days(), [4], "다음 성공 경계에서 보관 수 적용")
 	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯은 남는다")
+
+
+# --- SE-062 EC17 (d) hud_state().last_settlement (docs/gdd/economy.md #스냅샷 "표시 접근") -----------------------
+
+## 새 게임 {}, 1일 close 뒤 == day_settled 페이로드, 받은 값을 고쳐도 다음 hud_state() 불변, 다른 키 그대로.
+## 1일 마감 오토세이브 → 2일 close(값이 바뀜) → 오토세이브 불러오기(session.loaded) 뒤 저장 시점 값과 같다.
+func test_se062_hud_state_last_settlement() -> void:
+	var s: GameSession = _session()
+	_book(s)
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["economy.day_settled", "session.loaded", "session.load_failed"])
+	var h0: Dictionary = s.hud_state()
+	assert_eq(h0["last_settlement"], {}, "새 게임 {}")
+	var keys: Array = h0.keys()
+	keys.sort()
+	assert_eq(keys, ["bankrupt", "cash", "day", "last_settlement", "phase", "reputation_total", "show_active", "speed", "ticket_price"],
+		"기존 8키 + last_settlement")
+	_to_close(s)
+	var p1: Dictionary = rec.of("economy.day_settled")[0]
+	assert_eq(p1.size(), 19, "전제: 페이로드 19키")
+	assert_eq(_hash(s.hud_state()["last_settlement"]), _hash(p1), "1일 close 뒤 == day_settled 페이로드")
+	var got: Dictionary = s.hud_state()
+	(got["last_settlement"] as Dictionary)["net"] = -123456
+	(got["last_settlement"] as Dictionary)["foo"] = 1
+	assert_eq(_hash(s.hud_state()["last_settlement"]), _hash(p1), "돌려받은 값을 고쳐도 다음 hud_state() 불변")
+	assert_eq(s.hud_state()["cash"], p1["cash"], "close(구제 전): hud_state().cash == last_settlement.cash")
+	var autosave: String = s.last_autosave_path
+	assert_eq(autosave, s.autosave_path(1), "전제: 1일 마감 오토세이브")
+	_next(s)
+	_to_close(s)
+	var p2: Dictionary = rec.of("economy.day_settled")[1]
+	assert_eq(_hash(s.hud_state()["last_settlement"]), _hash(p2), "2일 close 뒤 2일 페이로드")
+	assert_ne(_hash(p2), _hash(p1), "전제: 1일·2일 값이 다르다")
+	s.bus.publish("session.load_requested", {"slot": "autosave_day1"})
+	s.advance(0)
+	assert_eq(rec.count("session.load_failed"), 0, "불러오기 실패 없음")
+	assert_eq(rec.count("session.loaded"), 1, "session.loaded")
+	assert_eq(_hash(s.hud_state()["last_settlement"]), _hash(p1), "오토세이브 불러오기 뒤 저장 시점 값과 같다")
+	assert_eq(s.hud_state()["phase"], "close", "전제: close 에서 불러왔다")

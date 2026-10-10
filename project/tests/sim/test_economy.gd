@@ -1,5 +1,5 @@
 extends GutTest
-## SE-012 EC2~EC16 — Economy. docs/gdd/economy.md#수용-기준 을 1:1 로 옮겼다.
+## SE-012 EC2~EC16, SE-062 EC17 — Economy. docs/gdd/economy.md#수용-기준 을 1:1 로 옮겼다.
 ## 기대 수치는 economy.json(행·reference_scenarios)에서 읽고, 핵심 수는 리터럴로 한 번 더 단언한다.
 ## 단위 케이스는 EventBus 하나에 time.* 를 테스트가 직접 발행해 구동하고, EC3·EC10·EC14·EC15·EC16(b) 는
 ## TickLoop 으로 구동한다(economy 를 훅과 함께 등록).
@@ -21,6 +21,9 @@ const TEST_DEFICIT: int = 100
 var _cfg: EconomyConfig
 var _scfg: SimConfig
 var _row: Dictionary
+## SE-062 EC17 (a): day_settled 구독자 안에서 읽은 [last_settlement 해시, 받은 페이로드 해시].
+var _probe_econ: Economy
+var _probe_inside: Array = []
 
 
 func before_all() -> void:
@@ -174,7 +177,8 @@ func test_new_game_state() -> void:
 	assert_eq(rec.events, [], "생성자는 이벤트를 내지 않는다")
 	var keys: Array = econ.snapshot().keys()
 	keys.sort()
-	assert_eq(keys, ["bailouts_left", "bankrupt", "cash", "day", "last_settled_day", "ledger", "loans", "pending_bailout", "phase", "ticket_price", "tier", "upkeep_per_day"], "#상태 표의 12개 필드")
+	assert_eq(keys, ["bailouts_left", "bankrupt", "cash", "day", "last_settled_day", "last_settlement", "ledger", "loans", "pending_bailout", "phase", "ticket_price", "tier", "upkeep_per_day"], "#상태 표의 13개 필드(SE-062: 필수 12 + 선택 last_settlement)")
+	assert_eq(econ.last_settlement, {}, "SE-062: 새 게임 last_settlement == {}")
 
 
 # --- EC3 ---------------------------------------------------------------------
@@ -1197,3 +1201,244 @@ func test_restore_rejects_unknown_phase_id() -> void:
 		ok["phase"] = ph
 		assert_true(econ.restore(ok), "구간 id %s → true" % ph)
 	assert_push_error_count(1, "구간 id 복원은 push_error 추가 0회")
+
+
+# --- EC17 (SE-062) ------------------------------------------------------------
+
+## SE-062 EC17 (a) 구독자: 받는 순간 last_settlement 가 이미 페이로드와 같은지 기록하고, 받은 페이로드를 고친다
+## (고쳐도 Economy 상태는 안 바뀌어야 한다).
+func _on_settled_probe(p: Dictionary) -> void:
+	_probe_inside.append([JSON.stringify(_probe_econ.last_settlement, "", true), JSON.stringify(p, "", true)])
+	p["net"] = -123456
+	p["foo"] = 1
+
+
+## 19키 Dictionary 이고 값이 전부 int 인지.
+func _assert_settlement_shape(d: Dictionary, label: String) -> void:
+	var keys: Array = d.keys()
+	keys.sort()
+	var want: Array = Array(Economy.SETTLEMENT_KEYS).duplicate()
+	want.sort()
+	assert_eq(keys, want, label + ": 19키 == day_settled 페이로드 키")
+	assert_eq(keys.size(), 19, label + ": 리터럴 19")
+	for k: Variant in keys:
+		assert_typeof(d[k], TYPE_INT, "%s: %s 는 int" % [label, k])
+
+
+## (a) 갱신·유지. TickLoop 으로 1일 close → 2일 day·evening·show 유지 → 2일 close 갱신. 파산일 정산 뒤 유지.
+func test_last_settlement_kept_and_restored() -> void:
+	var l: Array = _looped()
+	var loop: TickLoop = l[0]
+	var econ: Economy = l[1]
+	var rec: EventRecorder = l[2]
+	assert_eq(econ.last_settlement, {}, "새 게임 {}")
+	_probe_econ = econ
+	_probe_inside = []
+	loop.bus.subscribe("economy.day_settled", _on_settled_probe)
+	_charge(loop.bus, "guarantee", _cfg.guarantee("local"))
+	_sales(loop.bus, 100, 100)
+	loop.advance(_scfg.day_ticks)
+	assert_eq(loop.phase, "close", "전제: 1일 close")
+	var p1: Dictionary = rec.of("economy.day_settled")[0]
+	_assert_settlement_shape(p1, "1일 페이로드")
+	_assert_settlement_shape(econ.last_settlement, "1일 last_settlement")
+	assert_eq(JSON.stringify(econ.last_settlement, "", true), JSON.stringify(p1, "", true), "1일 close: last_settlement == day_settled 페이로드")
+	assert_eq(_probe_inside.size(), 1, "구독자 1회")
+	assert_eq(_probe_inside[0][0], JSON.stringify(p1, "", true), "구독자 안에서 읽어도 이미 페이로드와 같다")
+	assert_eq(_probe_inside[0][1], JSON.stringify(p1, "", true), "구독자가 받은 페이로드 == 기록기 사본")
+	assert_false(econ.last_settlement.has("foo"), "구독자가 페이로드를 고쳐도 상태 불변(여분 키 없음)")
+	assert_eq(econ.last_settlement["net"], p1["net"], "구독자가 페이로드를 고쳐도 상태 불변(net)")
+	assert_eq(econ.snapshot()["last_settlement"], econ.last_settlement, "snapshot 에 같은 값")
+	var snap_ls: Dictionary = econ.snapshot()["last_settlement"]
+	snap_ls["net"] = -1
+	assert_eq(econ.last_settlement["net"], p1["net"], "snapshot 은 깊은 복사본")
+	loop.bus.publish("time.next_day_requested", {})
+	loop.advance(0)
+	var phases: Array = [loop.phase]
+	var drift: int = 0
+	var want1: String = JSON.stringify(p1, "", true)
+	for i: int in _scfg.day_ticks - 1:
+		loop.advance(1)
+		if not phases.has(loop.phase):
+			phases.append(loop.phase)
+		if JSON.stringify(econ.last_settlement, "", true) != want1:
+			drift += 1
+	assert_eq(phases, ["day", "evening", "show"], "전제: 2일 day·evening·show 를 지났다")
+	assert_eq(drift, 0, "2일 day·evening·show 동안 last_settlement == 1일 페이로드(유지)")
+	assert_eq(rec.count("economy.day_settled"), 1, "전제: 아직 2일 정산 없음")
+	loop.advance(1)
+	assert_eq(loop.phase, "close", "전제: 2일 close")
+	var p2: Dictionary = _last(rec, "economy.day_settled")
+	assert_eq(p2["day"], 2)
+	assert_eq(JSON.stringify(econ.last_settlement, "", true), JSON.stringify(p2, "", true), "2일 close: 2일 페이로드로 바뀜")
+	assert_ne(JSON.stringify(p2, "", true), want1, "전제: 1일과 2일 페이로드가 다르다")
+
+	# 파산일 정산 뒤 last_settlement.day == bankrupt.day, 그 뒤 날을 넘겨도 불변.
+	var u: Array = _unit()
+	var bus: EventBus = u[0]
+	var e2: Economy = u[1]
+	var r2: EventRecorder = u[2]
+	_charge(bus, "build", _deficit_build(e2.cash))
+	_close(bus, 1)
+	_accept(bus)
+	_new_day(bus, 2)
+	_charge(bus, "build", e2.cash - TEST_DEFICIT)
+	_close(bus, 2)
+	_new_day(bus, 3)   # pending 자동 수락 → bailouts_left 0
+	assert_eq(e2.bailouts_left, 0, "전제: 구제 소진")
+	_charge(bus, "build", e2.cash)
+	_close(bus, 3)
+	assert_true(e2.bankrupt, "전제: 3일 파산")
+	var bk: Array = r2.of("economy.bankrupt")
+	assert_eq(bk.size(), 1)
+	assert_eq(e2.last_settlement["day"], bk[0]["day"], "파산일 정산 뒤 last_settlement.day == bankrupt.day")
+	assert_eq(JSON.stringify(e2.last_settlement, "", true), JSON.stringify(_last(r2, "economy.day_settled"), "", true), "파산일 페이로드")
+	var after_bk: String = JSON.stringify(e2.last_settlement, "", true)
+	for d: int in [4, 5]:
+		_new_day(bus, d)
+		_sales(bus, 50, 50)
+		_close(bus, d)
+	assert_eq(JSON.stringify(e2.last_settlement, "", true), after_bk, "파산 뒤 날을 넘겨도 불변")
+
+
+## (b) 왕복 + (c) 구버전(LS1). close 상태(last_settlement 19키)의 Economy 단독·TickLoop 수준.
+func test_last_settlement_roundtrip_and_legacy() -> void:
+	# (b) Economy 단독
+	var ua: Array = _econ_with_loan_and_pending()
+	var econ_a: Economy = ua[1]
+	var rec_a: EventRecorder = ua[2]
+	assert_eq([econ_a.phase, econ_a.last_settled_day], ["close", 2], "전제: 2일 close")
+	_assert_settlement_shape(econ_a.last_settlement, "원본")
+	var s: Dictionary = _rt(econ_a.snapshot())
+	assert_typeof(s["last_settlement"]["net"], TYPE_FLOAT, "전제: JSON 왕복으로 float")
+	var ub: Array = _unit()
+	var econ_b: Economy = ub[1]
+	var rec_b: EventRecorder = ub[2]
+	assert_true(econ_b.restore(s), "JSON 왕복 스냅샷 복원")
+	assert_eq(rec_b.events, [], "복원 이벤트 0")
+	assert_eq(econ_b.last_settlement, econ_a.last_settlement, "last_settlement 원본과 같다")
+	_assert_settlement_shape(econ_b.last_settlement, "복원본(int 정규화)")
+	assert_eq(_ehash(econ_b), _ehash(econ_a), "경제 상태 해시 동일")
+	var ls_new: Dictionary = (_unit()[1] as Economy).snapshot()
+	var ec: Economy = (_unit()[1] as Economy)
+	assert_true(ec.restore(_rt(ls_new)), "LS3: 새 게임 스냅샷({}) 왕복 true")
+	assert_eq(ec.last_settlement, {}, "LS3: {}")
+
+	# (b) TickLoop 수준
+	var la: Array = _looped(42)
+	var loop_a: TickLoop = la[0]
+	var e_a: Economy = la[1]
+	var r_a: EventRecorder = la[2]
+	_charge(loop_a.bus, "guarantee", _cfg.guarantee("local"))
+	_sales(loop_a.bus, 100, 100)
+	loop_a.advance(_scfg.day_ticks)
+	_assert_settlement_shape(e_a.last_settlement, "TickLoop 원본")
+	var parsed: Dictionary = _rt(loop_a.snapshot())
+	var lb: Array = _looped(7)
+	var loop_b: TickLoop = lb[0]
+	var e_b: Economy = lb[1]
+	var r_b: EventRecorder = lb[2]
+	assert_true(loop_b.restore(parsed), "TickLoop.restore true")
+	assert_eq(r_b.events, [], "복원 중 이벤트 0")
+	assert_eq(e_b.last_settlement, e_a.last_settlement, "TickLoop 왕복: last_settlement 같음")
+	assert_eq(_lhash(loop_b), _lhash(loop_a), "복원 직후 TickLoop 해시 동일")
+	r_a.clear()
+	_feed_loop(loop_a)
+	_feed_loop(loop_b)
+	assert_eq(_lhash(loop_b), _lhash(loop_a), "복원 후 진행 == 연속 진행")
+	assert_eq(_econ_events(r_b), _econ_events(r_a), "economy.* 이벤트 열 동일")
+
+	# (c) 구버전: last_settlement 키 없음 → true, push_error·push_warning 0, {}, 나머지 12키 같음, 이벤트 0.
+	var old: Dictionary = s.duplicate(true)
+	old.erase("last_settlement")
+	var uc: Array = _unit()
+	var econ_c: Economy = uc[1]
+	var rec_c: EventRecorder = uc[2]
+	var warn_before: int = _push_warnings()
+	assert_true(econ_c.restore(old), "LS1: 구버전 스냅샷 복원 true")
+	assert_push_error_count(0, "LS1: push_error 0")
+	assert_eq(_push_warnings(), warn_before, "LS1: push_warning 0")
+	assert_eq(econ_c.last_settlement, {}, "LS1: last_settlement == {}")
+	assert_eq(rec_c.events, [], "LS1: 이벤트 0")
+	var got12: Dictionary = econ_c.snapshot()
+	got12.erase("last_settlement")
+	var want12: Dictionary = econ_a.snapshot()
+	want12.erase("last_settlement")
+	assert_eq(got12.size(), 12, "나머지 12키")
+	assert_eq(JSON.stringify(got12, "", true), JSON.stringify(want12, "", true), "LS1: 나머지 12키는 원본과 같다")
+	_feed(ua[0])
+	_feed(uc[0])
+	assert_eq(_ehash(econ_c), _ehash(econ_a), "LS1: 다음 close 뒤 경제 상태 해시 == 연속 진행")
+	assert_eq(econ_c.last_settled_day, 4, "전제: 4일까지 정산")
+
+
+func _push_warnings() -> int:
+	var n: int = 0
+	for e: Variant in get_errors():
+		if e.is_push_warning():
+			n += 1
+	return n
+
+
+## (e) 거부(LS2·⑦~⑨): 정상 close 스냅샷에서 하나만 바꾼 사본 7건 + TickLoop 경로 null 1건.
+func test_last_settlement_restore_rejects() -> void:
+	var ua: Array = _econ_with_loan_and_pending()
+	var good: Dictionary = _rt((ua[1] as Economy).snapshot())
+	var lsd: int = int(good["last_settled_day"])
+	assert_eq(int(good["last_settlement"]["day"]), lsd, "전제: last_settlement.day == last_settled_day")
+	assert_true((_unit()[1] as Economy).restore(good.duplicate(true)), "전제: 바꾸지 않은 사본은 복원된다")
+	# [라벨, 사본, push_error 문구 일부]
+	var bads: Array = []
+	var x: Dictionary = good.duplicate(true)
+	x["last_settlement"] = null
+	bads.append(["LS2 null", x, "last_settlement 가 객체가 아니다"])
+	x = good.duplicate(true)
+	x["last_settlement"] = []
+	bads.append(["LS2 []", x, "last_settlement 가 객체가 아니다"])
+	x = good.duplicate(true)
+	(x["last_settlement"] as Dictionary).erase("net")
+	bads.append(["⑦ net 뺌", x, "last_settlement 키가"])
+	x = good.duplicate(true)
+	x["last_settlement"]["foo"] = 0
+	bads.append(["⑦ foo 더함", x, "last_settlement 키가"])
+	x = good.duplicate(true)
+	x["last_settlement"]["net"] = 1.5
+	bads.append(["⑧ net = 1.5", x, "last_settlement.net 가 정수가 아니다"])
+	x = good.duplicate(true)
+	x["last_settlement"]["revenue"] = "10"
+	bads.append(["⑧ revenue = \"10\"", x, "last_settlement.revenue 가 정수가 아니다"])
+	x = good.duplicate(true)
+	x["last_settlement"]["day"] = lsd + 1
+	bads.append(["⑨ day = last_settled_day + 1", x, "last_settlement.day"])
+	assert_eq(bads.size(), 7, "LS2 2 + ⑦ 2 + ⑧ 2 + ⑨ 1")
+	var ub: Array = _unit()
+	var econ_b: Economy = ub[1]
+	var rec_b: EventRecorder = ub[2]
+	var errs: int = 0
+	for b: Array in bads:
+		var label: String = b[0]
+		var before_e: String = _ehash(econ_b)
+		rec_b.clear()
+		assert_false(econ_b.restore(b[1]), "Economy: %s → false" % label)
+		errs += 1
+		assert_push_error(b[2], label + ": 의도한 검사에서 거부")
+		assert_push_error_count(errs, label + ": push_error 1회")
+		assert_eq(_ehash(econ_b), before_e, label + ": 상태 불변")
+		assert_eq(rec_b.events, [], label + ": 이벤트 0")
+	# TickLoop 경로: null 1건 → false, push_error 2회(시스템 1 + TickLoop 1), 양쪽 해시 불변.
+	var base: Dictionary = _rt((_looped(42)[0] as TickLoop).snapshot())
+	var lb: Array = _looped(7)
+	var loop_b: TickLoop = lb[0]
+	var e_b: Economy = lb[1]
+	var r_b: EventRecorder = lb[2]
+	var sb: Dictionary = base.duplicate(true)
+	sb["systems"]["economy"] = (bads[0][1] as Dictionary).duplicate(true)
+	var before_l: String = _lhash(loop_b)
+	var before_eb: String = _ehash(e_b)
+	r_b.clear()
+	assert_false(loop_b.restore(sb), "TickLoop: LS2 null → false")
+	errs += 2
+	assert_push_error_count(errs, "TickLoop: push_error 2회(시스템 + TickLoop)")
+	assert_eq(_lhash(loop_b), before_l, "TickLoop 해시 불변")
+	assert_eq(_ehash(e_b), before_eb, "Economy 해시 불변")
+	assert_eq(r_b.events, [], "이벤트 0")
