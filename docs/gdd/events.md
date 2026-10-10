@@ -49,6 +49,9 @@
 | `build.rejected` | `{action: "place"\|"demolish", reason: String, furniture_id, cell, rotation, entity_id}` — `reason` 15종: `invalid`·`not_allowed`·`unknown_furniture`·`bad_rotation`·`out_of_bounds`·`blocked_tile`·`overlap`·`wall_required`·`limit_reached`·`path_blocked`·`insufficient_cash`·`bankrupt`·`charge_invalid`·`charge_unresolved`·`not_found`. place 는 나머지 넷에 받은 값(없으면 `null`, `entity_id`는 `null`), demolish 는 `entity_id`에 받은 값, 나머지 셋은 인스턴스 값(없으면 `null`). 타입: `furniture_id`·`cell`·`rotation`·`entity_id`는 받은 값 그대로(any), 키 없으면 `null`; `reason != "invalid"`이면 각각 `String`·`[x, z]`·`int`·`String`(또는 `null`) | 배치 명령 거절(B1~B10, 경계), 지출 거절(H3, `economy.charge_resolved` 처리 중), 응답 없는 지출 정리(H5, 단계 2), 철거 명령 거절(D1~D3, 경계). 상태 불변 | SE-028, SE-044 |
 | `build.demolished` | `{entity_id: String, furniture_id: String, cell: [x, z], rotation: int, cells: Array[[x, z]], base_amount: int}` — `base_amount` = 설치 때 승인된 건설비 | 철거 명령 처리(경계), 인스턴스 제거 직후. 뒤이어 `economy.refund_proposed` → `economy.upkeep_reported` → `build.coverage_changed`. build.md D4 | SE-028 |
 | `build.coverage_changed` | `{cause: "placed"\|"demolished"\|"sync", has_stage: bool, floor_free: int, viewing_count: int, viewing_tiles, sound_tiles, sight_tiles, bar_tiles: Array[[x, z]], sound_bp: int, sight_bp: int, bar_bp: int, capacity: int, evac_capacity: int, evac_shortfall: int, light_grade: int, satisfaction_bonus_bp: int, upkeep_per_day: int, blocked_cells: [[x, z], …]}` — 공식 [build.md#커버리지](build.md#커버리지) C0~C8. 타일 배열은 z, x 오름차순. `blocked_cells` = 점유 셀 전체(G6 순서, 증분 아님 — 매번 전체 목록, 복원 뒤 다음 저녁 `sync`에도 실림). 관객 경로(SE-034)가 자기 `TilePath`를 이 목록으로 맞추고, 오버레이(SE-037)는 무시 | 설치 목록이 바뀐 뒤(`placed`·`demolished`, 그 연쇄의 마지막), 그리고 `time.phase_changed {to:"evening"}` 수신 시 1회(`sync`, 목록 변화 없어도). 관객·공연 시스템과 오버레이의 입력 | SE-028, SE-044 |
+| `session.saved` | `{slot: String, day: int}` — `slot` = 요청 값 그대로, `day` = 저장한 스냅샷의 날짜 | `session.save_requested` 처리(경계), 세이브 파일 쓰기 성공 직후. 저장 실패는 이벤트 없음(`push_error` 만 — [#session-명령-규칙](#session-명령-규칙) SN3). 게임 상태 불변 | SE-036, SE-039 |
+| `session.load_failed` | `{slot: <받은 값, 키가 없으면 null>, reason: "invalid"\|"missing"\|"corrupt"\|"version_mismatch"\|"restore_failed"}` | `session.load_requested` 처리(경계)에서 SN4 의 첫 실패 조건. 게임 상태 불변(`TickLoop.restore()` 원자성 — [tick.md#스냅샷](tick.md#스냅샷)) | SE-036, SE-039 |
+| `session.loaded` | `{day: int, phase: "day"\|"evening"\|"show"\|"close", speed: int, show_active: bool}` — 복원 **후** 값. `show_active` = 그날 `show.started` 가 났고 아직 `show.ended`·CL1 전(show 상태 `status == "running"`, [show.md#상태](show.md#상태)) | 불러오기 성공(SN4 통과, `restore()` true) 또는 새 게임 생성(SN5) 직후, 경계에서 1회. 뒤이어 SE-036 AC6 표의 전체 상태 재발행. `time.phase_changed`·`show.started`·`economy.cash_changed` 는 재발행하지 않는다(SE-049) | SE-036, SE-049, SE-039 |
 
 ## 명령 이벤트 (view/ui → sim)
 
@@ -61,6 +64,9 @@
 | `artist.book_requested` | `{artist_id: String}`. 결과는 `artist.booked`(개런티 지출 승인 뒤) 또는 `artist.booking_rejected` | sim/artist. 판정 K1~K5([artist.md#섭외-규칙](artist.md#섭외-규칙)), 낮 구간만, 하루 1명 | SE-031 |
 | `economy.ticket_price_requested` | `{price: int}` — `int`. 결과는 `economy.ticket_price_changed` 또는 `economy.ticket_price_rejected` | sim/economy. 낮 구간에서만 유효, 범위 `ticket_price_min..max` | SE-005 |
 | `economy.bailout_accept_requested` | `{}` | sim/economy. 구제 제안 중일 때만 유효, 아니면 무시(이벤트 없음). 결과 `economy.cash_changed` → `economy.bailout_taken` | SE-005 |
+| `session.save_requested` | `{slot: String}` — SN1 형식. 결과는 `session.saved`(실패 시 이벤트 없음, SN3) | core/`GameSession`(SE-036). 모든 구간·일시정지 중에도 유효(명령 큐 → 틱 경계, 세이브는 틱 경계에서만). 파산 뒤에도 거절하지 않는다(게임 오버 화면이 메뉴를 막는다) | SE-036, SE-039 |
+| `session.load_requested` | `{slot: String}` — SN1 형식. 결과는 `session.loaded` → 재발행, 또는 `session.load_failed` | core/`GameSession`(SE-036). 모든 구간에서 유효, 파산 뒤 포함 | SE-036, SE-039 |
+| `session.new_game_requested` | `{seed: int}` — `int` 전체(0·음수 포함, 특별한 뜻 없음). 결과는 `session.loaded {day: 1, phase: "day", speed: <day.default_speed>, show_active: false}` | core/`GameSession`(SE-036) — `new_game(seed)`. 모든 구간·파산 뒤 유효. `seed` 가 `int` 가 아니거나 없으면 무시(`push_error`, 이벤트 없음) | SE-036, SE-039 |
 
 "SE-006" 행의 상세 규칙은 [tick.md](tick.md), "SE-005" 행은 [economy.md](economy.md), "SE-028" 행은 [build.md](build.md). 새 도메인의 이벤트는 그 스펙 티켓에서 game-designer 가 이 표에 행을 더한다.
 
@@ -71,3 +77,18 @@
 "SE-031" 행(`artist.*`)의 상세 규칙은 [artist.md](artist.md). artist 는 `economy.charge_proposed {reason:"guarantee"}`를 발행하고 `economy.charge_resolved`·`time.phase_changed`·`time.day_started`·`show.ended`·`reputation.changed`를 구독한다(`show.*`·`reputation.*`는 SE-030 이 등록).
 
 "SE-030" 행(`show.*`, `reputation.*`)의 상세 규칙은 [show.md](show.md)·[reputation.md](reputation.md). show 는 `time.phase_changed`·`time.day_started`·`artist.lineup_set`·`audience.admissions_decided`·`build.coverage_changed`·`economy.ticket_price_changed`·`audience.day_summary`를 구독하고 `show.*` 3종을 발행한다. reputation 은 `show.started`·`show.ended`·`economy.day_settled`·`time.day_started`를 구독하고 `reputation.*` 2종을 발행한다. 둘 다 난수를 쓰지 않는다.
+
+## session 명령 규칙
+
+"SE-036, SE-039" 행(`session.*`)의 규칙. 발행·처리는 `GameSession`(SE-036, core), 명령 발행은 메뉴·파산 화면(SE-039, ui). 슬롯 수와 새 게임 시드의 출처는 이 계약 밖이다(SE-039 결과 2차 의견 — 슬롯 목록은 데이터, 시드는 SE-040). 난수를 쓰지 않는다(`seed` 는 받은 값을 `SeededRng` 에 넘길 뿐).
+
+| # | 규칙 |
+|---|---|
+| SN1 | **슬롯 형식.** `slot` 은 `^[a-z0-9_]{1,24}$` 에 맞는 `String`. 파일 경로는 `user://saves/<slot>.sav` 하나로 정해진다(수동 슬롯 `"1"`·`"2"`·`"3"`, 오토세이브 `autosave_day<N>` 이 같은 규칙 — SE-036 오토세이브 경로와 일치). 슬롯 목록(몇 개, 이름)은 이 규칙이 검사하지 않는다 |
+| SN2 | **처리 시점.** 세 명령 모두 명령 큐를 거쳐 다음 틱 경계에서 처리된다(일시정지·close 포함). 같은 경계에 여러 개가 쌓이면 큐 순서대로 처리한다. 불러오기·새 게임이 성공하면 같은 경계에서 그 **뒤에** 남아 있던 명령은 버린다(다른 세계에 적용되면 안 된다). 이후 큐는 복원된 스냅샷의 `pending_commands`(새 게임은 빈 큐)다. 실패한 불러오기는 큐를 건드리지 않는다 |
+| SN3 | **저장.** `slot` 이 SN1 에 어긋나거나 파일 쓰기가 실패하면 `push_error` 1회, 이벤트 없음. 성공하면 `session.saved {slot, day}` 1회. 저장은 게임 상태를 바꾸지 않는다(상태 해시 불변) |
+| SN4 | **불러오기 판정.** 위에서부터 처음 맞는 사유 하나로 `session.load_failed`: ① `invalid` — `slot` 키 없음·`String` 아님·SN1 위반 ② `missing` — 파일 없음 ③ `corrupt` — 읽기·JSON 파싱 실패 또는 최상위가 스냅샷 형식(tick.md #스냅샷 최상위 키)이 아님 ④ `version_mismatch` — `schema_version != sim.json snapshot_schema_version` ⑤ `restore_failed` — `TickLoop.restore()` 가 `false`(그 밖 전부). 실패 시 게임 상태 불변, `push_error` 횟수는 tick.md 규칙(⑤) 또는 0(①~④) |
+| SN5 | **새 게임.** `new_game(seed)` 와 같은 결과(같은 `seed` → 같은 1일차 상태 해시). 버스 구독은 유지되어야 한다 — ui·view 는 다시 bind 하지 않고 `session.loaded` 만으로 초기화한다(구현 방식은 SE-036·SE-040). 새 게임에서도 `session.loaded` 뒤 SE-036 AC6 재발행 표를 그대로 따른다 |
+| SN6 | **UI 쪽 의무(SE-039).** `session.loaded` 를 받으면 메뉴·모달·파산 화면을 닫고, 리포트·HUD 를 페이로드와 읽기 전용 멤버(`ReputationSystem.total` 등)로 다시 채운다. `session.load_failed` 는 알림 1줄(`ui.notify.load` + `ui.reason.load.<reason>`) |
+
+변경 이력: 2026-10-10 SE-039 2차(game-designer) — `session.*` 6행과 SN1~SN6 추가. 페이로드는 SE-036 AC6·SE-049 결정과 같고, `load_failed.reason` 5종·슬롯 형식·`new_game_requested` 는 이 절에서 처음 정했다.
