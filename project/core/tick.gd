@@ -191,14 +191,14 @@ func snapshot() -> Dictionary:
 func restore(s: Dictionary) -> bool:
 	if _reject_if_busy("restore"):                                            # 1
 		return false
-	var ver: Variant = _as_int(s.get("schema_version"))                       # 2
+	var ver: Variant = JsonUtil.as_int(s.get("schema_version"))              # 2
 	if ver == null or ver != config.snapshot_schema_version:
 		return _restore_fail("schema_version 불일치: %s (기대 %d)" % [s.get("schema_version"), config.snapshot_schema_version])
-	var n_seed: Variant = _as_int(s.get("seed"))                              # 3
-	var n_tick: Variant = _as_int(s.get("tick"))
-	var n_day: Variant = _as_int(s.get("day"))
-	var n_tip: Variant = _as_int(s.get("tick_in_phase"))
-	var n_speed: Variant = _as_int(s.get("speed"))
+	var n_seed: Variant = JsonUtil.as_int(s.get("seed"))                        # 3
+	var n_tick: Variant = JsonUtil.as_int(s.get("tick"))
+	var n_day: Variant = JsonUtil.as_int(s.get("day"))
+	var n_tip: Variant = JsonUtil.as_int(s.get("tick_in_phase"))
+	var n_speed: Variant = JsonUtil.as_int(s.get("speed"))
 	if n_seed == null or n_tick == null or n_day == null or n_tip == null or n_speed == null:
 		return _restore_fail("숫자 필드(seed/tick/day/tick_in_phase/speed)가 정수가 아니다")
 	if n_seed < 0 or n_seed > SeededRng.MASTER_SEED_MAX:
@@ -331,7 +331,7 @@ func _on_speed_requested(payload: Dictionary) -> void:
 		_reject_speed(null, REASON_INVALID)
 		return
 	var raw: Variant = payload["speed"]
-	var s: Variant = _as_int(raw)
+	var s: Variant = JsonUtil.as_int(raw)
 	if s == null:
 		_reject_speed(raw, REASON_INVALID)
 		return
@@ -405,12 +405,3 @@ func _rollback_systems(applied: Array[String], prev: Dictionary) -> void:
 		var ok: Variant = rh.call((prev[id] as Dictionary).duplicate(true))
 		if not (ok is bool and ok):
 			push_error("[TickLoop] restore: 시스템 '%s' 롤백 실패(복구 불능)" % id)
-
-
-## int, 또는 정수값인 유한 float 만 int 로. 그 밖(bool·문자열·1.5·null)은 null.
-static func _as_int(v: Variant) -> Variant:
-	if v is int:
-		return v
-	if v is float and is_finite(v) and v == floorf(v):
-		return int(v)
-	return null

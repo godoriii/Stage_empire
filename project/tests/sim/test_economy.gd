@@ -1172,3 +1172,28 @@ func test_unknown_phase_ignored() -> void:
 	_close(bus, 1)
 	assert_eq(econ.phase, "close", "그 뒤 정상 구간은 따라간다")
 	assert_eq(rec.count("economy.day_settled"), 1, "정상 close 는 정산")
+
+
+## SE-045 AC1 (economy.md #스냅샷, build.md RS1 과 같은 조건): restore 의 phase 가 SimConfig.PHASE_IDS(sim.json phases[].id)
+## 밖이면 false, push_error 1회, 상태 해시 불변, 이벤트 0. 비어 있지 않은 문자열이어도("noon") 거절한다.
+func test_restore_rejects_unknown_phase_id() -> void:
+	var u: Array = _unit()
+	var bus: EventBus = u[0]
+	var econ: Economy = u[1]
+	var rec: EventRecorder = u[2]
+	_charge(bus, "build", 1)
+	var good: Dictionary = _rt(econ.snapshot())
+	assert_false(SimConfig.PHASE_IDS.has("noon"), "전제: noon 은 구간 id 가 아니다")
+	var before: String = _ehash(econ)
+	rec.clear()
+	var bad: Dictionary = good.duplicate(true)
+	bad["phase"] = "noon"
+	assert_false(econ.restore(bad), "phase noon → false")
+	assert_push_error_count(1, "push_error 1회")
+	assert_eq(_ehash(econ), before, "상태 해시 불변")
+	assert_eq(rec.events, [], "이벤트 0")
+	for ph: String in SimConfig.PHASE_IDS:
+		var ok: Dictionary = good.duplicate(true)
+		ok["phase"] = ph
+		assert_true(econ.restore(ok), "구간 id %s → true" % ph)
+	assert_push_error_count(1, "구간 id 복원은 push_error 추가 0회")
