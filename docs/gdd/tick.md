@@ -3,9 +3,9 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | v0 |
-| 스펙 티켓 | SE-006 (game-designer), SE-011 (시스템 스냅샷 훅 — #명령-큐와-틱-순서 "시스템 등록", #스냅샷) |
+| 스펙 티켓 | SE-006 (game-designer), SE-011 (시스템 스냅샷 훅 — #명령-큐와-틱-순서 "시스템 등록", #스냅샷), SE-057 (#세이브-설정-savejson) |
 | 구현 티켓 | SE-001 (sim-engineer) — `project/core/{sim_config,event_bus,rng,tick}.gd`. SE-012 (sim-engineer) — `tick.gd` 시스템 스냅샷 훅 |
-| 데이터 | [`project/data/sim/sim.json`](../../project/data/sim/sim.json) (version 3. SE-011 결정, 적용됨(SE-012) — #수치표), 스키마 [`sim.schema.json`](../../project/data/schemas/sim.schema.json) |
+| 데이터 | [`project/data/sim/sim.json`](../../project/data/sim/sim.json) (version 3. SE-011 결정, 적용됨(SE-012) — #수치표), 스키마 [`sim.schema.json`](../../project/data/schemas/sim.schema.json) · [`project/data/save/save.json`](../../project/data/save/save.json) (version 1, SE-057 — #세이브-설정-savejson), 스키마 [`save.schema.json`](../../project/data/schemas/save.schema.json) |
 | 이벤트 | [`docs/gdd/events.md`](events.md) — 이 문서에 나오는 이벤트 이름은 전부 거기 표에 있다 |
 | 근거 | PRD "핵심 게임플레이 루프"(세션 구조 표), "기술 요구사항"(아키텍처 원칙 2·4, 세이브), ADR-0002 |
 
@@ -98,7 +98,7 @@
 
 - 다음 날 전환은 틱을 소비하지 않는다(`tick` 불변). 그래서 I1 이 유지된다.
 - close 이외의 구간에서 받은 `time.next_day_requested`는 **무시**한다(상태 불변, 이벤트 없음).
-- 새 게임은 `phases[0]`(day)·`tick_in_phase 0`·`speed = phases[0].default_speed`로 시작하며 이벤트를 내지 않는다. `time.day_started`는 2일차부터 난다.
+- 새 게임은 `phases[0]`(day)·`tick_in_phase 0`·`speed = phases[0].default_speed`로 시작하며 이벤트를 내지 않는다. `time.day_started`는 2일차부터 난다. (`TickLoop` 의 시간 이벤트 이야기다. `GameSession` 은 새 세계 생성 직후 `build.coverage_changed {cause:"sync"}` 1회를 낸다 — events.md 해당 행, SE-058. 시간 카운터·RNG 는 바꾸지 않는다.)
 - **티어 5~6 원칙:** "하루 = 3일짜리 페스티벌의 하루"가 되어도 같은 4구간·같은 카운터를 쓴다. 다중 무대는 `show` 구간 안의 시스템 문제이며 이 문서의 시간 규칙은 바뀌지 않는다. 상세는 티어 4+ 티켓.
 
 ### 배속
@@ -365,11 +365,11 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 | 1 | 검사 | 재진입 아님(허용 시점과 같은 조건) | `push_error`, `false`, 상태 불변 |
 | 2 | 검사 | `s.schema_version == snapshot_schema_version`. `systems` 키가 없는 v1 스냅샷은 여기서 거부된다. 세이브 파일이 아직 없으므로 마이그레이션은 만들지 않는다(후속 세이브 티켓) | 〃 |
 | 3 | 검사 | 숫자 필드(`seed`·`tick`·`day`·`tick_in_phase`·`speed`)는 `int`, 또는 정수값인 `float`(JSON 왕복 산물)를 `int`로 정규화. 그 밖의 값이면 실패. `seed` 0~2^31−1(2,147,483,647), `phase`가 유효, `day ≥ 1`, I1·I3·I4(`speed ∈ phases[phase].speeds`) 성립, `rng`가 Dictionary | 〃 |
-| 4 | 검사 | (a) `pending_commands` 정규화·형식 검사: 페이로드 안(재귀, 배열·중첩 Dictionary 포함)의 정수값인 `float`를 `int`로 정규화한다(`EventBus.normalize_commands`). 명령 페이로드 숫자는 원래 `int`뿐이므로(E4) 손실 없는 역변환이다. 정수가 아닌 `float`(예: `1.5`)나 형식 오류(원소가 `{name, payload}`가 아님, 이름이 `*_requested`가 아님, 페이로드가 E4 위반)가 하나라도 있으면 실패. (b) `rng` 상태 형식 검사: `seed`로 **새** `SeededRng`을 만들어 `rng` 상태를 적용해 본다(현재 `rng`는 그대로). 스냅샷에 없는 스트림(데이터에 새로 추가된 것)은 새 파생 시드에서 시작하고, 데이터에 없는 스트림은 `push_warning` 후 무시한다. `SeededRng.set_state`가 `false`면 실패다: 스트림 이름이 문자열이 아니거나 값이 10진 정수 문자열이 아닌 항목이 하나라도 있을 때이고, 이때 `set_state` 자신이 `push_error` 1회를 낸다. 값 형식 검사가 스트림 이름 확인보다 먼저라 데이터에 없는 스트림이라도 값이 틀리면 실패다(SE-017 명문화, 현 구현 그대로) | 〃 (`push_error` 합계 2회: `SeededRng` 1 + `TickLoop` 1) |
+| 4 | 검사 | (a) `pending_commands` 정규화·형식 검사: 페이로드 안(재귀, 배열·중첩 Dictionary 포함)의 정수값인 `float`를 `int`로 정규화한다(`EventBus.normalize_commands`). 명령 페이로드 숫자는 원래 `int`뿐이므로(E4) 손실 없는 역변환이다. 정수가 아닌 `float`(예: `1.5`)나 형식 오류(원소가 `{name, payload}`가 아님, 이름이 `*_requested`가 아님, 페이로드가 E4 위반)가 하나라도 있으면 실패. (b) `rng` 상태 형식 검사: `seed`로 **새** `SeededRng`을 만들어 `rng` 상태를 적용해 본다(현재 `rng`는 그대로). 스냅샷에 없는 스트림(데이터에 새로 추가된 것)은 새 파생 시드에서 시작하고, 데이터에 없는 스트림은 `push_warning` 후 무시한다. `SeededRng.set_state`가 `false`면 실패다: 스트림 이름이 문자열이 아니거나 값이 10진 정수 문자열이 아닌 항목이 하나라도 있을 때이고, 이때 `set_state` 자신이 `push_error` 1회를 낸다. 값 형식 검사가 스트림 이름 확인보다 먼저라 데이터에 없는 스트림이라도 값이 틀리면 실패다(SE-017 명문화, 현 구현 그대로). 마지막으로 새 `SeededRng`의 스트림 목록(`stream_names`, 이름·순서)이 현재 `rng`의 것과 다르면 실패다(SE-052 — 8(b) 의 상태 적용이 실패할 수 없게 하는 사전 검사. 둘 다 `sim.json` `rng_streams`로 만들므로 정상 경로에서는 도달하지 않는다) | 〃 (`push_error` 합계: `set_state` 실패 2회 = `SeededRng` 1 + `TickLoop` 1, 스트림 목록 불일치 1회 = `TickLoop` 1) |
 | 5 | 검사 | `systems` (SE-011 D5): ① `Dictionary`여야 한다(키 없음·`Array` 등은 실패). ② 모든 값이 `Dictionary`여야 한다(id 등록 여부와 무관). ③ 훅을 등록한 시스템마다 `systems`에 항목이 있어야 한다(없으면 상태 불완전 → 실패). ④ 훅을 등록한 시스템의 두 훅이 지금도 `is_valid()`. ⑤ 훅 시스템이 아닌 id(`system_order` 밖, 미등록, 훅 없이 등록)의 항목은 id 마다 `push_warning` 1회 후 무시한다(4단계 "데이터에 없는 스트림"과 같은 결). 경고는 실패가 아니다 | `push_error`, `false`, 상태 불변 |
 | 6 | 검사(사전 스냅샷) | "실행 중" 표시(SH5). 훅 시스템마다 `system_order` 순으로 `prev[id] = snapshot_hook()`을 받아 `snapshot()` 2단계와 같은 검사를 한다. 아직 어떤 시스템도 복원하지 않았다 | `push_error`, 표시 해제, `false`, 상태 불변 |
 | 7 | 적용(시스템) | 훅 시스템마다 `system_order` 순으로 `restore_hook(systems[id]의 깊은 복사본)`. 반환이 `true`면 다음 시스템. `false`(또는 `bool`이 아닌 값)면: `push_error`(시스템 id 포함) 1회 → 이 단계에서 이미 성공한 시스템을 **역순**으로 `restore_hook(prev[id]의 깊은 복사본)`으로 되돌린다 → 표시 해제, `false`. 실패한 시스템 자신은 SH3 에 따라 바뀌지 않았으므로 되돌리지 않는다. 롤백의 `restore_hook`이 `false`면 그 시스템마다 `push_error` 1회를 더하고 남은 롤백을 계속한다(복구 불능, 아래) | `push_error`, `false`. 시스템 상태 원복, `TickLoop` 필드 불변 |
-| 8 | 적용(`TickLoop`) | 순서대로 (a) 버스 명령 큐를 4단계 정규화 목록으로 교체, (b) 카운터·`speed`·`seed` 덮어쓰기, 4단계에서 만든 `SeededRng`으로 `rng` 교체, `acc = 0`. 4단계가 같은 E4 규칙으로 검사를 끝냈으므로 (a)는 실패하지 않는다. 방어 규칙: 그래도 (a)가 실패하면 7단계와 같은 역순 롤백(모든 훅 시스템)을 하고 `push_error`, `false`. (b)는 실패할 수 없다 | (도달 불가) |
+| 8 | 적용(`TickLoop`) | 순서대로 (a) 버스 명령 큐를 4단계 정규화 목록으로 바꿔 넣기, (b) 카운터·`speed`·`seed` 덮어쓰기, 4단계에서 검증한 시드·상태를 기존 `rng` 객체에 적용(객체 유지 — `rng.assign(new_rng)`. 시스템이 생성자에서 받아 들고 있는 `SeededRng` 참조가 로드 뒤에도 `loop.rng`와 같은 객체여야 한다. 근거 [SE-034-bug](../tickets/SE-034-bug.md), `78de35a`), `acc = 0`. 4단계가 같은 E4 규칙으로 검사를 끝냈으므로 (a)는 실패하지 않는다. 방어 규칙: 그래도 (a)가 실패하면 7단계와 같은 역순 롤백(모든 훅 시스템)을 하고 `push_error`, `false`. (b)는 4(b) 가 스트림 목록 일치까지 검사했으므로 실패하지 않는다(`assign`의 반환값은 버리지 않고 확인한다 — SE-052) | (도달 불가) |
 | 9 | 끝 | 표시 해제. 이벤트를 발행하지 않는다. `true` | — |
 
 결정 근거(SE-011 D4): 시스템을 먼저, `TickLoop` 자기 필드(카운터·`seed`·`rng`·명령 큐)를 마지막에 적용한다. 시스템 복원은 실패할 수 있지만 8단계는 실패하지 않기 때문이다. 그래서 7단계 실패 때 되돌릴 대상이 시스템뿐이고, `TickLoop` 필드는 처음부터 바뀌지 않는다.
@@ -391,6 +391,7 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 | 1단계 재진입 | 1 | 0 | 0 | 1 | `test_snapshot_rejected_mid_tick`, `test_system_hooks_reject_reentry` |
 | 2·3단계, 4(a) `pending_commands`, 5단계 | 1 | 0 | 0 | 1 | `test_restore_rejects_bad_snapshot`(5단계 ①②③), `test_restore_rejects_invalid_hook`(5단계 ④ — 훅 객체 해제 뒤 `restore` false, `push_error` 1회 "더 이상 유효하지 않다", TickLoop 필드 불변, `restore_hook` 0회; `snapshot()` 이 `{}` 라 해시 대신 필드 비교) (SE-022 추가) |
 | 4(b) `rng` 상태 값 오류(`rng.audience = "x"`) | 1 | 1 (`SeededRng.set_state`) | 0 | **2** | `test_restore_rejects_bad_snapshot` "rng audience x" (SE-017 추가) |
+| 4(b) 스트림 목록 불일치(현재 `rng`를 다른 스트림 목록의 `SeededRng`으로 바꿔 끼운 루프) | 1 | 0 | 0 | 1 | `test_tick.gd` 새 케이스(SE-052 B, sim-engineer): `restore` `false`, `push_error` 1회, 상태 해시 불변 |
 | 6단계 사전 스냅샷 위반 | 1 | 훅 자신 (가짜 훅 0) | 0 | 1 | `test_system_snapshot_rejects_invalid_hook_return` |
 | 7단계 `restore_hook` `false`, 가짜 시스템 | 1 | 0 | 0 | 1 | `test_system_restore_rolls_back_on_failure` (a) |
 | 7단계 `restore_hook` `false`, `Economy` | 1 | 1 (`Economy.restore`) | 0 | **2** | economy.md EC16 (c) `TickLoop` 경로(`test_economy.gd::test_snapshot_roundtrip`) |
@@ -414,6 +415,25 @@ staff·show·reputation 이 난수가 필요해지면 그 스펙 티켓에서 �
 
 **오토세이브 시점.** PRD "하루 마감마다" = close 진입 틱이 끝난 경계. 그 틱의 단계 4 에서 `time.phase_changed {to:"close"}`가 나고, close 는 홀드라 `advance`/`step`이 그 경계에서 반환한다(뒤따르는 경계 처리 없음).
 세이브 시스템(후속 티켓)은 `time.phase_changed {to:"close"}`를 구독해 플래그만 세우고, 구동기가 `advance`/`step` 반환 뒤 `snapshot()`을 찍는다. 파일 포맷(JSON → gzip)·마이그레이션은 후속 세이브 티켓.
+
+#### 세이브 설정 (save.json)
+
+[`save.json`](../../project/data/save/save.json)(version 1, SE-057)은 슬롯 수와 오토세이브 보관 수만 담는다. 파일 형식(JSON → gzip, SE-036 `SaveFile`)과 스냅샷 버전(`sim.json` `snapshot_schema_version`)은 이 테이블 밖이다. 난수를 쓰지 않고 게임 상태(스냅샷)에 들어가지 않는다 — 값을 바꿔도 상태 해시·리플레이 기준값은 불변이다.
+
+| 필드 | 값 | 범위 | 뜻 |
+|---|---|---|---|
+| `manual_slots` | 3 | 1~9 | 수동 저장 슬롯 수. 슬롯 이름 `"1"` … `str(manual_slots)`(events.md SN1 형식). 상한 9 는 메뉴 한 화면·한 자리 이름 기준 |
+| `autosave_keep` | 3 | 0~99, 0 = 무제한 | 보관할 오토세이브(`autosave_day<N>`) 파일 수 |
+
+| # | 규칙 |
+|---|---|
+| SV1 | **읽는 쪽.** `GameSession`(core)이 `new_game`·`load_configs` 때 `<data_root>/save/save.json` 을 읽는다. `manual_slots` 는 메뉴(SE-039/SE-040, AC-39d)가 읽는다. 둘 다 읽기 전용 |
+| SV2 | **수동 슬롯은 UI 목록일 뿐.** sim 은 `manual_slots` 로 저장·불러오기를 거부하지 않는다(SN1 형식만 검사). 슬롯 수를 줄여도 기존 `"4"` 파일은 지우지 않고, 메뉴에 안 보일 뿐이다 |
+| SV3 | **보관 수 적용.** 오토세이브 파일을 쓴 직후(close 홀드 경계, 위 "오토세이브 시점") `autosave_keep > 0` 이면 `autosave_day<N>` 파일을 `N` 오름차순으로 지워 `autosave_keep` 개만 남긴다. 방금 쓴 파일은 가장 큰 `N` 이라 항상 남는다. 수동 슬롯 파일과 그 밖의 파일은 세지도 지우지도 않는다. `autosave_keep == 0` 이면 지우지 않는다. 오토세이브 쓰기가 실패한 경계에서는 지우지 않는다 |
+| SV4 | **파일·필드 없음.** `save/save.json` 이 없거나 `autosave_keep` 키가 없으면 무제한(0, SE-036 의 현재 기본과 같음). `manual_slots` 가 없으면 메뉴 기본값(`ui_params.tres`, SE-040 AC-39d) |
+| SV5 | **잘못된 값.** `autosave_keep` 이 `int` 가 아니거나 0 미만이면 `push_error` 1회 후 무제한(0) — 잘못된 데이터로 세이브를 지우지 않는 쪽이 안전하다. `manual_slots` 가 `int` 가 아니거나 1 미만이면 메뉴가 SV4 기본값을 쓴다. 스키마(`validate_data.py --strict`)가 CI 에서 먼저 막으므로 런타임 경로는 손상 대비다 |
+
+수용 기준(SE-057): `autosave_keep: 2` 를 주입한 데이터 루트로 3일 진행하면 3일차 close 뒤 `autosave_day1.sav` 가 없고 `day2`·`day3` 이 있다. 데이터 루트에 `save/` 가 없으면 3일 뒤 세 파일이 다 있다. 수동 슬롯 `"1"` 파일은 어느 경우에도 남는다. → `test_game_session.gd`(sim-engineer).
 
 ### 이벤트 순서
 
@@ -559,3 +579,6 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-017 (docs/reviews/SE-012.md 발견 5·참고 4·후속 제안 D, docs/reports/SE-012.md 리뷰어에게 6) | #스냅샷 `restore` 문단의 "`push_error`는 정확히 1회"를 "**`TickLoop` 자신의** `push_error` 1회, 하위 구성 요소(4(b) `SeededRng.set_state`, 6·7단계 시스템 훅 자신)와 7단계 롤백 실패분은 별도"로 고쳤다. restore 표 4단계에 `set_state` 실패 조건(이름이 문자열 아님·값이 10진 정수 문자열 아님, 값 검사가 스트림 이름 확인보다 먼저)과 합계 2회를 적었다. "복구 불능" 뒤에 "`push_error` 횟수 (SE-017)" 블록(세 항 (i)~(iii), 실패 경로별 합계 표 7행, 결정 근거)을 더했다. 수용 기준 머리말에 "restore 행의 횟수는 누적 합계, '1회' 행은 `TickLoop` 자신 1회와 같다, economy.md EC16 (c) 2회와 모순 없음"을 한 번 적고, AC10 `test_restore_rejects_bad_snapshot` 행에 `rng["audience"] = "x"` → `false`·해시 불변·`push_error` 누적 +2 케이스를 더했다. 기존 단언(I4·`seed` 범위 +1, "seed max passes" +0, `systems` 불일치 +1, 롤백 (a) 1·(b) +2, EC16 (c) +2)은 모두 새 규칙과 일치해 그대로다. economy.md 변경 0. 수치·이벤트·스냅샷 키 변경 0, 코드·데이터 변경 0 |
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-016 (docs/reviews/SE-012.md 발견 4·후속 제안 C) | 공개 API 표 `EventBus`에 `static is_valid_value(v: Variant, allow_float: bool) -> bool`(E4 기본형 재귀 검사, SH2 용, `project/core/event_bus.gd`)을 더했다. 이미 있던 공개 멤버를 표에 올린 것뿐이라 코드·규칙·이벤트·리플레이 기준값 변경 없음 |
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-022 (docs/reviews/SE-017.md 발견 1·후속 E) | #스냅샷 "`push_error` 횟수 (SE-017)" 표 2행의 "고정하는 테스트" 열을 바로잡았다. 기존 `test_restore_rejects_bad_snapshot`은 5단계 ①②③만 때리므로 그 범위를 `(5단계 ①②③)`로 적고, 5단계 ④(훅 시스템 객체 해제로 `Callable.is_valid()`가 아님)를 고정하는 `test_restore_rejects_invalid_hook`(SE-022 1차 sim-engineer 추가)을 덧붙였다. 이 케이스는 `snapshot()`이 같은 무효 훅 때문에 `{}`를 돌려주므로 상태 해시 대신 `TickLoop` 필드 비교로 불변을 단언하고, ④ 분기를 변이에서 구별하는 것은 메시지 단언 "더 이상 유효하지 않다"다(분기를 지우면 6단계 사전 스냅샷이 같은 횟수로 실패한다). 표의 (i)(ii)(iii)·합계 열(1·0·0·1)과 다른 행은 변경 없음. 규칙·수치·이벤트·스냅샷 키 변경 0, 코드·데이터 변경 0 |
+| 2026-10-10 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-052 A (docs/reviews/SE-034.md 후속 2·3, SE-034-bug) | #스냅샷 restore 8(b) 문구를 SE-034-bug 수정(`78de35a`, `rng.assign`)에 맞췄다: "4단계에서 만든 `SeededRng`으로 `rng` 교체" → "4단계에서 검증한 시드·상태를 기존 `rng` 객체에 적용(객체 유지)", 근거 링크. 같은 행 (a) 의 "교체"도 "바꿔 넣기"로 고쳐 8단계 행에 "교체" 0건. 4(b) 끝에 "새 `SeededRng`의 스트림 목록이 현재 `rng`와 다르면 실패"(TickLoop 1회)를 더해 8(b) 가 실패할 수 없음을 사전 검사로 보장하고, `push_error` 횟수 표에 그 경로 1행(합계 1)을 더했다. 구현·테스트는 SE-052 B(sim-engineer). 수치·이벤트·스냅샷 키 변경 0, 데이터 변경 0 |
+| 2026-10-10 | `save.json` v1 + `save.schema.json` version 1 (신규), tick.md v0 (후속 수정) | SE-057 (docs/reviews/SE-036.md 후속 제안, docs/tickets/SE-036.md 결과 절 "game-designer 요청 필드") | #스냅샷 아래 "세이브 설정 (save.json)" 절(SV1~SV5)을 새로 썼다. 필드 `manual_slots` 3(1~9), `autosave_keep` 3(0~99, 0 = 무제한). SE-036 결과 절 제안 이름 `save_slot_count` 는 SE-057 티켓의 `manual_slots` 로 바꿨다(SE-040 AC-39d 가 이미 이 이름을 참조). `sim.json` 에 넣지 않고 새 테이블로 둔 이유: 세이브 설정은 시뮬레이션 상수가 아니고 상태 해시에 영향이 없으며, `sim.json` 은 버전을 올리면 리플레이 기준값 검토가 따라온다. `sim.json`·스냅샷 키·이벤트 변경 0 |
+| 2026-10-10 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-058 | #세션-구간 "새 게임은 … 이벤트를 내지 않는다" 뒤에 "`TickLoop` 시간 이벤트 이야기이고, `GameSession` 은 새 세계 생성 직후 `build.coverage_changed {cause:"sync"}` 1회를 낸다(시간·RNG 불변)"를 덧붙였다(events.md 해당 행과 모순 제거). 규칙·수치·스냅샷 키 변경 0 |

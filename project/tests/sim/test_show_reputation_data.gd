@@ -344,8 +344,9 @@ func test_show_numeric_targets_sg1_sg4() -> void:
 			assert_false(int(r[0]) < m and int(r[1]) >= m, "%s 범위가 경계 %d 를 가로지름" % [id, m])
 			var dist: int = mini(absi(int(r[0]) - m), absi(int(r[1]) - m))
 			assert_true(dist >= 200 or m == 0, "%s ↔ 경계 %d 거리 %d ≥ 200 (SG3)" % [id, m, dist])
-	assert_eq(_grade_of(6732), "good")
-	assert_eq(_grade_of(5730), "ok", "SG2: 가격 30 은 한 단계 아래")
+	# SG1·SG2 입력은 audience.json 시나리오의 손계산 평균에서 읽는다(만족 bp 리터럴 없음).
+	assert_eq(_grade_of(int(aud_by["local_top_baseline"]["expected"]["avg_satisfaction_bp_hand"])), "good", "SG1: 로컬 상위 기준 배치는 호평")
+	assert_eq(_grade_of(int(aud_by["local_top_price30"]["expected"]["avg_satisfaction_bp_hand"])), "ok", "SG2: 가격 30 은 한 단계 아래")
 	var no_lineup: int = int(aud_by["no_lineup"]["expected"]["avg_satisfaction_bp_hand"])
 	assert_eq(_grade_of(no_lineup), "poor", "SG4: 단골만 온 날 수준은 poor 구간")
 
@@ -613,6 +614,8 @@ func test_rt_targets() -> void:
 func test_rotation_orders_all_reach_tier2_same_day() -> void:
 	# 순환 전략의 6가지 순서는 서로 같은 날 도달한다(확산 보너스는 순서와 무관). 집중 전략과의 차이는 RT5(≤ 2일).
 	# 수치 리터럴(25일)은 없다: 도달일은 모두 이 파일의 공식 재계산에서 나온다. 두 보너스가 같은지(Q5)는 요구하지 않는다.
+	# 공연 입력(만족·입장)은 순환 시나리오 데이터에서 읽는다.
+	var shot: Dictionary = _scenario("rotation_good_30")["show_cycle"][0]
 	var perms: Array = [
 		["rock", "indie", "electronic"], ["rock", "electronic", "indie"], ["indie", "rock", "electronic"],
 		["indie", "electronic", "rock"], ["electronic", "rock", "indie"], ["electronic", "indie", "rock"],
@@ -625,7 +628,7 @@ func test_rotation_orders_all_reach_tier2_same_day() -> void:
 	for p: Array in perms:
 		var cyc: Array = []
 		for gid: String in p:
-			cyc.append({"genre": gid, "satisfaction_bp": 6732, "admissions": 83})
+			cyc.append({"genre": gid, "satisfaction_bp": int(shot["satisfaction_bp"]), "admissions": int(shot["admissions"])})
 		var r: Dictionary = _run({"days": 30, "cash": _scenario("local_daily_good_30")["cash"], "show_cycle": cyc})
 		var day: Variant = _first_day(r["total"], need)
 		assert_true(day != null, "순환 %s: 30일 안에 도달" % ",".join(p))
@@ -647,7 +650,6 @@ func test_failure_floor_scenario_hand_values() -> void:
 	var total: Array = []
 	var delta: Array = []
 	var t: int = 0
-	var by_indie: int = 0
 	for i: int in range(cyc.size()):
 		if cyc[i] == null:
 			grades.append(null)
@@ -668,7 +670,9 @@ func test_failure_floor_scenario_hand_values() -> void:
 		delta.append(nt - t)
 		t = nt
 		total.append(t)
-		by_indie = maxi(0, by_indie + c)
+	# 전제: 양수 등급에도 장르 보정이 없다(이 시나리오는 FC1 미충족). 인라인 닫힌 식에 보정 항이 없는 근거.
+	for fk: Variant in r["focus"]:
+		assert_true(fk == null or String(fk) == "none", "전제: 장르 보정 없음(focus none) — %s" % str(fk))
 	assert_eq(r["grade"], grades)
 	assert_eq(r["factor_bp"], factors, "계수 하한·상한")
 	assert_eq(r["computed_delta"], comp, "계산값(하한 전)")

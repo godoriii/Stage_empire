@@ -4,7 +4,9 @@ extends Node3D
 ## 팔레트에서 가구를 고르면(select) 호버 타일(hover)에 고스트 상자를 띄운다. 색은 view 쪽 **추정**:
 ##   맵 밖(out_of_bounds) / 배치 불가 타일(blocked_tile) / 점유 겹침(overlap) / 벽 비인접(wall_required) → 무효(빨강),
 ##   그 밖 → 유효(녹색). 자금·구간·한도·경로는 sim 이 판정한다(build.md B2·B9·B10·H3). 최종 결과는 build.placed/rejected.
-##   SE-032 병합 뒤 build.md Q4 의 check_place() 읽기 전용 쿼리로 바꿀 자리(estimate_reason 한 곳).
+##   SE-040(AC-37a): bind 의 validator(Callable(furniture_id: String, cell: Vector2i, rotation_deg: int) -> String)가 있으면
+##   그 결과를 쓴다 — 메인 씬이 Callable(session, "check_place")(build.md Q4 읽기 전용 쿼리, B1·B3~B10)를 주입한다.
+##   validator 가 없으면(샌드박스) estimate_reason 추정.
 ## 클릭(build_confirm) → build.place_requested {furniture_id, cell:[x,z], rotation}(무효 추정이면 보내지 않는다).
 ## 철거 모드(build_demolish) → 클릭한 셀의 가구가 있으면 build.demolish_requested {entity_id}, 빈 타일이면 아무것도 없음.
 ## 회전(build_rotate) → rotation 순환(rotatable == false 면 고정). 취소(build_cancel) → 선택 해제, 이벤트 없음.
@@ -38,6 +40,8 @@ var _furniture_id: String = ""
 var _rotation: int = 0
 var _hover: Vector2i = IsoGridMath.INVALID_TILE
 var _reason: String = ""
+## 유효성 쿼리(없으면 estimate_reason). 상태를 바꾸지 않는 읽기 전용 쿼리여야 한다(커서 이동마다 부른다).
+var _validator: Callable = Callable()
 
 var _box: MeshInstance3D
 var _box_mat: StandardMaterial3D
@@ -45,7 +49,9 @@ var _label: Label3D
 var _radius: MultiMeshInstance3D
 
 
-func bind(bus: EventBus, catalog: BuildCatalog, furniture: FurnitureView, tile_m: float) -> void:
+func bind(bus: EventBus, catalog: BuildCatalog, furniture: FurnitureView, tile_m: float,
+		validator: Callable = Callable()) -> void:
+	_validator = validator
 	if params == null:
 		params = load(DEFAULT_PARAMS_PATH) as BuildViewParams
 	_bus = bus
@@ -200,6 +206,18 @@ func get_radius_preview_count() -> int:
 	return _radius.multimesh.instance_count
 
 
+## 고스트 판정: validator 가 있으면 그 결과(String), 없으면 estimate_reason. "" = 유효.
+func check_reason(furniture_id: String, cell: Vector2i, rotation_deg: int) -> String:
+	if _validator.is_valid():
+		return str(_validator.call(furniture_id, cell, rotation_deg))
+	return estimate_reason(furniture_id, cell, rotation_deg)
+
+
+## validator 를 주입받았는가(메인 씬 = true, 샌드박스 = false).
+func has_validator() -> bool:
+	return _validator.is_valid()
+
+
 ## view 쪽 유효성 추정(build.md B5~B8 중 view 가 아는 것). "" = 유효 추정.
 ## 점유는 FurnitureView 가 받은 build.placed 기준. 자금(H3)·구간(B2)·한도(B9)·경로(B10)는 판정하지 않는다.
 func estimate_reason(furniture_id: String, cell: Vector2i, rotation_deg: int) -> String:
@@ -232,7 +250,7 @@ func _refresh() -> void:
 	var on: bool = _hover != IsoGridMath.INVALID_TILE
 	match _mode:
 		Mode.PLACE:
-			_reason = estimate_reason(_furniture_id, _hover, _rotation) if on else ""
+			_reason = check_reason(_furniture_id, _hover, _rotation) if on else ""
 			if on:
 				_show_place()
 		Mode.DEMOLISH:

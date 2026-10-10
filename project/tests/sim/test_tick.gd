@@ -886,6 +886,9 @@ func test_rejects_float_beyond_int64() -> void:
 		s["seed"] = v
 		assert_false(target.restore(s), "TickLoop seed %s → false" % v)
 		errs += 1
+		# SE-052 AC-45a: 3단계 "숫자 필드" 분기에서 거절돼야 한다. 2^63 가드를 지우면 seed 가 int 로 접혀
+		# "seed 범위 밖" 으로 같은 횟수만큼 실패하므로 횟수만으로는 변이를 못 잡는다.
+		assert_push_error("숫자 필드", "seed %s: 숫자 필드 분기에서 거절" % v)
 		assert_push_error_count(errs, "seed %s: push_error 1회" % v)
 		assert_eq(_hash(target), before, "seed %s: 상태 불변" % v)
 	var raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SimConfig.DEFAULT_PATH))
@@ -893,3 +896,40 @@ func test_rejects_float_beyond_int64() -> void:
 	raw["ticks_per_second"] = 1e19
 	assert_null(SimConfig.from_dict(raw), "SimConfig ticks_per_second 1e19 → null")
 	assert_push_error_count(errs + 1, "SimConfig: push_error 1회")
+
+
+## SE-052 AC2: restore 4(b) 끝 — 새 SeededRng(sim.json rng_streams)의 스트림 목록이 현재 rng 와 다르면 거부.
+## 현재 rng 를 다른 스트림 목록의 SeededRng 으로 바꿔 끼운 루프에서 restore → false, push_error 1회(TickLoop 자신,
+## 하위 0), 상태 해시 불변. tick.md#스냅샷 "push_error 횟수" 표의 "4(b) 스트림 목록 불일치" 행.
+func test_restore_rejects_rng_stream_list_mismatch() -> void:
+	var loop: TickLoop = _new_loop()
+	loop.advance(2500)
+	var good: Dictionary = loop.snapshot()
+	var target: TickLoop = _new_loop(9)
+	target.advance(10)
+	var cfg_streams: Array[String] = _cfg.rng_streams.duplicate()
+	assert_gt(cfg_streams.size(), 1, "전제: rng_streams 2개 이상")
+	var reversed: Array[String] = cfg_streams.duplicate()
+	reversed.reverse()
+	var dropped: Array[String] = cfg_streams.duplicate()
+	dropped.pop_back()
+	var errs: int = 0
+	for label: String in ["순서 다름", "하나 빠짐"]:
+		var other: Array[String] = reversed if label == "순서 다름" else dropped
+		target.rng = SeededRng.new(9, other)
+		var swapped: SeededRng = target.rng
+		var before: String = _hash(target)
+		var tick0: int = target.tick
+		assert_false(target.restore(good), label + ": restore → false")
+		errs += 1
+		assert_push_error("스트림 목록", label + ": 4(b) 스트림 목록 검사에서 거부")
+		assert_push_error_count(errs, label + ": push_error 1회(TickLoop 자신, SeededRng.assign 0)")
+		assert_eq(_hash(target), before, label + ": 상태 해시 불변")
+		assert_eq(target.tick, tick0, label + ": tick 불변")
+		assert_same(target.rng, swapped, label + ": rng 객체 그대로")
+		assert_eq(target.rng.stream_names, other, label + ": 스트림 목록 그대로")
+	# 같은 목록이면 통과(전제: 위 실패는 목록 차이 때문).
+	target.rng = SeededRng.new(9, cfg_streams)
+	assert_true(target.restore(good), "같은 스트림 목록 → true")
+	assert_push_error_count(errs, "같은 목록: push_error 추가 0")
+	assert_eq(_hash(target), _hash(loop), "같은 목록: 복원 뒤 해시 일치")

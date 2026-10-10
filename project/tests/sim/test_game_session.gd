@@ -3,8 +3,15 @@ extends GutTest
 ## AC-35a/b(실제 audience 포함 하루 이벤트 순서·라인업 없는 날), AC5(오토세이브·경계), AC6(session 명령·재발행 규칙),
 ## SE-049(session.loaded 4필드, 공연 중 로드 → 연속 진행과 동일). docs/tickets/SE-036.md, docs/gdd/tick.md#스냅샷.
 ## SE-056 AC1~AC5(session.* 계약 SN1~SN5, docs/gdd/events.md #session-명령-규칙)는 파일 끝 절.
+## SE-058(새 세계 생성 직후 coverage sync, 이중 restore 제거, AC-56b·AC-56d)는 그 뒤 절.
 
 const DIR: String = "user://test_se036_session"
+## SE-057 데이터 루트 사본(res://data 복사, save/ 만 바꾼다).
+const ROOT_NO_SAVE: String = "user://test_se057_root_nosave"
+const ROOT_KEEP2: String = "user://test_se057_root_keep2"
+const ROOT_SCRATCH: String = "user://test_se057_scratch"
+const SAVE_JSON_REL: String = "save/save.json"
+const MANUAL_SLOT: String = "1"
 const SEED: int = 36
 const ARTIST: String = "thumbnail_soda"
 const LAYOUT: String = "baseline_show"
@@ -30,6 +37,11 @@ func before_all() -> void:
 
 func after_each() -> void:
 	_rm_dir(DIR)
+
+
+func after_all() -> void:
+	for r: String in [ROOT_NO_SAVE, ROOT_KEEP2, ROOT_SCRATCH]:
+		_rm_tree(r)
 
 
 # --- 도우미 ----------------------------------------------------------------------
@@ -212,9 +224,13 @@ func test_autosave_each_close_and_keep() -> void:
 	assert_eq(s.list_autosave_days(), [2, 3], "보관 수 2 초과분(1일차) 삭제")
 
 
+## SE-057: 기본 데이터 루트에는 save.json autosave_keep 이 있으므로 "필드 없음 → 무제한" 은 save/ 없는 데이터 루트로 본다.
 func test_autosave_unlimited_by_default_and_disable() -> void:
-	var s: GameSession = _session(false)
-	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED, "데이터 필드가 없으면 무제한")
+	var root: String = _data_root_copy(ROOT_NO_SAVE, {})
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED, root), "save/ 없는 데이터 루트로 시작")
+	s.saves_dir = DIR
+	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED, "save.json 이 없으면 무제한(SV4)")
 	for d: int in range(2):
 		s.advance(_day_ticks())
 		s.bus.publish("time.next_day_requested", {})
@@ -568,3 +584,387 @@ func test_se056_ac5_new_game_bad_seed_ignored() -> void:
 	assert_eq(rec.events, [])
 	assert_push_error_count(2)
 	assert_eq(_hash(s.snapshot()), before)
+
+
+# --- SE-040 선행: check_place 읽기 전용 위임(build.md Q4, AC-37a) ------------------------------------
+
+## 상태 불변·이벤트 0 확인용으로 기록하는 이벤트(재발행·하루 진행·build 결과 전부).
+const CHECK_EVENTS: Array[String] = [
+	"session.saved", "session.loaded", "session.load_failed", "build.placed", "build.rejected", "build.removed",
+	"build.coverage_changed", "build.charge_requested", "tick.advanced", "time.phase_changed", "time.day_started",
+	"economy.cash_changed", "reputation.changed", "audience.admissions_decided", "show.started", "artist.lineup_set",
+]
+
+
+## [결과, 상태 해시 불변, 이벤트 수, 대기 명령 불변]. 비교 기준 BuildSystem.check_place 는 호출 뒤에 따로 부른다.
+func _probe_check(s: GameSession, fid: String, cell: Vector2i, rot: int) -> Array:
+	var before: String = _hash(s.snapshot())
+	var pending: String = _hash(s.bus.get_pending_commands())
+	var rec: EventRecorder = EventRecorder.new(s.bus, CHECK_EVENTS)
+	var got: String = s.check_place(fid, cell, rot)
+	return [got, _hash(s.snapshot()) == before, rec.events.size(), _hash(s.bus.get_pending_commands()) == pending]
+
+
+## 유효 위치: 빈 세계에 레이아웃 첫 가구 → "" 이고 BuildSystem.check_place 와 같다. 상태·큐 불변, 이벤트 0.
+func test_se040_check_place_valid_matches_build_system() -> void:
+	var s: GameSession = _session(false)
+	var bcfg: BuildConfig = _cfgs["build"]
+	var p: Dictionary = bcfg.layout(LAYOUT)["placements"][0]
+	var cell: Vector2i = Vector2i(int(p["cell"][0]), int(p["cell"][1]))
+	var rot: int = int(p["rotation"])
+	var r: Array = _probe_check(s, p["furniture_id"], cell, rot)
+	assert_eq(r[0], "", "빈 세계의 레이아웃 첫 배치는 유효")
+	assert_eq(r[0], s.build.check_place(p["furniture_id"], [cell.x, cell.y], rot), "BuildSystem.check_place 와 같다")
+	assert_eq(r.slice(1), [true, 0, true], "상태 해시 불변, 이벤트 0, 대기 명령 불변")
+	assert_push_error_count(0)
+
+
+## 무효 위치: 겹침(overlap)·범위 밖(out_of_bounds)·모르는 가구 → BuildSystem.check_place 와 같은 reason.
+## 상태·큐 불변, 이벤트 0. 새 게임 전 세션은 "invalid".
+func test_se040_check_place_invalid_matches_build_system() -> void:
+	var s: GameSession = _session(true)
+	var bcfg: BuildConfig = _cfgs["build"]
+	var p: Dictionary = bcfg.layout(LAYOUT)["placements"][0]
+	var fid: String = p["furniture_id"]
+	var rot: int = int(p["rotation"])
+	var cases: Array = [
+		[fid, Vector2i(int(p["cell"][0]), int(p["cell"][1])), rot, BuildSystem.R_OVERLAP],
+		[fid, Vector2i(-1, -1), rot, BuildSystem.R_OUT_OF_BOUNDS],
+		["no_such_furniture", Vector2i(int(p["cell"][0]), int(p["cell"][1])), rot, BuildSystem.R_UNKNOWN_FURNITURE],
+	]
+	for c: Array in cases:
+		var r: Array = _probe_check(s, c[0], c[1], c[2])
+		var cell: Vector2i = c[1]
+		assert_eq(r[0], c[3], "%s %s → %s" % [c[0], cell, c[3]])
+		assert_eq(r[0], s.build.check_place(c[0], [cell.x, cell.y], c[2]), "BuildSystem.check_place 와 같다")
+		assert_eq(r.slice(1), [true, 0, true], "상태 해시 불변, 이벤트 0, 대기 명령 불변")
+	assert_eq(GameSession.new().check_place(fid, Vector2i.ZERO, rot), BuildSystem.R_INVALID, "새 게임 전 → invalid")
+	assert_push_error_count(0)
+
+# --- SE-057 save.json autosave_keep (docs/gdd/tick.md #세이브-설정-savejson SV1~SV5) --------------------------
+
+## res://data 를 dst 로 복사한다. save/ 는 복사하지 않고, save_json 이 비어 있지 않으면 dst/save/save.json 으로 쓴다.
+## 이미 있으면 다시 만들지 않는다(after_all 이 지운다). 반환 = dst.
+func _data_root_copy(dst: String, save_json: Dictionary) -> String:
+	if not DirAccess.dir_exists_absolute(dst):
+		_copy_tree(GameSession.DEFAULT_DATA_ROOT, dst, ["save"])
+		if not save_json.is_empty():
+			_write_text(dst.path_join(SAVE_JSON_REL), JSON.stringify(save_json))
+	return dst
+
+
+func _copy_tree(src: String, dst: String, skip_dirs: Array) -> void:
+	DirAccess.make_dir_recursive_absolute(dst)
+	for f: String in DirAccess.get_files_at(src):
+		DirAccess.copy_absolute(src.path_join(f), dst.path_join(f))
+	for d: String in DirAccess.get_directories_at(src):
+		if not skip_dirs.has(d):
+			_copy_tree(src.path_join(d), dst.path_join(d), [])
+
+
+func _rm_tree(path: String) -> void:
+	if not DirAccess.dir_exists_absolute(path):
+		return
+	for d: String in DirAccess.get_directories_at(path):
+		_rm_tree(path.path_join(d))
+	for f: String in DirAccess.get_files_at(path):
+		DirAccess.remove_absolute(path.path_join(f))
+	DirAccess.remove_absolute(path)
+
+
+func _write_text(path: String, text: String) -> void:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+
+
+## 기본 save.json 사본에서 autosave_keep 만 바꾼 Dictionary(다른 필드는 데이터 그대로).
+func _save_json_with_keep(keep: Variant) -> Dictionary:
+	var d: Dictionary = JsonUtil.read_json(GameSession.SAVE_CONFIG_PATH)
+	d[GameSession.KEY_AUTOSAVE_KEEP] = keep
+	return d
+
+
+## 낮부터 close 까지 1일, 다음 날로 넘기지 않는다(close 경계 = 오토세이브 시점).
+func _to_close(s: GameSession) -> void:
+	assert_eq(s.advance(_day_ticks()), _day_ticks())
+	assert_eq(s.loop.phase, "close")
+
+
+func _next(s: GameSession) -> void:
+	s.bus.publish("time.next_day_requested", {})
+	s.advance(0)
+
+
+## 수동 슬롯 "1" 저장(경계 명령). 오토세이브 보관 수에 세지 않아야 한다(SV3).
+func _manual_save(s: GameSession) -> void:
+	s.bus.publish("session.save_requested", {"slot": MANUAL_SLOT})
+	s.advance(0)
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯 파일")
+
+
+## AC2 (tick.md SV 절 수용 기준): autosave_keep 2 를 주입한 데이터 루트로 3일 → 3일차 close 뒤 day1 없음, day2·day3 있음.
+## 수동 슬롯 "1" 은 남는다.
+func test_se057_ac2_keep2_data_root_drops_oldest_on_third() -> void:
+	var root: String = _data_root_copy(ROOT_KEEP2, _save_json_with_keep(2))
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED, root))
+	s.saves_dir = DIR
+	assert_eq(s.autosave_keep, 2, "save.json autosave_keep 적용(SV1)")
+	_manual_save(s)
+	_to_close(s)
+	_next(s)
+	_to_close(s)
+	assert_eq(s.list_autosave_days(), [1, 2], "2개까지는 지우지 않는다")
+	_next(s)
+	_to_close(s)
+	assert_false(FileAccess.file_exists(s.autosave_path(1)), "3개째에서 가장 오래된 day1 삭제")
+	assert_true(FileAccess.file_exists(s.autosave_path(2)))
+	assert_true(FileAccess.file_exists(s.autosave_path(3)), "방금 쓴 파일은 남는다")
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯은 세지도 지우지도 않는다")
+	assert_eq(get_errors().size(), 0, "오류 0")
+
+
+## AC2: 데이터 루트에 save/ 가 없으면 3일 뒤 세 파일이 다 있다(SV4). 수동 슬롯도 남는다.
+func test_se057_ac2_no_save_dir_keeps_all() -> void:
+	var root: String = _data_root_copy(ROOT_NO_SAVE, {})
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED, root))
+	s.saves_dir = DIR
+	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED)
+	_manual_save(s)
+	for d: int in range(3):
+		if d > 0:
+			_next(s)
+		_to_close(s)
+	assert_eq(s.list_autosave_days(), [1, 2, 3], "무제한")
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)))
+	assert_eq(get_errors().size(), 0, "save.json 없음은 오류가 아니다")
+
+
+## SV1: 기본 데이터 루트는 res://data/save/save.json 의 값을 쓴다(리터럴이 아니라 파일에서 읽어 비교).
+func test_se057_default_data_root_reads_save_json() -> void:
+	var want: Variant = JsonUtil.as_int((JsonUtil.read_json(GameSession.SAVE_CONFIG_PATH) as Dictionary)[GameSession.KEY_AUTOSAVE_KEEP])
+	assert_not_null(want, "기본 save.json 에 autosave_keep(int)")
+	assert_eq(GameSession.load_configs()[GameSession.KEY_AUTOSAVE_KEEP], want, "load_configs 가 읽는다")
+	assert_eq(_cfgs[GameSession.KEY_AUTOSAVE_KEEP], want)
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED))
+	assert_eq(s.autosave_keep, want, "new_game 이 적용")
+	var t: GameSession = GameSession.new()
+	var cfgs: Dictionary = _cfgs.duplicate()
+	cfgs.erase(GameSession.KEY_AUTOSAVE_KEEP)
+	assert_true(t.new_game_from_configs(SEED, cfgs), "키 없는 configs 도 시작한다(선택 키)")
+	assert_eq(t.autosave_keep, GameSession.KEEP_UNLIMITED, "키 없음 → 무제한")
+
+
+## SV4: 파일 없음·키 없음 → 0, 오류 0. 정수값 float(JSON 숫자)은 int 로.
+func test_se057_sv4_missing_file_or_key_unlimited() -> void:
+	assert_eq(GameSession.read_autosave_keep(ROOT_SCRATCH.path_join("none/save.json")), GameSession.KEEP_UNLIMITED)
+	var d: Dictionary = _save_json_with_keep(0)
+	d.erase(GameSession.KEY_AUTOSAVE_KEEP)
+	var p: String = ROOT_SCRATCH.path_join("nokey.json")
+	_write_text(p, JSON.stringify(d))
+	assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "키 없음")
+	_write_text(p, JSON.stringify(_save_json_with_keep(2)))
+	assert_eq(GameSession.read_autosave_keep(p), 2, "JSON 숫자 2(float) → 2")
+	_write_text(p, JSON.stringify(_save_json_with_keep(0)))
+	assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "0 = 무제한")
+	assert_eq(get_errors().size(), 0, "오류 0")
+
+
+## SV5: int 아님·음수 → push_error 1회 후 0. JSON 객체가 아닌 파일도 push_error 1회 후 0. configs 주입값도 같은 규칙.
+func test_se057_sv5_invalid_value_error_once_then_unlimited() -> void:
+	var p: String = ROOT_SCRATCH.path_join("bad.json")
+	var bads: Array = [-1, "3", 1.5, true, null, [2]]
+	for i: int in range(bads.size()):
+		_write_text(p, JSON.stringify(_save_json_with_keep(bads[i])))
+		assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "잘못된 값 %s → 무제한" % [bads[i]])
+		assert_push_error_count(i + 1, "값 %s 당 push_error 1" % [bads[i]])
+	_write_text(p, "[1, 2]")
+	assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "객체가 아닌 JSON")
+	assert_push_error_count(bads.size() + 1, "객체 아님 push_error 1")
+	var s: GameSession = GameSession.new()
+	var cfgs: Dictionary = _cfgs.duplicate()
+	cfgs[GameSession.KEY_AUTOSAVE_KEEP] = -2
+	assert_true(s.new_game_from_configs(SEED, cfgs), "잘못된 보관 수는 시작을 막지 않는다")
+	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED)
+	assert_push_error_count(bads.size() + 2, "configs 주입값 push_error 1")
+
+
+## SV3: 오토세이브 쓰기가 실패한 경계에서는 지우지 않는다. 다음 성공 경계에서 보관 수를 적용한다.
+func test_se057_sv3_no_prune_on_autosave_write_failure() -> void:
+	var s: GameSession = _session(false)
+	s.autosave_keep = GameSession.KEEP_UNLIMITED
+	_manual_save(s)
+	_to_close(s)
+	_next(s)
+	_to_close(s)
+	assert_eq(s.list_autosave_days(), [1, 2])
+	s.autosave_keep = 1
+	var blocker: String = s.autosave_path(3) + SaveFile.TMP_SUFFIX
+	DirAccess.make_dir_recursive_absolute(blocker)               # 임시 파일 경로가 디렉터리 → 3일차 쓰기 실패
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.saved"])
+	_next(s)
+	_to_close(s)
+	assert_eq(rec.events, [], "쓰기 실패 → session.saved 0")
+	assert_gte(get_errors().size(), 1, "SaveFile push_error")
+	for e: Variant in get_errors():
+		e.handled = true
+	assert_eq(s.list_autosave_days(), [1, 2], "실패 경계에서는 보관 수 1 이어도 지우지 않는다")
+	DirAccess.remove_absolute(blocker)
+	_next(s)
+	_to_close(s)
+	assert_eq(s.list_autosave_days(), [4], "다음 성공 경계에서 보관 수 적용")
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯은 남는다")
+
+
+# --- SE-058 새 세계 생성 직후 coverage sync · 이중 restore 제거 (docs/tickets/SE-058.md) -------------------
+
+const SEED_058: int = 58
+const SLOT_058: String = "p"
+
+
+## d 에서 keys 만 남긴 사본(AudienceSystem.coverage 가 보관하는 키로 비교한다).
+static func _pick(d: Dictionary, keys: Array) -> Dictionary:
+	var out: Dictionary = {}
+	for k: Variant in keys:
+		out[k] = d[k]
+	return out
+
+
+## 재발행 중(session.loaded 수신) 명령 하나를 내는 구독자(AC-56b i).
+func _publish_speed_on_loaded(_p: Dictionary, b: EventBus) -> void:
+	b.publish("time.speed_requested", {"speed": 3})
+
+
+## AC1·AC4(재현 A 행): 새 게임 직후(설치 0) 저장 → 다른 seed 세션 load_from → 상태 해시 == 저장 시점 해시.
+func test_se058_ac1_fresh_save_load_from_matches() -> void:
+	var a: GameSession = _session(false, SEED_058)
+	a.autosave_enabled = false
+	a.bus.publish("session.save_requested", {"slot": SLOT_058})
+	a.advance(0)
+	var before: String = _hash(a.snapshot())
+	assert_eq(_hash(SaveFile.read(a.slot_path(SLOT_058))), before, "저장 = 경계 상태")
+	var b: GameSession = _session(false, 777)
+	assert_true(b.load_from(b.slot_path(SLOT_058)))
+	assert_eq(_hash(b.snapshot()), before, "새 게임 직후 저장도 재발행 뒤 해시 == 저장 시점 해시(SE-036 AC6)")
+	assert_eq(int(b.audience.coverage["capacity"]), int(b.build.coverage()["capacity"]), "audience capacity = build capacity")
+	assert_push_error_count(0)
+
+
+## AC1·AC4: 같은 세션 session.load_requested 경로도 같다(낮 구간에서 움직인 뒤 불러온다).
+func test_se058_ac1_fresh_save_load_requested_matches() -> void:
+	var s: GameSession = _session(false, SEED_058)
+	s.autosave_enabled = false
+	s.bus.publish("session.save_requested", {"slot": SLOT_058})
+	s.advance(0)
+	var before: String = _hash(s.snapshot())
+	s.advance(5)
+	assert_ne(_hash(s.snapshot()), before, "전제: 움직였다")
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.loaded", "session.load_failed"])
+	s.bus.publish("session.load_requested", {"slot": SLOT_058})
+	s.advance(0)
+	assert_eq(rec.names(), ["session.loaded"])
+	assert_eq(_hash(s.snapshot()), before, "load_requested 경로도 해시 == 저장 시점 해시")
+
+
+## AC2(회귀, 표 B·C): 설치 뒤 첫 저녁 전 저장, 설치 + 섭외 + 저녁 진행 중 저장도 load_from·load_requested 둘 다 일치.
+func test_se058_ac2_placed_and_evening_saves_still_match() -> void:
+	var c: SimConfig = _cfgs["sim"]
+	var s: GameSession = _session(true, SEED_058)
+	s.autosave_enabled = false
+	s.bus.publish("session.save_requested", {"slot": "b"})
+	s.advance(0)
+	var hash_b: String = _hash(s.snapshot())
+	_book(s)
+	s.advance(c.phase_ticks("day") + c.phase_ticks("evening") / 2)
+	assert_eq(s.loop.phase, "evening", "전제: 저녁 진행 중")
+	s.bus.publish("session.save_requested", {"slot": "c"})
+	s.advance(0)
+	var hash_c: String = _hash(s.snapshot())
+	for slot_hash: Array in [["b", hash_b], ["c", hash_c]]:
+		var o: GameSession = _session(false, 777)
+		assert_true(o.load_from(o.slot_path(slot_hash[0])))
+		assert_eq(_hash(o.snapshot()), slot_hash[1], "load_from %s" % slot_hash[0])
+		s.advance(7)
+		s.bus.publish("session.load_requested", {"slot": slot_hash[0]})
+		s.advance(0)
+		assert_eq(_hash(s.snapshot()), slot_hash[1], "load_requested %s" % slot_hash[0])
+
+
+## 인계 1: 새 세계(new_game_from_configs 직후)의 AudienceSystem.coverage == BuildSystem.coverage()(빈 맵 capacity 포함).
+## 생성 직후 sync 는 새 세계 자신의 버스에서 나므로 생성 뒤 붙인 리스너는 받지 않는다(인계 6).
+func test_se058_new_world_coverage_synced_at_creation() -> void:
+	var s: GameSession = _session(false, SEED_058)
+	assert_eq(_hash(s.audience.coverage), _hash(_pick(s.build.coverage(), s.audience.coverage.keys())), "생성 직후 audience.coverage = build.coverage()")
+	assert_gt(int(s.audience.coverage["capacity"]), 0, "빈 맵 capacity(바닥 면적) > 0")
+	assert_eq(s.loop.tick, 0, "틱 불변")
+	assert_eq(s.bus.get_pending_commands(), [], "명령 큐 불변")
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["build.coverage_changed"])
+	s.advance(1)
+	assert_eq(rec.events, [], "생성 뒤 붙인 리스너에게는 낮 구간 coverage 이벤트 0")
+
+
+## AC-56b (ii): new_game_requested 뒤 AudienceSystem.coverage == 마지막으로 받은 build.coverage_changed{sync} 페이로드.
+func test_se058_ac56b_new_game_audience_coverage_equals_last_sync() -> void:
+	var mv: Array = _moved_session()
+	var s: GameSession = mv[0]
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["build.coverage_changed"])
+	s.bus.publish("session.new_game_requested", {"seed": 7})
+	s.advance(0)
+	var syncs: Array = rec.of("build.coverage_changed")
+	assert_eq(syncs.size(), 1)
+	var last: Dictionary = syncs[-1]
+	assert_eq(last["cause"], "sync")
+	assert_eq(_hash(s.audience.coverage), _hash(_pick(last, s.audience.coverage.keys())), "audience.coverage == 마지막 sync 페이로드(cause 제외)")
+
+
+## AC-56b (i): 재발행 중 구독자가 낸 명령을 새 게임 경로와 불러오기 경로가 같게 처리한다.
+## 두 경로 모두 seed 7 의 1일차 세계에 도착하고, session.loaded 구독자가 낸 speed 명령이 큐에 남아 같은 경계에서 적용된다.
+func test_se058_ac56b_command_during_republish_same_on_both_paths() -> void:
+	var ref: GameSession = _session(false, 7)
+	ref.bus.publish("session.save_requested", {"slot": "fresh7"})
+	ref.advance(0)
+	var fresh7: String = _hash(ref.snapshot())
+	var out: Array = []
+	for cmd: Array in [["session.new_game_requested", {"seed": 7}], ["session.load_requested", {"slot": "fresh7"}]]:
+		var x: GameSession = _moved_session()[0]
+		var rec: EventRecorder = EventRecorder.new(x.bus, ["session.loaded", "time.speed_changed"])
+		x.bus.subscribe("session.loaded", _publish_speed_on_loaded.bind(x.bus))
+		x.bus.publish(cmd[0], cmd[1])
+		x.advance(0)
+		assert_eq(rec.names(), ["session.loaded", "time.speed_changed"], "%s: 재발행 중 낸 명령이 적용된다" % cmd[0])
+		assert_eq(x.loop.speed, 3, "%s: 배속 3" % cmd[0])
+		assert_eq(x.bus.get_pending_commands(), [], "%s: 큐 비움" % cmd[0])
+		x.bus.publish("time.speed_requested", {"speed": 1})
+		x.advance(0)
+		assert_eq(_hash(x.snapshot()), fresh7, "%s: 배속을 되돌리면 seed 7 의 1일차 상태" % cmd[0])
+		out.append(_hash(x.snapshot()))
+	assert_eq(out[0], out[1], "두 경로 결과 상태 해시 동일")
+	assert_push_error_count(0)
+
+
+## AC-56d(회귀 방지): {seed:-1} 새 게임 명령 → push_error 정확히 1(SeededRng), 상태 해시 == 독립 new_game(-1) 해시
+## (= posmod 로 접은 seed 의 해시), 두 번 실행해 같다.
+func test_se058_ac56d_negative_seed_new_game_requested() -> void:
+	var hashes: Array[String] = []
+	for i: int in range(2):
+		var s: GameSession = _session(false)
+		s.advance(50)
+		var rec: EventRecorder = EventRecorder.new(s.bus, SESSION_EVENTS)
+		s.bus.publish("session.new_game_requested", {"seed": -1})
+		s.advance(0)
+		assert_push_error("SeededRng")
+		assert_push_error_count(i + 1, "실행 %d: push_error 정확히 1(SeededRng)" % (i + 1))
+		assert_eq(rec.names(), ["session.loaded"], "새 게임 성공")
+		hashes.append(_hash(s.snapshot()))
+	assert_eq(hashes[0], hashes[1], "결정적")
+	var ref: GameSession = GameSession.new()
+	assert_true(ref.new_game_from_configs(-1, _cfgs))
+	assert_push_error_count(3, "독립 new_game(-1) 도 push_error 1")
+	assert_eq(hashes[0], _hash(ref.snapshot()), "== 독립 new_game_from_configs(-1)")
+	var folded: GameSession = GameSession.new()
+	assert_true(folded.new_game_from_configs(posmod(-1, SeededRng.MASTER_SEED_MAX + 1), _cfgs))
+	assert_eq(hashes[0], _hash(folded.snapshot()), "== posmod 로 접은 seed 의 new_game")

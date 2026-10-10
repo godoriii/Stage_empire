@@ -102,9 +102,11 @@ undo_created_dirs() {
   local d="$EXIST_PRE" c rest="$REST_PRE" list=() parts=() i
   rest="${rest#/}"
   [ -n "$rest" ] || return 0
-  # '/' 로 나눌 때 pathname expansion(glob)이 일어나면 꼬리 성분의 *?[ 가 현재 디렉터리의 다른 이름으로 풀려
-  # 이미 있던 빈 디렉터리를 rmdir 할 수 있다 (SE-047 리뷰 [낮음] 1). read -r -a 는 glob 을 하지 않는다.
-  IFS=/ read -r -a parts <<< "$rest"
+  # '/' 로 나눌 때 (1) pathname expansion(glob)이 일어나면 꼬리 성분의 *?[ 가 현재 디렉터리의 다른 이름으로 풀려
+  # 이미 있던 빈 디렉터리를 rmdir 할 수 있고 (SE-047 리뷰 [낮음] 1), (2) read 로 나누면 첫 개행에서 잘려
+  # 성분 안의 개행 뒤가 사라진다 (SE-048 리뷰 [낮음] 1). readarray -d / 는 glob 도 개행 절단도 하지 않는다.
+  # (printf '%s' 로 끝 개행을 붙이지 않으므로 마지막 성분의 개행이 보존된다.)
+  readarray -d / -t parts < <(printf '%s' "$rest")
   for c in "${parts[@]}"; do d="${d%/}/$c"; list+=("$d"); done
   for ((i=${#list[@]}-1; i>=0; i--)); do rmdir -- "${list[$i]}" 2>/dev/null || true; done
 }

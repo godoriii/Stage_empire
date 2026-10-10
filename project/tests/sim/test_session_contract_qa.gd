@@ -265,6 +265,37 @@ func test_command_payload_keys_doc_is_what_code_reads() -> void:
 	assert_eq(JSON.stringify(s.snapshot(), "", true), JSON.stringify(ref.snapshot(), "", true), "seed 9 가 실제로 적용됐다")
 
 
+## SE-058 AC-56e: SN1 슬롯 형식. 문서 SN1 행의 정규식 == 코드 SLOT_PATTERN, 그리고 그 정규식이 코드 판정(is_valid_slot)과 같은 답을 낸다.
+func _doc_sn1_pattern() -> String:
+	for line: String in _md.split("\n"):
+		if line.begins_with("| SN1 |"):
+			var m: RegExMatch = RegEx.create_from_string("`(\\^[^`]+\\$)`").search(line)
+			if m != null:
+				return m.get_string(1)
+	return ""
+
+
+func test_sn1_slot_pattern_doc_equals_code() -> void:
+	var doc: String = _doc_sn1_pattern()
+	assert_ne(doc, "", "문서 SN1 행에서 정규식이 읽힌다")
+	assert_eq(GameSession.SLOT_PATTERN, doc, "game_session.gd SLOT_PATTERN == 문서 SN1 정규식")
+	var re: RegEx = RegEx.create_from_string(doc)
+	assert_not_null(re, "문서 정규식이 컴파일된다")
+	var ok: Array = ["a", "1", "autosave_day12", "a_b_9", "x".repeat(24)]
+	var bad: Array = ["", "A", "a-b", "a b", "../x", "a.sav", "x".repeat(25), "é", 5, null, ["a"]]
+	for v: Variant in ok:
+		assert_true(GameSession.is_valid_slot(v), "유효: %s" % [v])
+		assert_not_null(re.search(v), "문서 정규식도 유효: %s" % [v])
+	for v: Variant in bad:
+		assert_false(GameSession.is_valid_slot(v), "무효: %s" % [v])
+		if v is String:
+			assert_null(re.search(v), "문서 정규식도 무효: %s" % [v])
+	## 알려진 틈(SE-058 QA 리포트 "발견"): PCRE 의 `$` 는 끝의 개행 하나 앞에서도 맞아서 "a\n" 이 SN1 을 통과한다(파일 "a\n.sav").
+	## 여기서는 문서 정규식과 코드 판정이 같은 답을 내는지만 고정한다(옳다고 보증하지 않는다).
+	for v: String in ["a\n", "a\n\n", "\n"]:
+		assert_eq(GameSession.is_valid_slot(v), re.search(v) != null, "문서 정규식 == 코드 판정: %s" % [v.c_escape()])
+
+
 ## SN2 의 틱 중 경로: advance(n) 도중에 들어온 명령은 구동기가 반환한 뒤(_after_drive) 한꺼번에 처리한다.
 ## 같은 경계에 [불러오기(성공), 저장] 이 쌓이면 저장은 버려진다(`session.saved` 없음, 파일 없음).
 ## (경계 앞 pre-dispatch 경로는 test_game_session.gd::test_se056_ac4 가 덮는다 — 변이 a3 가 이 경로만 살아남아 qa 가 추가.)
