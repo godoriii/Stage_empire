@@ -12,6 +12,7 @@ game-designer가 쓴다. 파일 하나가 시스템 하나. 티켓은 여기의 
 | `show.md` | 공연 시작 조건(라인업·무대 → `show.started`/`show.skipped`), 만족도 진실의 출처(관객 평균 → 등급 5단계 임계), `show.ended`·`revenue_hint`, 마감 리포트 필드(SE-039 인계), 스냅샷. 사고 이벤트는 `events_crisis.md` | v0 (SE-030) |
 | `audience.md` | 관객 유형 3(색·장르 적합·가격 민감·바·인내), 입장 수 공식(인기·장르·명성·가격·수용 150, 시드 고정 ±10%), 에이전트 ≤150 상태 기계·타일 이동·혼잡 대기·조기 퇴장, 만족(라인업·음향·시야·가격·혼잡·대기), `economy.sales_reported` 발행, 스냅샷. 흐름장(티어 4+)은 범위 밖 | v0 (SE-029) |
 | `reputation.md` | 종합 명성 + MVP 3장르 벡터, Δ = 등급 기본값 × 입장 계수 × 장르 집중/확산 보정(`genres.json` `affinity`), 실패 감소·하한 0, 티어 2 해금 판정(`economy.day_settled.cash` ∧ 명성, 게임당 1회 알림), 30일 기준 시나리오(500 도달 25일), 스냅샷 | v0 (SE-030) |
+| `bot_metrics.md` | 봇 플레이 정책 3종(절약형·공격형·무작위)과 "한 번 더" 대리 지표 M1~M12·목표 범위·통계/결과 파일 형식(qa 러너 입력) | v0 (SE-042 1차) |
 | `staff.md` | 스태프 직군, 숙련·피로, 구역 배정 | 미작성 |
 | `events_crisis.md` | 날씨·고장·노쇼·민원·사고·바이럴 | 미작성 |
 | `materials.md` | 머티리얼 슬롯·에셋 규약 (`base`/`accent`/`emissive`/`glass`, 슬롯 = 별도 서피스, glass, 정점 알파·군중 색) | v0 (SE-019) |

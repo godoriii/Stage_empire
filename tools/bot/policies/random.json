@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "id": "random",
+  "spec": "docs/gdd/bot_metrics.md#정책-3--무작위-random",
+  "opening_layout": "baseline_show",
+  "artist_pick": "uniform_random",
+  "artist_id": null,
+  "book_reserve": null,
+  "price_mode": "uniform_random",
+  "price_fixed": null,
+  "price_min": null,
+  "price_max": null,
+  "price_step": null,
+  "price_low_fill_bp": null,
+  "build_queue": [],
+  "build_min_cash_after": 0,
+  "build_max_per_day": 1,
+  "random_build_bp": 2500,
+  "random_accept_bp": 5000,
+  "rng_salt": 7,
+  "bailout_accept": "random"
+}
