@@ -2,6 +2,7 @@ extends GutTest
 ## SE-036 GameSession: AC1(systems 키), AC-33a(생성·등록 순서, 저녁 진입 이벤트 순서, artist 설정·스냅샷 누락 실패),
 ## AC-35a/b(실제 audience 포함 하루 이벤트 순서·라인업 없는 날), AC5(오토세이브·경계), AC6(session 명령·재발행 규칙),
 ## SE-049(session.loaded 4필드, 공연 중 로드 → 연속 진행과 동일). docs/tickets/SE-036.md, docs/gdd/tick.md#스냅샷.
+## SE-056 AC1~AC5(session.* 계약 SN1~SN5, docs/gdd/events.md #session-명령-규칙)는 파일 끝 절.
 
 const DIR: String = "user://test_se036_session"
 const SEED: int = 36
@@ -249,7 +250,7 @@ func test_save_outside_boundary_rejected() -> void:
 func test_save_and_load_commands() -> void:
 	var s: GameSession = _session()
 	_book(s)
-	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.saved", "session.save_failed", "session.load_failed", "session.loaded"])
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.saved", "session.load_failed", "session.loaded"])
 	assert_true(s.bus.publish("session.save_requested", {"slot": "slot1"}), "명령 큐")
 	assert_false(FileAccess.file_exists(s.slot_path("slot1")), "경계 처리 전에는 저장하지 않는다")
 	s.advance(0)
@@ -262,10 +263,11 @@ func test_save_and_load_commands() -> void:
 	s.bus.publish("session.load_requested", {"slot": "../x"})
 	s.bus.publish("session.save_requested", {"slot": ""})
 	s.advance(0)
-	assert_eq(rec.of("session.load_failed"), [{"slot": "nope", "reason": "not_found"}, {"slot": "../x", "reason": "bad_slot"}])
-	assert_eq(rec.of("session.save_failed"), [{"slot": "", "reason": "bad_slot"}])
+	assert_eq(rec.of("session.load_failed"), [{"slot": "nope", "reason": "missing"}, {"slot": "../x", "reason": "invalid"}],
+		"SE-056: SN4 사유 이름(missing·invalid)")
+	assert_eq(rec.count("session.saved"), 1, "SE-056 SN3: 잘못된 슬롯 저장은 이벤트 없음")
 	assert_eq(_hash(s.snapshot()), moved_hash, "실패한 로드는 상태 불변")
-	assert_push_error_count(1, "파일 없음 1")
+	assert_push_error_count(1, "SE-056: 잘못된 슬롯 저장 push_error 1, 불러오기 ①②는 0")
 	s.bus.publish("session.load_requested", {"slot": "slot1"})
 	s.advance(0)
 	assert_eq(rec.of("session.loaded"), [{"day": 1, "phase": "day", "speed": 1, "show_active": false}])
@@ -339,3 +341,230 @@ func test_mid_show_load_matches_continuous() -> void:
 	assert_eq(rec_b.to_json(), rec_a.to_json(), "이벤트 열 동일")
 	assert_gt(rec_a.count("show.ended"), 0)
 	assert_false(s2.show_active(), "공연 끝")
+
+
+# --- SE-056 session.* 계약(events.md SN1~SN5) ---------------------------------------------
+
+const SESSION_EVENTS: Array[String] = ["session.saved", "session.loaded", "session.load_failed"]
+
+
+## 저장된 슬롯 하나와 그 뒤로 500틱 움직인 세션. [세션, 움직인 상태 해시].
+func _moved_session() -> Array:
+	var s: GameSession = _session()
+	_book(s)
+	s.bus.publish("session.save_requested", {"slot": "good"})
+	s.advance(0)
+	s.advance(500)
+	return [s, _hash(s.snapshot())]
+
+
+## 세이브 파일 문서({header, snapshot})를 SaveFile 을 거치지 않고 그대로 쓴다.
+func _write_doc(path: String, save_version: int, snap: Variant) -> void:
+	var header: Dictionary = {"save_version": save_version, "written_day": 1}
+	if snap is Dictionary:
+		header["snapshot_schema_version"] = (snap as Dictionary).get("schema_version")
+	_write_bytes(path, JSON.stringify({"header": header, "snapshot": snap}).to_utf8_buffer().compress(FileAccess.COMPRESSION_GZIP))
+
+
+func _write_bytes(path: String, bytes: PackedByteArray) -> void:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	f.store_buffer(bytes)
+	f.close()
+
+
+func _load_reason(s: GameSession, payload: Dictionary) -> Array:
+	var rec: EventRecorder = EventRecorder.new(s.bus, SESSION_EVENTS)
+	s.bus.publish("session.load_requested", payload)
+	s.advance(0)
+	return rec.events
+
+
+## AC1: SN4 5종, 판정 순서(겹치면 앞 사유), 상태 불변, push_error ①~④ 0 · ⑤ tick.md 규칙(TickLoop 1).
+func test_se056_ac1_load_failed_reasons_in_sn4_order() -> void:
+	var mv: Array = _moved_session()
+	var s: GameSession = mv[0]
+	var moved: String = mv[1]
+	var snap: Dictionary = SaveFile.read(s.slot_path("good"))
+	var v_bad: Dictionary = snap.duplicate(true)
+	v_bad["schema_version"] = int(snap["schema_version"]) + 1
+	var v_bad_noeco: Dictionary = v_bad.duplicate(true)
+	(v_bad_noeco["systems"] as Dictionary).erase("economy")
+	var no_systems: Dictionary = v_bad.duplicate(true)                 # 최상위 키 9개 + 버전 불일치 → corrupt 가 앞
+	no_systems.erase("systems")
+	var noeco: Dictionary = snap.duplicate(true)
+	(noeco["systems"] as Dictionary).erase("economy")
+	_write_bytes(s.slot_path("garbage"), "not a save file".to_utf8_buffer())
+	_write_doc(s.slot_path("toplist"), 1, [1, 2, 3])
+	_write_doc(s.slot_path("nosys"), 1, no_systems)
+	_write_doc(s.slot_path("schema"), 1, v_bad)
+	_write_doc(s.slot_path("schema_noeco"), 1, v_bad_noeco)
+	_write_doc(s.slot_path("savever"), 2, snap)
+	_write_doc(s.slot_path("noeco"), 1, noeco)
+	var cases: Array = [
+		[{"slot": "A"}, "invalid", "SN1 위반(대문자) — 파일도 없지만 ① 이 앞"],
+		[{}, "invalid", "slot 키 없음"],
+		[{"slot": 3}, "invalid", "String 아님"],
+		[{"slot": "nope"}, "missing", "파일 없음"],
+		[{"slot": "garbage"}, "corrupt", "gzip·JSON 아님"],
+		[{"slot": "toplist"}, "corrupt", "snapshot 이 객체가 아님"],
+		[{"slot": "nosys"}, "corrupt", "최상위 키 부족(버전도 틀리지만 ③ 이 앞)"],
+		[{"slot": "schema"}, "version_mismatch", "schema_version != sim.json"],
+		[{"slot": "savever"}, "version_mismatch", "save_version 2"],
+		[{"slot": "schema_noeco"}, "version_mismatch", "버전 불일치 + restore 실패 조건 → ④ 가 앞"],
+	]
+	for c: Array in cases:
+		var ev: Array = _load_reason(s, c[0])
+		assert_eq(ev, [["session.load_failed", {"slot": (c[0] as Dictionary).get("slot"), "reason": c[1]}]], c[2])
+		assert_eq(_hash(s.snapshot()), moved, "상태 불변: " + c[2])
+	assert_push_error_count(0, "①~④ push_error 0")
+	var ev5: Array = _load_reason(s, {"slot": "noeco"})
+	assert_eq(ev5, [["session.load_failed", {"slot": "noeco", "reason": "restore_failed"}]], "⑤ restore() false")
+	assert_eq(_hash(s.snapshot()), moved, "⑤ 상태 불변")
+	assert_push_error_count(1, "⑤ = TickLoop.restore push_error 1(tick.md)")
+	var ok: Array = _load_reason(s, {"slot": "good"})
+	assert_eq(ok[0][0], "session.loaded", "정상 슬롯은 불러온다")
+
+
+## AC2: 저장 실패(슬롯 위반·쓰기 실패) → 이벤트 0, push_error 1, 상태 불변. core 에 save_failed 문자열 0.
+func test_se056_ac2_save_failure_no_event() -> void:
+	var s: GameSession = _session(false)
+	var before: String = _hash(s.snapshot())
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.saved", "session.save_failed", "session.load_failed", "session.loaded"])
+	s.bus.publish("session.save_requested", {"slot": "Bad.Slot"})
+	s.advance(0)
+	assert_eq(rec.events, [], "슬롯 위반 → 이벤트 0")
+	assert_push_error_count(1, "슬롯 위반 push_error 1")
+	assert_eq(_hash(s.snapshot()), before)
+	_write_bytes(DIR.path_join("blocker"), PackedByteArray([1]))
+	s.saves_dir = DIR.path_join("blocker").path_join("sub")             # 부모가 파일 → 쓰기 실패
+	s.bus.publish("session.save_requested", {"slot": "x"})
+	s.advance(0)
+	assert_eq(rec.events, [], "쓰기 실패 → 이벤트 0")
+	assert_push_error_count(2, "쓰기 실패 push_error 1(SaveFile)")
+	for e: Variant in get_errors():
+		e.handled = true                                               # 디렉터리 생성 실패 엔진 오류
+	assert_eq(_hash(s.snapshot()), before, "저장 실패는 상태 불변")
+	for f: String in DirAccess.get_files_at("res://core"):
+		if f.ends_with(".gd"):
+			var src: String = FileAccess.get_file_as_string("res://core".path_join(f))
+			for word: String in ["save_failed", "bad_slot", "not_found"]:
+				assert_false(src.contains(word), "core/%s 에 '%s' 없음" % [f, word])
+
+
+## AC3: SN1 슬롯 형식 ^[a-z0-9_]{1,24}$.
+func test_se056_ac3_slot_format() -> void:
+	var s: GameSession = _session(false)
+	var rec: EventRecorder = EventRecorder.new(s.bus, SESSION_EVENTS)
+	var too_long: String = "a".repeat(25)
+	var max_len: String = "b".repeat(24)
+	for bad: String in ["A", "a-b", too_long, "", "a.b", "a b"]:
+		s.bus.publish("session.save_requested", {"slot": bad})
+		s.advance(0)
+		assert_false(FileAccess.file_exists(s.slot_path(bad)), "저장 안 됨: '%s'" % bad)
+	assert_eq(rec.events, [], "SN1 위반 저장 6건 → 이벤트 0")
+	assert_push_error_count(6)
+	for good: String in ["autosave_day3", "1", max_len]:
+		s.bus.publish("session.save_requested", {"slot": good})
+	s.advance(0)
+	assert_eq(rec.of("session.saved"), [{"slot": "autosave_day3", "day": 1}, {"slot": "1", "day": 1}, {"slot": max_len, "day": 1}])
+	rec.clear()
+	for bad: String in ["A", "a-b", too_long]:
+		s.bus.publish("session.load_requested", {"slot": bad})
+	s.bus.publish("session.load_requested", {"name": "1"})
+	s.advance(0)
+	assert_eq(rec.of("session.load_failed"), [
+		{"slot": "A", "reason": "invalid"}, {"slot": "a-b", "reason": "invalid"}, {"slot": too_long, "reason": "invalid"},
+		{"slot": null, "reason": "invalid"},
+	], "키 없음 → slot null")
+	s.bus.publish("session.load_requested", {"slot": "1"})
+	s.advance(0)
+	assert_eq(rec.count("session.loaded"), 1, "'1' 은 통과")
+
+
+## AC4: SN2 — 같은 경계 [load, speed] 에서 불러오기 성공이면 뒤 명령 폐기, 실패면 적용. [load, save] 도 같다.
+func test_se056_ac4_commands_after_load_dropped() -> void:
+	var mv: Array = _moved_session()
+	var s: GameSession = mv[0]
+	var moved: String = mv[1]
+	var saved: String = _hash(SaveFile.read(s.slot_path("good")))
+	assert_eq(s.loop.speed, 1, "전제: 배속 1")
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["time.speed_changed", "session.loaded", "session.load_failed", "session.saved"])
+	s.bus.publish("session.load_requested", {"slot": "nope"})
+	s.bus.publish("time.speed_requested", {"speed": 3})
+	s.advance(0)
+	assert_eq(rec.names(), ["session.load_failed", "time.speed_changed"], "실패한 불러오기 뒤 명령은 적용(큐 순서)")
+	assert_eq(s.loop.speed, 3)
+	rec.clear()
+	s.bus.publish("session.load_requested", {"slot": "good"})
+	s.bus.publish("time.speed_requested", {"speed": 2})
+	s.bus.publish("session.save_requested", {"slot": "after"})
+	s.advance(0)
+	assert_eq(rec.names(), ["session.loaded"], "성공한 불러오기 뒤 speed·save 명령 폐기")
+	assert_eq(s.loop.speed, 1, "배속 = 복원값")
+	assert_false(FileAccess.file_exists(s.slot_path("after")), "save 명령 미처리")
+	assert_eq(s.bus.get_pending_commands(), [], "큐 = 복원 스냅샷의 pending_commands")
+	assert_eq(_hash(s.snapshot()), saved, "상태 = 저장 시점")
+	assert_ne(saved, moved)
+
+
+## AC4 보강: 저장은 큐 순서 그대로 — [speed, save] 는 배속이 적용된 상태를 저장한다.
+func test_se056_ac4_save_sees_earlier_commands() -> void:
+	var s: GameSession = _session(false)
+	s.bus.publish("time.speed_requested", {"speed": 2})
+	s.bus.publish("session.save_requested", {"slot": "s2"})
+	s.advance(0)
+	assert_eq(int(SaveFile.read(s.slot_path("s2"))["speed"]), 2, "save 앞 명령이 적용된 뒤 저장")
+	assert_eq(_hash(SaveFile.read(s.slot_path("s2"))), _hash(s.snapshot()))
+
+
+## AC5: new_game_requested {seed:7} → 같은 버스 구독자가 다시 bind 없이 session.loaded + 재발행을 받는다.
+## 1일차 상태 해시 == new_game(7). 뒤 명령 폐기, 큐 비움, 진행 결과도 같다.
+func test_se056_ac5_new_game_requested() -> void:
+	var mv: Array = _moved_session()
+	var s: GameSession = mv[0]
+	var bus_before: EventBus = s.bus
+	var names: Array[String] = RELOAD_EVENTS.duplicate()
+	names.append_array(["time.speed_changed", "session.load_failed"])
+	var rec: EventRecorder = EventRecorder.new(s.bus, names)
+	s.bus.publish("session.new_game_requested", {"seed": 7})
+	s.bus.publish("time.speed_requested", {"speed": 3})
+	s.advance(0)
+	var ref: GameSession = GameSession.new()
+	assert_true(ref.new_game_from_configs(7, _cfgs))
+	assert_eq(s.bus, bus_before, "같은 EventBus")
+	assert_eq(_hash(s.snapshot()), _hash(ref.snapshot()), "1일차 상태 해시 == new_game(7)")
+	assert_eq(s.loop.master_seed, 7)
+	var expect: Array[String] = ["session.loaded"]
+	for i: int in range(ref.build.instances.size()):
+		expect.append("build.placed")
+	expect.append_array(["build.coverage_changed", "reputation.changed"])
+	assert_eq(rec.names(), expect, "session.loaded → 재발행, speed 명령 폐기")
+	assert_eq(rec.of("session.loaded")[0], {"day": 1, "phase": "day", "speed": 1, "show_active": false})
+	assert_eq(rec.of("build.coverage_changed")[0]["cause"], "sync")
+	assert_eq(rec.of("reputation.changed")[0]["delta"], 0)
+	assert_eq(s.bus.get_pending_commands(), [], "새 게임 큐 = 빈 큐")
+	assert_push_error_count(0)
+	# 시스템 구독도 유지: 같은 명령 → 같은 결과
+	rec.clear()
+	var bcfg: BuildConfig = _cfgs["build"]
+	var p0: Dictionary = bcfg.layout(LAYOUT)["placements"][0]
+	for x: GameSession in [s, ref]:
+		x.bus.publish("build.place_requested", {"furniture_id": p0["furniture_id"], "cell": p0["cell"], "rotation": p0["rotation"]})
+		x.advance(300)
+	assert_eq(rec.count("build.placed"), 1, "기존 구독자가 새 세계의 이벤트를 받는다")
+	assert_eq(_hash(s.snapshot()), _hash(ref.snapshot()), "이후 진행도 new_game(7) 과 같다")
+
+
+## AC5 보강: seed 가 int 가 아니거나 없으면 무시(push_error 1, 이벤트 0, 상태 불변).
+func test_se056_ac5_new_game_bad_seed_ignored() -> void:
+	var s: GameSession = _session(false)
+	s.advance(50)
+	var before: String = _hash(s.snapshot())
+	var rec: EventRecorder = EventRecorder.new(s.bus, SESSION_EVENTS)
+	s.bus.publish("session.new_game_requested", {})
+	s.bus.publish("session.new_game_requested", {"seed": "7"})
+	s.advance(0)
+	assert_eq(rec.events, [])
+	assert_push_error_count(2)
+	assert_eq(_hash(s.snapshot()), before)

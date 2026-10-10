@@ -5,21 +5,30 @@ extends RefCounted
 ## 규칙: docs/gdd/tick.md #스냅샷("허용 시점", "오토세이브 시점"), #명령-큐와-틱-순서("시스템은 이벤트 구독도
 ## system_order 순서로 생성·구독"), docs/tickets/SE-036.md, SE-049(session.loaded 4필드).
 ##
-## 저장·로드는 틱 경계에서만 한다. session.save_requested / load_requested 는 명령 큐로 들어오고, 경계 처리에서
-## 핸들러가 요청만 기록한다. GameSession 의 구동기(advance/step)가 TickLoop 호출 바깥(경계)에서 요청을 처리한다:
-## - 구동 시작 시 큐에 session.* 명령이 있으면 먼저 advance(0) 으로 경계 처리를 하고, 그 경계에서 요청을 처리한다.
+## 저장·로드·새 게임은 틱 경계에서만 한다. session.save_requested / load_requested / new_game_requested 는 명령 큐로
+## 들어오고, 경계 처리에서 핸들러가 요청만 기록한다. GameSession 의 구동기(advance/step)가 TickLoop 호출 바깥(경계)에서
+## 요청을 처리한다:
+## - 구동 시작 시 큐에 session.* 명령이 있으면 먼저 큐 순서대로 경계 처리를 한다(session 명령까지 advance(0) →
+##   그 요청 처리 → 다음 묶음, _pre_dispatch_session_commands).
 ##   (session 명령이 없으면 TickLoop 호출 순서는 TickLoop 을 직접 구동할 때와 같다.)
 ## - 오토세이브: time.phase_changed {to:"close"} 구독 핸들러는 플래그만 세우고, 구동기가 advance/step 반환 뒤
 ##   (close 는 홀드라 그 경계에서 반환) 파일을 쓴다.
-## 로드 성공 뒤 이벤트(재발행 규칙, SE-036 AC6): session.loaded {day, phase, speed, show_active} →
+## session.* 계약(SE-056, docs/gdd/events.md #session-명령-규칙 SN1~SN5):
+## - SN1 슬롯 = ^[a-z0-9_]{1,24}$ 인 String. SN3 저장 실패는 push_error 만(이벤트 없음).
+## - SN4 불러오기 실패 사유 invalid → missing → corrupt → version_mismatch → restore_failed(처음 맞는 것 하나).
+## - SN2 같은 경계의 명령은 큐 순서대로: session 명령 앞의 명령을 먼저 전달하고 session 명령을 처리한다.
+##   불러오기·새 게임이 성공하면 그 뒤 명령은 버리고 큐 = 복원 스냅샷의 pending_commands(새 게임은 빈 큐).
+## - SN5 새 게임(session.new_game_requested)은 같은 TickLoop·EventBus·시스템에 new_game(seed) 의 1일차 스냅샷을
+##   restore 한다 — 구독이 그대로 남고, 상태 해시는 new_game(seed) 와 같다.
+## 로드·새 게임 성공 뒤 이벤트(재발행 규칙, SE-036 AC6): session.loaded {day, phase, speed, show_active} →
 ## build.placed(설치 인스턴스 순서대로 전부) → build.coverage_changed {cause:"sync"} → reputation.changed {delta:0}.
 ## economy 는 재발행하지 않는다(cash()·ticket_price()·hud_state() 접근자로 읽는다). show.started·time.phase_changed·
 ## artist.lineup_set 은 재발행하지 않는다(구독 시스템이 다시 반응해 상태·난수가 바뀐다, SE-049).
 
 const CMD_SAVE: String = "session.save_requested"
 const CMD_LOAD: String = "session.load_requested"
+const CMD_NEW_GAME: String = "session.new_game_requested"
 const EV_SAVED: String = "session.saved"
-const EV_SAVE_FAILED: String = "session.save_failed"
 const EV_LOADED: String = "session.loaded"
 const EV_LOAD_FAILED: String = "session.load_failed"
 const CMD_PREFIX: String = "session."
@@ -30,11 +39,14 @@ const EV_REPUTATION: String = "reputation.changed"
 const COVERAGE_CAUSE_RELOAD: String = "sync"
 const PHASE_CLOSE: String = "close"
 
-const REASON_BAD_SLOT: String = "bad_slot"
-const REASON_NOT_FOUND: String = "not_found"
+## session.load_failed.reason (SN4, 판정 순서대로).
+const REASON_INVALID: String = "invalid"
+const REASON_MISSING: String = "missing"
 const REASON_CORRUPT: String = "corrupt"
+const REASON_VERSION_MISMATCH: String = "version_mismatch"
 const REASON_RESTORE_FAILED: String = "restore_failed"
-const REASON_WRITE_FAILED: String = "write_failed"
+## SN1 슬롯 형식(계약의 형식 규칙이라 데이터가 아니다).
+const SLOT_PATTERN: String = "^[a-z0-9_]{1,24}$"
 
 const DEFAULT_DATA_ROOT: String = "res://data"
 const DEFAULT_SAVES_DIR: String = "user://saves"
@@ -92,7 +104,9 @@ var _economy: Economy = null
 var _reputation: ReputationSystem = null
 var _driving: bool = false          # advance/step 이 TickLoop 을 부르는 중(경계 밖)
 var _autosave_day: int = NO_DAY     # close 진입 플래그(그날 번호)
-var _requests: Array = []           # [[명령 이름, slot], …] 경계에서 처리할 session 명령
+var _requests: Array = []           # [[명령 이름, slot 또는 seed], …] 경계에서 처리할 session 명령
+var _configs: Dictionary = {}       # new_game 에 쓴 설정(새 게임 명령이 같은 설정으로 세계를 만든다)
+static var _slot_re: RegEx = null
 
 
 ## data_root 아래 설정 테이블을 읽는다. 경로는 각 Config 의 기본 경로에서 DEFAULT_DATA_ROOT 를 data_root 로 바꾼 것.
@@ -164,8 +178,10 @@ func new_game_from_configs(seed_value: int, configs: Dictionary) -> bool:
 	_show = made["show"]
 	_economy = made["economy"]
 	_reputation = made["reputation"]
+	_configs = configs
 	_loop.bus.subscribe(CMD_SAVE, _on_save_requested)
 	_loop.bus.subscribe(CMD_LOAD, _on_load_requested)
+	_loop.bus.subscribe(CMD_NEW_GAME, _on_new_game_requested)
 	_loop.bus.subscribe(EV_PHASE_CHANGED, _on_phase_changed)
 	return true
 
@@ -218,10 +234,14 @@ func save_to(path: String) -> bool:
 
 
 ## 경계에서 path 를 읽어 복원하고 session.loaded + 재발행 이벤트를 낸다. 실패하면 false, 상태 불변.
+## (직접 호출 API 라 SN4 ②~④ 실패도 push_error 1회를 낸다. ⑤ 는 TickLoop.restore 의 push_error.)
 func load_from(path: String) -> bool:
 	if _reject_if_busy("load_from"):
 		return false
-	return _load_now(path) == ""
+	var reason: String = _load_now(path)
+	if reason != "" and reason != REASON_RESTORE_FAILED:
+		push_error("[GameSession] load_from 실패(%s): %s" % [reason, path])
+	return reason == ""
 
 
 ## 슬롯 이름 → 파일 경로(saves_dir/slot.sav).
@@ -277,17 +297,38 @@ func _reject_if_busy(what: String) -> bool:
 	return false
 
 
-## 큐에 session.* 명령이 있으면 먼저 경계 처리(advance(0))를 하고 그 경계에서 요청을 처리한다.
+## 큐에 session.* 명령이 있으면 TickLoop 구동 전 경계에서 큐 순서대로 처리한다(SN2):
+## session 명령까지의 묶음을 advance(0) 으로 전달하고(핸들러가 요청을 기록) 그 요청을 처리한다. 처리 중 버스의 큐는
+## "아직 전달하지 않은 명령 + 전달 중 새로 들어온 명령"이라 저장 스냅샷의 pending_commands 가 된다.
+## 불러오기·새 게임이 성공하면 남은 명령을 버린다(큐는 restore 가 정한 값). 끝에 남은 묶음도 이 경계에서 전달한다.
+## session 명령이 없으면 아무것도 하지 않는다(TickLoop 호출 순서는 TickLoop 을 직접 구동할 때와 같다).
 func _pre_dispatch_session_commands() -> void:
-	var found: bool = false
-	for c: Dictionary in _loop.bus.get_pending_commands():
-		if String(c["name"]).begins_with(CMD_PREFIX):
-			found = true
-			break
-	if not found:
+	var rest: Array = _loop.bus.get_pending_commands()
+	if _first_session_index(rest) < 0:
 		return
-	_loop.advance(0)
-	_process_requests()
+	var deferred: Array = []                     # 전달 중 새로 들어온 명령(다음 경계 몫)
+	while true:
+		var i: int = _first_session_index(rest)
+		var seg: Array = rest if i < 0 else rest.slice(0, i + 1)
+		rest = [] if i < 0 else rest.slice(i + 1)
+		if seg.is_empty():
+			break
+		_loop.bus.set_pending_commands(seg)
+		_loop.advance(0)
+		deferred.append_array(_loop.bus.get_pending_commands())
+		var visible: Array = rest.duplicate()
+		visible.append_array(deferred)
+		_loop.bus.set_pending_commands(visible)
+		if _process_requests():
+			return                               # 세계가 바뀌었다: 남은 명령 폐기(SN2)
+	_loop.bus.set_pending_commands(deferred)
+
+
+static func _first_session_index(cmds: Array) -> int:
+	for i: int in cmds.size():
+		if String(cmds[i]["name"]).begins_with(CMD_PREFIX):
+			return i
+	return -1
 
 
 ## advance/step 반환 뒤(경계): 오토세이브 → 남은 session 요청.
@@ -300,31 +341,38 @@ func _after_drive() -> void:
 	_process_requests()
 
 
-func _process_requests() -> void:
+## 기록된 session 요청을 순서대로 처리한다. 불러오기·새 게임이 성공하면 남은 요청을 버리고 true(SN2).
+func _process_requests() -> bool:
 	while not _requests.is_empty():
 		var r: Array = _requests.pop_front()
-		var slot: Variant = r[1]
-		if r[0] == CMD_SAVE:
-			if not _is_valid_slot(slot):
-				_loop.bus.publish(EV_SAVE_FAILED, {"slot": str(slot), "reason": REASON_BAD_SLOT})
-			elif _save_now(slot_path(slot)):
-				_loop.bus.publish(EV_SAVED, {"slot": slot, "day": _loop.day})
-			else:
-				_loop.bus.publish(EV_SAVE_FAILED, {"slot": slot, "reason": REASON_WRITE_FAILED})
-		else:
-			if not _is_valid_slot(slot):
-				_loop.bus.publish(EV_LOAD_FAILED, {"slot": str(slot), "reason": REASON_BAD_SLOT})
-				continue
-			var reason: String = _load_now(slot_path(slot))
-			if reason != "":
-				_loop.bus.publish(EV_LOAD_FAILED, {"slot": slot, "reason": reason})
+		var arg: Variant = r[1]
+		match r[0]:
+			CMD_SAVE:
+				if not is_valid_slot(arg):
+					push_error("[GameSession] 저장 거부: 슬롯 '%s' 가 SN1 형식(%s)이 아니다" % [arg, SLOT_PATTERN])
+				elif _save_now(slot_path(arg)):
+					_loop.bus.publish(EV_SAVED, {"slot": arg, "day": _loop.day})
+			CMD_LOAD:
+				var reason: String = _load_now(slot_path(arg)) if is_valid_slot(arg) else REASON_INVALID
+				if reason != "":
+					_loop.bus.publish(EV_LOAD_FAILED, {"slot": arg, "reason": reason})
+				else:
+					_requests.clear()
+					return true
+			CMD_NEW_GAME:
+				if not (arg is int):
+					push_error("[GameSession] 새 게임 무시: seed 가 int 가 아니다(%s)" % [arg])
+				elif _new_world(arg):
+					_requests.clear()
+					return true
+	return false
 
 
+## 실패하면 이벤트 없음(SN3, push_error 는 SaveFile 이 낸다).
 func _autosave(d: int) -> void:
 	var slot: String = autosave_slot(d)
 	var path: String = slot_path(slot)
 	if not _save_now(path):
-		_loop.bus.publish(EV_SAVE_FAILED, {"slot": slot, "reason": REASON_WRITE_FAILED})
 		return
 	last_autosave_path = path
 	_prune_autosaves()
@@ -339,19 +387,47 @@ func _save_now(path: String) -> bool:
 	return SaveFile.write(path, s)
 
 
-## 성공이면 "", 실패면 load_failed reason. 실패 시 상태 불변(TickLoop.restore 원자성).
+## 성공이면 "", 실패면 SN4 ②~⑤ 사유. ②~④ 는 push_error 0, ⑤ 는 TickLoop.restore 의 push_error. 실패 시 상태 불변.
 func _load_now(path: String) -> String:
-	if not FileAccess.file_exists(path):
-		push_error("[GameSession] 로드 실패: 파일 없음 %s" % path)
-		return REASON_NOT_FOUND
-	var s: Dictionary = SaveFile.read(path)
-	if s.is_empty():
+	if not FileAccess.file_exists(path):                                       # ②
+		return REASON_MISSING
+	var r: Dictionary = SaveFile.inspect(FileAccess.get_file_as_bytes(path))
+	if r[SaveFile.R_ERROR] != "":                                              # ③ 파일 형식
 		return REASON_CORRUPT
-	if not _loop.restore(s):
+	var snap: Dictionary = r[SaveFile.R_SNAPSHOT]
+	for k: String in TickLoop.SNAPSHOT_KEYS:                                   # ③ 스냅샷 최상위 키
+		if not snap.has(k):
+			return REASON_CORRUPT
+	var sv: Variant = r[SaveFile.R_SAVE_VERSION]
+	if sv == null or sv != SaveFile.SAVE_VERSION:                              # ④ 파일 버전
+		return REASON_VERSION_MISMATCH
+	if JsonUtil.as_int(snap["schema_version"]) != _loop.config.snapshot_schema_version:   # ④ 스냅샷 스키마
+		return REASON_VERSION_MISMATCH
+	if not _loop.restore(SaveFile.migrate(snap)):                              # ⑤
 		return REASON_RESTORE_FAILED
 	_autosave_day = NO_DAY
 	_publish_loaded()
 	return ""
+
+
+## SN5: new_game(seed) 와 같은 1일차 세계를 만들어 그 스냅샷을 지금 TickLoop 에 restore 한다(버스·시스템·구독 유지).
+## 재발행(session.loaded → build.placed → build.coverage_changed{sync} → reputation.changed) 뒤 같은 스냅샷을 한 번 더
+## restore 한다: 새 세계의 AudienceSystem.coverage 는 첫 coverage_changed 전이라 비어 있는데(capacity 0) 재발행 sync 가
+## 그것을 채워 상태 해시가 new_game(seed) 와 달라지기 때문이다(SN5 "같은 seed → 같은 1일차 상태 해시").
+## 실패하면 push_error, false, 상태 불변.
+func _new_world(seed_value: int) -> bool:
+	var fresh: GameSession = GameSession.new()
+	if not fresh.new_game_from_configs(seed_value, _configs):
+		push_error("[GameSession] 새 게임 실패: 세계를 만들지 못했다(seed %d)" % seed_value)
+		return false
+	var snap: Dictionary = fresh.snapshot()
+	if not _loop.restore(snap):
+		return false
+	_autosave_day = NO_DAY
+	_publish_loaded()
+	if not _loop.restore(snap):
+		push_error("[GameSession] 새 게임: 재발행 뒤 재적용 실패(seed %d)" % seed_value)
+	return true
 
 
 ## 로드 뒤 view 가 전체 상태를 다시 그리도록 한다(재발행 규칙, 파일 머리 주석).
@@ -401,8 +477,13 @@ func list_autosave_days() -> Array[int]:
 	return out
 
 
-static func _is_valid_slot(slot: Variant) -> bool:
-	return (slot is String or slot is StringName) and String(slot) != "" and String(slot).is_valid_filename()
+## SN1: String 이고 ^[a-z0-9_]{1,24}$ 에 맞는다.
+static func is_valid_slot(slot: Variant) -> bool:
+	if not (slot is String):
+		return false
+	if _slot_re == null:
+		_slot_re = RegEx.create_from_string(SLOT_PATTERN)
+	return _slot_re.search(slot) != null
 
 
 static func _rebase(default_path: String, data_root: String) -> String:
@@ -417,6 +498,10 @@ func _on_save_requested(p: Dictionary) -> void:
 
 func _on_load_requested(p: Dictionary) -> void:
 	_requests.append([CMD_LOAD, p.get("slot")])
+
+
+func _on_new_game_requested(p: Dictionary) -> void:
+	_requests.append([CMD_NEW_GAME, p.get("seed")])
 
 
 func _on_phase_changed(p: Dictionary) -> void:
