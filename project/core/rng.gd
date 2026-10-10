@@ -57,6 +57,22 @@ func get_state() -> Dictionary:
 	return out
 
 
+## other 의 마스터 시드·스트림 시드·상태를 이 객체에 옮긴다(이 객체와 스트림 객체는 그대로 둔다). 같은 스트림 이름
+## 목록이어야 한다(아니면 push_error, false, 상태 불변). TickLoop.restore 8(b) 가 검증을 끝낸 새 SeededRng 를 기존 객체에
+## 적용할 때 쓴다 — 시스템이 생성자에서 받은 rng 참조가 복원 뒤에도 유효하다(SE-034-bug).
+func assign(other: SeededRng) -> bool:
+	if other == null or other.stream_names != stream_names:
+		push_error("[SeededRng] assign: 스트림 목록이 다르다")
+		return false
+	master_seed = other.master_seed
+	for n: String in stream_names:
+		var dst: RandomNumberGenerator = _streams[n]
+		var src: RandomNumberGenerator = other._streams[n]
+		dst.seed = src.seed
+		dst.state = src.state
+	return true
+
+
 ## get_state() 결과를 적용한다. 값이 10진 정수 문자열이 아니면 push_error, false, 상태 불변.
 ## 모르는 스트림은 push_warning 후 무시, 빠진 스트림은 현재 상태 유지.
 func set_state(d: Dictionary) -> bool:
