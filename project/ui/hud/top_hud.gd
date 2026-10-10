@@ -15,6 +15,8 @@ signal menu_requested
 ## economy.md: 가격 요청은 낮 구간에서만 유효(구간 id 는 events.md 의 프로토콜 값).
 const PRICE_PHASE: String = "day"
 const SPEED_NAME_PATTERN: String = "Speed_%d"
+## tick.md #배속: 0 = 일시정지(프로토콜 값). 이 버튼만 ui.hud.pause 키로 표시한다.
+const PAUSE_SPEED: int = 0
 const META_SPEED: StringName = &"speed"
 const CASH_PATH: NodePath = ^"Top/VBox/Row1/Cash"
 const REP_PATH: NodePath = ^"Top/VBox/Row1/Reputation"
@@ -187,7 +189,7 @@ func _build_speed_buttons() -> void:
 	for s: int in _data.all_speeds:
 		var b: Button = Button.new()
 		b.name = SPEED_NAME_PATTERN % s
-		b.text = t("ui.hud.speed", {"speed": s})
+		b.text = t("ui.hud.pause") if s == PAUSE_SPEED else t("ui.hud.speed", {"speed": s})
 		b.toggle_mode = true
 		b.focus_mode = Control.FOCUS_NONE
 		b.set_meta(META_SPEED, s)

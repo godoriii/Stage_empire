@@ -39,6 +39,8 @@ func _payload(evs: Array, name: String) -> Dictionary:
 func test_rows_cover_r1_to_r13_in_params_order() -> void:
 	var ids: PackedStringArray = report.get_row_ids()
 	assert_eq(ids, UiParams.load_default().report_rows, "행 순서 = report_rows")
+	assert_eq(ids, PackedStringArray(["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R13", "R9", "R10", "R11", "R12"]),
+		"SE-039 2차 확정 순서(show.md)")
 	for r: String in R_ALL:
 		assert_true(ids.has(r), "%s 행 존재(필드 누락 0)" % r)
 

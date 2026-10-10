@@ -126,3 +126,14 @@ func _reader(total: int) -> RefCounted:
 	var o: RefCounted = load("res://tests/view/fake_reputation.gd").new()
 	o.set("total", total)
 	return o
+
+
+## SE-039 2차 열린 질문 b: 배속 0 버튼은 "0x" 가 아니라 ui.hud.pause 키로 표시한다.
+func test_pause_button_uses_pause_key() -> void:
+	var text: UiText = UiText.from_strings({"ui.hud.pause": "PAUSE", "ui.hud.speed": "{speed}x"})
+	hud.setup(bus, UiData.load_default(), text, UiParams.load_default())
+	assert_eq(hud.get_speed_button(TopHud.PAUSE_SPEED).text, "PAUSE", "0 = ui.hud.pause")
+	for b: Button in hud.get_speed_buttons():
+		var s: int = int(b.get_meta(TopHud.META_SPEED))
+		if s != TopHud.PAUSE_SPEED:
+			assert_eq(b.text, "%dx" % s, "나머지는 ui.hud.speed")

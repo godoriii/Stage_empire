@@ -13,7 +13,7 @@ const DEFAULT_PATH: String = "res://ui/ui_params.tres"
 @export var notification_max: int = 0
 ## 알림 한 줄이 사라지기까지의 초(0 이하면 사라지지 않는다).
 @export var notification_seconds: float = 0.0
-## 마감 리포트 행 순서(show.md R1~R13 id). 2차가 순서를 확정한다.
+## 마감 리포트 행 순서(show.md R1~R13 id, SE-039 2차 확정 순서).
 @export var report_rows: PackedStringArray = PackedStringArray()
 
 
