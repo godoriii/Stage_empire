@@ -3,8 +3,9 @@
 ## mutate_and_test.sh — 변이 확인 (SE-023)
 
 "이 코드를 이렇게 망가뜨리면 테스트가 빨개지는가?"를 한 명령으로 확인한다.
-`project/` 를 **리포지토리 밖 사본**으로 복사 → 패치 적용 → GUT 실행 → 사본 삭제(항상). 실제 `project/` 는 읽기만 하고,
-리포지토리 안에는 임시 파일을 만들지 않는다.
+`project/` 를 **리포지토리 밖 사본**으로 복사(문서를 읽는 테스트용으로 `docs/` 도 사본 옆에 읽기 전용으로 복사) → 패치 적용 → GUT 실행 → 사본 삭제(항상).
+실제 `project/`·`docs/` 는 읽기만 하고, 리포지토리 안에는 임시 파일을 만들지 않는다. 사본 구조는 `<사본>/project/...` + `<사본>/docs/...` 이다
+(테스트가 `res://../docs/gdd/*.md` 를 읽기 때문에 `docs/` 가 없으면 그 테스트가 Pending 이 되어 기준선이 `tools/run_tests.sh` 와 달라진다).
 
 ```bash
 tools/bot/mutate_and_test.sh <patch.diff> [tests_subdir=tests/sim] [--keep]
@@ -19,7 +20,11 @@ tools/bot/mutate_and_test.sh <patch.diff> [tests_subdir=tests/sim] [--keep]
 환경 변수
 
 - `SE_MUTATE_DIR`: 사본을 만들 상위 디렉터리. 없으면 `$TMPDIR` 또는 `/tmp` 아래 `mktemp -d`. 사본 이름은 `se_mutate.XXXXXX`.
-  **리포지토리 밖이어야 한다**(`SE_MUTATE_DIR`·`TMPDIR` 모두). 리포지토리 안이면 디렉터리·사본을 만들기 전에 exit 2.
+  **리포지토리 밖이어야 하고 `/` 가 아니어야 한다**(`SE_MUTATE_DIR`·`TMPDIR` 모두). 판정은 물리 경로(`cd -P`)로 한다:
+  1. 경로 어디에든 `..` 성분이 있으면 exit 2 (심링크 뒤 `..` 는 글자 해석과 커널 해석이 달라 판정이 어긋난다).
+  2. 디렉터리를 **만들기 전에**, 존재하는 가장 가까운 상위를 실경로로 풀고 아직 없는 꼬리를 붙여 리포지토리 안(또는 `/`)이면 exit 2. 이때 아무것도 만들지 않는다.
+  3. 만든 뒤에 실경로 `$BASE` 를 한 번 더 검사하는 방어선이 있다. 리포지토리 안이면 **이번 실행이 새로 만든** 빈 디렉터리를 `rmdir` 로 정리하고 exit 2 (기존 디렉터리는 건드리지 않는다).
+  4. 어느 단계든 `cd` 가 실패하면(권한 없음 등) exit 2.
 - `GODOT_BIN`: Godot 바이너리. 없으면 PATH 의 `godot`/`godot4` (`tools/run_tests.sh` 와 같은 규칙).
 
 ### 종료 코드
@@ -28,10 +33,10 @@ tools/bot/mutate_and_test.sh <patch.diff> [tests_subdir=tests/sim] [--keep]
 |---|---|
 | 0 | GUT 전부 통과. 패치가 있으면 **변이를 테스트가 못 잡았다**는 뜻, 빈 패치면 기준선이 녹색이라는 뜻 |
 | GUT 의 코드 (보통 1) | 테스트 실패 = **변이가 잡혔다**. 마지막에 요약(`Tests/Passing/Failing`)과 실패한 테스트 이름을 다시 출력한다 |
-| 2 | 사용법 오류: 인자 없음, 알 수 없는 옵션, 인자 초과(패치·`tests_subdir` 뒤의 위치 인자), `tests_subdir` 가 절대 경로이거나 `..` 포함, 패치/테스트 디렉터리 없음, 사본 상위 디렉터리(`SE_MUTATE_DIR`/`TMPDIR`)가 리포지토리 안이거나, 아직 없는 경로 중간에 `..` 가 있어 위치를 판정할 수 없음 |
+| 2 | 사용법 오류: 인자 없음, 알 수 없는 옵션, 인자 초과(패치·`tests_subdir` 뒤의 위치 인자), `tests_subdir` 가 절대 경로이거나 `..` 포함, 패치/테스트 디렉터리 없음, 사본 상위 디렉터리(`SE_MUTATE_DIR`/`TMPDIR`)가 리포지토리 안이거나 `/` 이거나, 경로에 `..` 성분이 있거나, `cd` 로 이동할 수 없음 |
 | 3 | 패치 적용 불가 (`patch -p1 --dry-run` 실패, 출력 포함). GUT 는 실행하지 않는다 |
 | 4 | Godot 바이너리 없음 |
-| 5 | 내부 오류 (사본 생성 실패, GUT 애드온 없음) |
+| 5 | 내부 오류 (사본·`docs/` 복사 실패, GUT 애드온 없음, `mkdir`/`mktemp` 실패) |
 
 ### 패치 규칙
 
@@ -60,14 +65,18 @@ tools/bot/mutate_and_test.sh /tmp/empty.diff tests/view                         
 ### 주의
 
 boundary hook 이 qa/reviewer 의 `project/sim|core|world` 쓰기를 막는 것은 정상이다. 이 스크립트는 그 우회가 아니라 **사본** 검증이며, 실제 `project/` 에는 쓰지 않는다.
-`rm -rf` 는 `mktemp` 가 만든 `se_mutate.*` 사본에만, 실경로가 `<사본 상위 디렉터리의 실경로>/se_mutate.*` 일 때만 실행한다(상위 디렉터리는 리포지토리 밖임을 사본 생성 전에 확인한다). `--keep` 으로 남긴 사본은 직접 지운다.
+`rm -rf` 는 `mktemp` 가 만든 `se_mutate.*` 사본에만, 실경로가 `<사본 상위 디렉터리의 실경로>/se_mutate.*` 일 때만 실행한다(상위 디렉터리는 사본 생성 전에 물리 경로로 리포지토리 밖임을 확인하고, 만든 뒤 실경로로 다시 확인한다).
+사본의 `docs/` 는 읽기 전용(`a-w`)이다. 삭제 직전에 스크립트가 `chmod -R u+w` 로 풀어 지운다. `--keep` 으로 남긴 사본은 직접 지운다(비 root 면 `chmod -R u+w <사본> && rm -rf <사본>`).
+
+요약의 "실패한 테스트" 는 GUT Run Summary 항목 중 `[Failed]` 가 있는 것만 센다. Pending/Risky 만 있는 항목은 "Pending/Risky 테스트(실패 아님)" 로 따로 표시한다(기준선에서는 0건이어야 한다).
 
 ### 스크립트 자체 테스트 방법
 
 SE-023 AC1~AC5 를 그대로 돌린다. 합격 기준:
 
-1. 빈 패치 → exit 0, 요약이 `tools/run_tests.sh project/tests/sim` 과 같다.
+1. 빈 패치 → exit 0, 요약(Scripts/Tests/Passing/Asserts)이 `tools/run_tests.sh project/tests/sim` 과 같고 Pending 0, "실패한 테스트" 0건.
 2. 예시 패치 2개 → exit ≠ 0, 실패 테스트가 위 표의 건수와 같다(se016 2건, se015 1건).
 3. 실행 전후 `git status --short` 동일, `ls /tmp | grep se_mutate`(또는 `$SE_MUTATE_DIR`/`$TMPDIR`) 비어 있음, 경고 출력 없음. `--keep` 이면 경로가 출력되고 남는다.
-4. 적용 불가 패치 → exit 3 + `patch` 출력, 사본 삭제. `GODOT_BIN=/nonexistent` → exit 4.
-5. `tests/view` 인자 → 사본에서 view 테스트가 돌고 exit 0.
+4. 사본 상위 경로: 심링크 뒤 `..`(`/tmp/L/../x`, 심링크 안에서 상대 `../x`), `SE_MUTATE_DIR=/`, 권한 없는 디렉터리 → 전부 exit 2, 리포지토리 안에 새 디렉터리 0.
+5. 적용 불가 패치 → exit 3 + `patch` 출력, 사본 삭제. `GODOT_BIN=/nonexistent` → exit 4.
+6. `tests/view` 인자 → 사본에서 view 테스트가 돌고 exit 0.
