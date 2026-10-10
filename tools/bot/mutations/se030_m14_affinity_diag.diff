@@ -1,0 +1,13 @@
+# SE-030 QA 변이 m14_affinity_diag: electronic 대각 0.9 [AC4 RL3]
+# 사용: tools/bot/mutate_and_test.sh tools/bot/mutations/se030_m14_affinity_diag.diff
+--- a/project/data/genres/genres.json
++++ b/project/data/genres/genres.json
+@@ -5,7 +5,7 @@
+       "affinity": { "rock": 1.0, "indie": 0.5, "electronic": 0.2 } },
+     { "id": "hiphop",     "name": "힙합",      "accent_color": "#f2a93b" },
+     { "id": "electronic", "name": "일렉트로닉", "accent_color": "#3bc9db",
+-      "affinity": { "rock": 0.2, "indie": 0.4, "electronic": 1.0 } },
++      "affinity": { "rock": 0.2, "indie": 0.4, "electronic": 0.9 } },
+     { "id": "indie",      "name": "인디",      "accent_color": "#8fbf6a",
+       "affinity": { "rock": 0.5, "indie": 1.0, "electronic": 0.4 } },
+     { "id": "jazz",       "name": "재즈",      "accent_color": "#7b5ea7" },
