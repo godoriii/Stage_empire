@@ -1,0 +1,70 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/hud/top_hud.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0, 0, 0, 0.6)
+content_margin_left = 12.0
+content_margin_top = 6.0
+content_margin_right = 12.0
+content_margin_bottom = 6.0
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="TopHud" type="CanvasLayer"]
+layer = 2
+script = ExtResource("1_hud")
+
+[node name="Top" type="PanelContainer" parent="."]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 16.0
+offset_bottom = 16.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="VBox" type="VBoxContainer" parent="Top"]
+layout_mode = 2
+
+[node name="Row1" type="HBoxContainer" parent="Top/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Row2" type="HBoxContainer" parent="Top/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Cash" type="Label" parent="Top/VBox/Row1"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="Reputation" type="Label" parent="Top/VBox/Row1"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="Day" type="Label" parent="Top/VBox/Row1"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="Phase" type="Label" parent="Top/VBox/Row1"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="Speeds" type="HBoxContainer" parent="Top/VBox/Row1"]
+layout_mode = 2
+
+[node name="PriceLabel" type="Label" parent="Top/VBox/Row2"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+
+[node name="Price" type="SpinBox" parent="Top/VBox/Row2"]
+layout_mode = 2
+
+[node name="Artists" type="Button" parent="Top/VBox/Row2"]
+layout_mode = 2
+focus_mode = 0
+
+[node name="Menu" type="Button" parent="Top/VBox/Row2"]
+layout_mode = 2
+focus_mode = 0

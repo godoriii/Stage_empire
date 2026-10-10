@@ -1,0 +1,21 @@
+class_name UiParams
+extends Resource
+## SE-039: UI 표시 상수(아트 디렉터·2차가 바꾸는 값). 값은 ui_params.tres 에 있다(코드 기본값은 빈 값).
+## 게임 규칙 수치가 아니다 — 저장 슬롯 id·새 게임 시드·알림 수·리포트 행 순서(2차 확정 전 초안).
+
+const DEFAULT_PATH: String = "res://ui/ui_params.tres"
+
+## 메뉴 저장/불러오기 슬롯 id(session.save_requested {slot: String}). 슬롯 수 = 배열 길이.
+@export var save_slots: PackedStringArray = PackedStringArray()
+## session.new_game_requested {seed} 의 시드(SE-040 이 정할 때까지 고정).
+@export var new_game_seed: int = 0
+## 알림 피드에 동시에 남는 최대 줄 수.
+@export var notification_max: int = 0
+## 알림 한 줄이 사라지기까지의 초(0 이하면 사라지지 않는다).
+@export var notification_seconds: float = 0.0
+## 마감 리포트 행 순서(show.md R1~R13 id). 2차가 순서를 확정한다.
+@export var report_rows: PackedStringArray = PackedStringArray()
+
+
+static func load_default() -> UiParams:
+	return load(DEFAULT_PATH) as UiParams

@@ -25,6 +25,10 @@ extends Node3D
 ##   붙인다. 배치 프리셋이 없으면 baseline 을 함께 붙이고, 오버레이는 끈다(군중이 잘 보이게). CrowdPreset 의 가짜 sim 출력
 ##   (조명 가구 + 관객 n 명 watching + show.started)을 핸들러에 직접 넣는다(버스 발행 없음). 범위 밖·숫자 아님이면
 ##   push_error + 종료 코드 2. 캡처: -- --se-crowd-preset=150 --se-screenshot=<경로>(줌 기본 = 2).
+##
+## HUD·패널(SE-039): -- --se-ui-preset=<day|close> 일 때만 UiRoot(상단 HUD·섭외 패널·리포트·모달·알림·메뉴)를 붙인다.
+##   배치 프리셋이 없으면 baseline 을 함께 붙이고(같은 버스), 디버그 HUD 는 숨긴다. UiPreset 의 가짜 sim 출력을
+##   UiRoot.inject 로 넣는다(버스 발행 없음). day = 낮 + 섭외 패널 열림, close = 마감 리포트. 없는 id 면 push_error + 종료 코드 2.
 
 const SCREENSHOT_ARG: String = "--se-screenshot="
 const HOVER_ARG: String = "--se-hover="
@@ -36,6 +40,8 @@ const EXIT_BAD_MATERIAL: int = 2
 const EXIT_BAD_BUILD_PRESET: int = 2
 ## 종료 코드: 군중 프리셋 값이 틀림(SE-038).
 const EXIT_BAD_CROWD_PRESET: int = 2
+## 종료 코드: 없는 UI 프리셋 id(SE-039).
+const EXIT_BAD_UI_PRESET: int = 2
 const BUILD_PALETTE_SCENE: String = "res://ui/build/build_palette.tscn"
 ## 스크린샷 전 렌더가 안정될 때까지 기다리는 프레임 수(디버그 기능 전용).
 const SCREENSHOT_WARMUP_FRAMES: int = 10
@@ -61,6 +67,8 @@ var _palette: BuildPalette
 ## SE-038 군중·무대 연출(군중 프리셋이 있을 때만). 없으면 null.
 var _crowd_view: CrowdView
 var _stage_lights: StageLights
+## SE-039 HUD·패널(UI 프리셋이 있을 때만). 없으면 null.
+var _ui_root: UiRoot
 
 
 func _ready() -> void:
@@ -83,6 +91,10 @@ func _ready() -> void:
 	var crowd_raw: String = CrowdPreset.resolve(args)
 	if crowd_raw != CrowdPreset.NONE and not setup_crowd(crowd_raw):
 		get_tree().quit(EXIT_BAD_CROWD_PRESET)
+		return
+	var ui_preset: String = UiPreset.resolve(args)
+	if ui_preset != UiPreset.NONE and not setup_ui(ui_preset):
+		get_tree().quit(EXIT_BAD_UI_PRESET)
 		return
 	_run_screenshot_if_requested()
 
@@ -219,6 +231,32 @@ func setup_crowd(raw: String) -> bool:
 	_stage_lights.on_show_started(CrowdPreset.show_started_payload((moved["agents"] as Array).size()))
 	_overlay.set_mode(CoverageOverlay.MODE_OFF)
 	return true
+
+
+## SE-039: UiRoot 를 붙이고 UiPreset 의 가짜 sim 출력을 넣는다. 없는 id 면 push_error 후 false.
+func setup_ui(preset_id: String) -> bool:
+	if not UiPreset.is_valid_id(preset_id):
+		push_error("GridSandbox: UI 프리셋 '%s' 없음 (가능: %s)" % [preset_id, ", ".join(UiPreset.IDS)])
+		return false
+	if _ui_root != null:
+		return true
+	if _bus == null and not setup_build(BuildPreset.BASELINE):
+		return false
+	hud.visible = false
+	var catalog: UiArtistCatalog = UiArtistCatalog.load_default()
+	var data: UiData = UiData.load_default()
+	_ui_root = UiRoot.new()
+	add_child(_ui_root)
+	_ui_root.bind(_bus, data, UiText.load_default(), UiParams.load_default(), {UiRoot.SRC_ARTIST_CONFIG: catalog})
+	for ev: Array in UiPreset.events(preset_id, data, catalog):
+		_ui_root.inject(str(ev[0]), ev[1] as Dictionary)
+	if preset_id == UiPreset.DAY:
+		_ui_root.artist_panel.visible = true
+	return true
+
+
+func get_ui_root() -> UiRoot:
+	return _ui_root
 
 
 func get_crowd_view() -> CrowdView:
