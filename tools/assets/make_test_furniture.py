@@ -33,8 +33,10 @@ TICKET = "SE-041"
 SLOT_ORDER = ["base", "accent", "emissive", "glass"]
 
 # 이 파일의 .glb 머티리얼 baseColorFactor 는 5종 공통 자리표시 색이다(런타임 색은 슬롯 파라미터에서 온다 - GLTF_SPEC §2).
+# R-B 전에는 자리표시 색이 화면에 그대로 보인다(슬롯 파라미터를 적용하는 렌더 쪽이 아직 없다).
 # 형태·바이트 불변을 위해 SE-041 1차 값을 그대로 둔다. 미리보기 PNG 색은 이 표가 아니라 furniture.json 행의
 # `slots` 색(preview_colors)을 쓴다. glTF 안에서 슬롯 이름만 의미가 있고 색은 의미가 없다.
+# 그래서 R-B 전에는 자리표시 색이 화면에 그대로 보인다 — 이 색으로 룩을 판단하지 말 것.
 GLB_PLACEHOLDER = {
     "base": (0.23, 0.20, 0.25, 1.0),
     "accent": (0.78, 0.26, 0.23, 1.0),
@@ -44,9 +46,19 @@ GLB_PLACEHOLDER = {
 FURNITURE_JSON = HERE.parent.parent / "project" / "data" / "furniture" / "furniture.json"
 
 
+class SlotKeyMismatch(ValueError):
+    """furniture.json 행 slots 키 집합 ≠ 생성기 서피스(슬롯) 집합."""
+
+
 def preview_colors(fid, furniture_json=None):
     """furniture.json 행 `fid` 의 slots('#RRGGBB') → {슬롯: (r, g, b, a) 0..1}. glass 만 알파 0.4(미리보기 반투명 표시용)."""
     rows = {r["id"]: r for r in json.loads(Path(furniture_json or FURNITURE_JSON).read_text(encoding="utf-8"))["rows"]}
+    if fid not in rows:
+        raise SlotKeyMismatch(f"furniture.json 에 행이 없음: {fid}")
+    want, have = set(FURNITURE[fid][5]), set(rows[fid]["slots"])
+    if want != have:
+        raise SlotKeyMismatch(f"slots 키 ≠ 서피스: {fid} — 서피스 {sorted(want)}, slots 키 {sorted(have)}"
+                              f" (없는 키 {sorted(want - have)}, 남는 키 {sorted(have - want)})")
     out = {}
     for slot, hexv in rows[fid]["slots"].items():
         out[slot] = tuple(int(hexv[i:i + 2], 16) / 255 for i in (1, 3, 5)) + (0.4 if slot == "glass" else 1.0,)
@@ -375,7 +387,11 @@ def main():
     ap.add_argument("--preview", action="store_true", help="<id>/preview.png 도 쓴다(furniture.json slots 색, 순수 파이썬 래스터, 느림)")
     ap.add_argument("--lint", action="store_true", help="lint_gltf.py 를 돌려 <id>/lint.json 도 쓴다")
     args = ap.parse_args()
-    codes = generate(args.out, args.lint, args.preview)
+    try:
+        codes = generate(args.out, args.lint, args.preview)
+    except SlotKeyMismatch as e:
+        sys.stderr.write(f"오류: {e}\n")
+        sys.exit(1)
     for fid, (fn, *_rest) in FURNITURE.items():
         print(f"{fid}: {fn().tri_count()} tri, 슬롯 {','.join(fn().slots())}" + (f", lint exit {codes[fid]}" if args.lint else ""))
     sys.exit(1 if any(codes.values()) else 0)
