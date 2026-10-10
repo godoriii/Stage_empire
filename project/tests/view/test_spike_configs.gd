@@ -2,6 +2,7 @@ extends GutTest
 ## SE-003/SE-013 설정 리소스(spike_configs.tres) 유효성: 구성 A~E 가 티켓 표와 같고, 측정 절차 값이 티켓과 같으며,
 ## SpikeConfigSet.get_errors() 가 비어 있다. 잘못된 값은 오류로 잡힌다.
 ## SE-013 AC3: 구성 E = B 와 같되 crowd_shadows 만 false, 관문 구성 E.
+## SE-038 AC6: 구성 F(대표 장면: 가구 20 + 군중 150 + 스포트 4) 추가, A~E 값·관문 불변.
 
 const SETTINGS_PATH: String = "res://view/perf/spike_configs.tres"
 
@@ -27,7 +28,8 @@ func test_configs_match_ticket_table() -> void:
 		"D": [10000, 32, 8, 2048, true],
 		"E": [5000, 32, 8, 2048, false],
 	}
-	assert_eq(_s.get_config_ids(), PackedStringArray(["A", "B", "C", "D", "E"]), "구성 순서 A~E")
+	# SE-038: 구성 F(대표 장면)가 E 뒤에 붙는다. A~E 값은 아래 표 그대로(불변).
+	assert_eq(_s.get_config_ids(), PackedStringArray(["A", "B", "C", "D", "E", "F"]), "구성 순서 A~F")
 	for id: String in expected:
 		var c: SpikeConfig = _s.get_config(id)
 		assert_not_null(c, "구성 %s" % id)
@@ -106,3 +108,57 @@ func test_invalid_values_are_reported() -> void:
 	var dup: SpikeConfigSet = _s.duplicate(true) as SpikeConfigSet
 	dup.configs.append(dup.get_config("A").duplicate())
 	assert_true(", ".join(dup.get_errors()).contains("중복"), "id 중복 검출")
+
+
+# --- SE-038 구성 F ----------------------------------------------------------
+
+const AUDIENCE_PATH: String = "res://data/audience/audience.json"
+const STAGE_LIGHT_PARAMS_PATH: String = "res://view/stage/stage_light_params.tres"
+const SPIKE_SCENE: String = "res://view/perf/spike_crowd.tscn"
+## 티켓 SE-038 범위: "대표 장면 구성 F(가구 20 + 군중 150 + 스포트 4)".
+const F_PROPS: int = 20
+
+
+func test_config_f_representative_scene() -> void:
+	var f: SpikeConfig = _s.get_config("F")
+	assert_not_null(f, "구성 F")
+	if f == null:
+		return
+	var aud: Dictionary = ViewTestUtil.read_json(AUDIENCE_PATH) as Dictionary
+	var sl: StageLightParams = load(STAGE_LIGHT_PARAMS_PATH) as StageLightParams
+	assert_eq(f.instances, int(aud["max_agents"]), "군중 = audience.json max_agents (150)")
+	assert_eq(f.lights, sl.max_spots, "라이트 = StageLights 스포트 상한 (4)")
+	assert_true(f.spots_only, "라이트는 전부 스포트")
+	assert_eq(f.prop_count, F_PROPS, "가구 프록시 20")
+	assert_eq(f.shadow_lights, 0, "스포트 그림자 off (stage_light_params spot_shadows 와 같음)")
+	assert_eq(sl.spot_shadows, f.shadow_lights > 0)
+	assert_false(f.crowd_shadows, "군중 그림자 off (style-guide)")
+	assert_lte(f.shadow_atlas_size, 2048)
+	assert_string_contains(f.note, "대표 장면")
+	assert_eq(_s.gate_config_id, "E", "관문 구성은 E 그대로(F 실측은 사람 GPU 관문 묶음)")
+	# A~E 는 새 필드 기본값(동작 불변).
+	for id: String in ["A", "B", "C", "D", "E"]:
+		assert_eq(_s.get_config(id).prop_count, 0, "%s prop_count 0 = 공통 stage_prop_count" % id)
+		assert_false(_s.get_config(id).spots_only, "%s Omni/Spot 교대" % id)
+	var bad: SpikeConfig = f.duplicate() as SpikeConfig
+	bad.prop_count = -1
+	assert_string_contains(", ".join(bad.get_errors()), "prop_count")
+
+
+func test_config_f_spike_scene_builds_props_and_spots() -> void:
+	var vp: SubViewport = ViewTestUtil.make_viewport(self)
+	autofree(vp)
+	var spike: SpikeCrowd = (load(SPIKE_SCENE) as PackedScene).instantiate() as SpikeCrowd
+	spike.config_id = "F"
+	vp.add_child(spike)
+	var f: SpikeConfig = _s.get_config("F")
+	assert_eq(spike.get_instance_count(), f.instances, "인스턴스 150")
+	assert_eq(spike.get_stage_prop_nodes().size(), f.prop_count, "가구 프록시 20")
+	assert_eq(spike.get_light_nodes().size(), f.lights, "라이트 4")
+	for l: Light3D in spike.get_light_nodes():
+		assert_true(l is SpotLight3D, "%s 는 SpotLight3D" % l.name)
+	assert_eq(spike.get_shadow_light_count(), 0)
+	assert_false(spike.is_crowd_casting_shadows())
+	# 같은 프록시 메시 빌더(CrowdView 와 같은 삼각형 수).
+	assert_eq(spike.get_instance_mesh_triangle_count(), CrowdProxyMesh.build(_s.body_radius_m, _s.body_height_m,
+		_s.body_radial_segments, _s.body_rings, _s.head_size_m, _s.arm_size_m).get_faces().size() / 3)

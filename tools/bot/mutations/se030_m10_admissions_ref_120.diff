@@ -1,0 +1,13 @@
+# SE-030 QA 변이 m10_admissions_ref_120: 입장 기준 120 [RG3]
+# 사용: tools/bot/mutate_and_test.sh tools/bot/mutations/se030_m10_admissions_ref_120.diff
+--- a/project/data/reputation/reputation.json
++++ b/project/data/reputation/reputation.json
+@@ -1,7 +1,7 @@
+ {
+   "version": 1,
+   "base_by_grade": {"disaster": -30, "poor": -10, "ok": 12, "good": 22, "rave": 32},
+-  "admission_factor": {"admissions_ref": 100, "min_bp": 5000, "max_bp": 10000},
++  "admission_factor": {"admissions_ref": 120, "min_bp": 5000, "max_bp": 10000},
+   "focus": {
+     "min_genre_sum": 50,
+     "identity_share_bp": 7000,

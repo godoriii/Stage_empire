@@ -1,6 +1,6 @@
 class_name SpikeCrowd
 extends Node3D
-## 성능 스파이크 씬(SE-003, SE-013): MultiMesh 캐릭터 프록시 N개 + 동적 라이트 M개(Omni/Spot 혼합) +
+## 성능 스파이크 씬(SE-003, SE-013, SE-038 구성 F): MultiMesh 캐릭터 프록시 N개 + 동적 라이트 M개(Omni/Spot 혼합) +
 ## 무대 프록시 박스(셰도우 캐스터)를 SE-002 의 IsoCamera(최대 줌아웃)·GridView 위에 전부 화면 안에 띄우고 매 프레임 움직인다.
 ## 표시 전용. sim/core 와 연결하지 않고 이벤트 버스를 쓰지 않는다.
 ## SE-004/SE-018: 툰 셰이더 시안은 material_id(@export) 또는 --material=<plain|a|b|c|ss> 로 고른다(ShaderVariants).
@@ -212,28 +212,10 @@ static func fit_crowd_side_m(cam_params: IsoCameraParams, aspect: float, char_he
 
 ## 캐릭터 프록시 메시: 캡슐 몸통 + 박스 머리 + 박스 팔 2개를 한 서피스로 합친다(MultiMesh 드로우 1회).
 ## 피벗은 발 중심(y = 0, style-guide). 인스턴스 색은 정점 색으로 albedo 에 곱해진다.
+## SE-038: 빌더 본체는 공유 모듈 CrowdProxyMesh 로 옮겼다(CrowdView 와 같은 빌더). 시그니처·결과는 그대로.
 static func build_proxy_mesh(s: SpikeConfigSet) -> ArrayMesh:
-	var body: CapsuleMesh = CapsuleMesh.new()
-	body.radius = s.body_radius_m
-	body.height = s.body_height_m
-	body.radial_segments = s.body_radial_segments
-	body.rings = s.body_rings
-	var head: BoxMesh = BoxMesh.new()
-	head.size = Vector3.ONE * s.head_size_m
-	var arm: BoxMesh = BoxMesh.new()
-	arm.size = s.arm_size_m
-	var st: SurfaceTool = SurfaceTool.new()
-	st.append_from(body, 0, Transform3D(Basis.IDENTITY, Vector3(0.0, s.body_height_m * 0.5, 0.0)))
-	st.append_from(head, 0, Transform3D(Basis.IDENTITY, Vector3(0.0, s.body_height_m + s.head_size_m * 0.5, 0.0)))
-	var arm_x: float = s.body_radius_m + s.arm_size_m.x * 0.5
-	var arm_y: float = s.body_height_m - s.body_radius_m - s.arm_size_m.y * 0.5
-	st.append_from(arm, 0, Transform3D(Basis.IDENTITY, Vector3(-arm_x, arm_y, 0.0)))
-	st.append_from(arm, 0, Transform3D(Basis.IDENTITY, Vector3(arm_x, arm_y, 0.0)))
-	var mesh: ArrayMesh = st.commit()
-	var mat: StandardMaterial3D = StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mesh.surface_set_material(0, mat)
-	return mesh
+	return CrowdProxyMesh.build(s.body_radius_m, s.body_height_m, s.body_radial_segments, s.body_rings,
+		s.head_size_m, s.arm_size_m)
 
 
 # --- 구성 -----------------------------------------------------------------
@@ -334,13 +316,15 @@ func _build_crowd() -> void:
 	_write_instances(0.0)
 
 
-## 무대 프록시 박스(셰도우 캐스터)를 군중 영역 안에 한 줄로 놓는다. 모든 구성에서 같다(구성 간 비교 가능성).
+## 무대 프록시 박스(셰도우 캐스터)를 군중 영역 안에 한 줄로 놓는다. A~E 는 모두 같은 수(구성 간 비교 가능성),
+## SE-038 구성 F 만 prop_count(가구 20)로 바꾼다.
 ## 배치는 군중과 같은 레이아웃 좌표(카메라 기준 요로 돌린 정사각형)를 쓴다.
 func _build_stage_props() -> void:
 	var s: SpikeConfigSet = settings
 	for child: Node in stage_props_root.get_children():
 		child.queue_free()
-	var n: int = s.stage_prop_count
+	# SE-038: 구성 F 는 prop_count 로 가구 수를 바꾼다(0 = 설정 공통값, A~E 그대로).
+	var n: int = config.prop_count if config.prop_count > 0 else s.stage_prop_count
 	var span: float = _crowd_side_m * s.stage_prop_span_ratio
 	var spacing: float = span / float(n)
 	var v: float = _crowd_side_m * 0.5 * s.stage_prop_offset_ratio
@@ -374,7 +358,8 @@ func _build_lights() -> void:
 		_light_phase[i] = TAU * float(i) / float(m)
 		var light: Light3D
 		# 홀수 = 무빙 헤드(SpotLight3D), 짝수 = OmniLight3D. 셰도우는 앞쪽 shadow_lights 개 → 두 종류에 고르게.
-		if i % 2 == 1:
+		# SE-038: spots_only 구성(F)은 전부 SpotLight3D(무대 스포트).
+		if config.spots_only or i % 2 == 1:
 			var spot: SpotLight3D = SpotLight3D.new()
 			spot.spot_range = s.spot_range_m
 			spot.spot_angle = s.spot_angle_deg
