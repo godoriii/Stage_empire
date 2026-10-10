@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 대기 (재현됨) |
+| 상태 | 해결 (78de35a) |
 | 담당 에이전트 | sim-engineer |
 | 마일스톤 | MVP |
 | 의존 티켓 | SE-034 (발견), SE-001 (`TickLoop`·`SeededRng`), SE-036 (`GameSession` 로드 경로) |
@@ -58,4 +58,26 @@
 
 ## 결과
 
-(수정 담당 기록)
+sim-engineer, 2026-10-10. SE-032-bug 선례대로 같은 브랜치 `feature/SE-034-audience-system`(HEAD `276ebdc` 위)에서 고쳤다. 커밋 `78de35a`, 푸시 안 함. 이번 수정에 한해 core 변경 허용(producer).
+
+### 수정
+
+- `project/core/tick.gd` — `restore` 4(b)는 그대로 새 `SeededRng`(사본)에 `seed`·`rng` 상태를 적용해 **검증만** 한다(실패 시 현재 `rng` 불변 — 원자성 유지). 8(b)의 `rng = new_rng`(객체 교체)를 `rng.assign(new_rng)`(기존 객체에 마스터 시드·스트림 시드·상태를 옮김)로 바꿨다. 8(b)는 7단계 시스템 적용·8(a) 명령 큐 적용이 모두 성공한 뒤라 실패 경로에서는 도달하지 않는다.
+- `project/core/rng.gd` — `SeededRng.assign(other) -> bool` 추가. 스트림 이름 목록이 같아야 하며(다르면 `push_error`, `false`, 상태 불변) 이 객체와 스트림 객체(`RandomNumberGenerator`)를 유지한 채 `master_seed`, 스트림별 `seed`·`state` 를 복사한다. `restore` 의 사본은 `set_state` 가 빠진 스트림을 새 시드 기본값으로 두는 동작까지 그대로 옮긴다(이전 교체 방식과 같은 결과).
+
+### 회귀 테스트
+
+| 파일 | 테스트 | 내용 |
+|---|---|---|
+| `project/tests/sim/replay/test_replay_restore_rng.gd`(신규) | `test_load_then_next_evening_matches_continuous` | qa 재현 그대로(rookie_baseline·시드 0, 1일차 close 저장 S). A 연속 / B 새 루프(시드 777)에 로드 / C 같은 루프를 2일차까지 돌린 뒤 S 로 되돌림. B·C: `restore` 뒤 `loop.rng` 객체 유지·`AudienceSystem.rng == loop.rng`(AC1), 복원 직후 상태 = 저장본·`master_seed` = 저장본 seed, 2일차 `admissions_decided` 의 `noise_bp`·`admissions`·`by_type`·`expected`·`capped_by`, `day_summary` 해시, 뽑기 뒤 `loop.rng` 상태, **다시 저장한 `rng` = 연속 진행 저장본**이 A 와 같음(AC2) |
+| 〃 | `test_rejected_restore_keeps_rng` | AC4: rng 상태 `"x"`(push_error 2), `seed: -1`(1), 시스템 훅 실패(7단계 롤백, 2) 각각 `false` 이고 `loop.rng` 객체·상태·`master_seed` 불변 |
+| `project/tests/sim/test_rng.gd` | `test_assign_keeps_objects_and_copies_state` | `assign` 이 객체·스트림 객체를 유지하고 시드·상태를 옮기며 이어지는 열이 같음, 스트림 목록이 다르면 `false`·push_error 1·상태 불변 |
+
+- **수정 전 실패 확인**: 수정 전 코드(`rng = new_rng`)에서 `test_load_then_next_evening_matches_continuous` 가 실패했다 — 객체 유지 단언 3건, 2일차 `noise_bp` B **228** / C **642** vs A **413**(qa 측정과 같은 값), `day_summary`(평균 만족 6,666 / 6,667 vs 6,662), 뽑기 뒤 `rng.audience`(B·C −4905547652258290101 그대로, A 8446068138391308941), 재저장 rng 불일치. `test_rejected_restore_keeps_rng` 는 수정 전에도 통과(거부 경로는 원래 원자적).
+- 수정 뒤: `tools/run_tests.sh project/tests/sim` → **34 스크립트 / 322 테스트 전부 통과**(qa 커밋 포함 319 + 신규 3), asserts 239,427. `python3 tools/validate_data.py --strict` exit 0(12 테이블). 기존 `test_tick.gd`(SH·롤백·거부 24건) 수정 없이 통과.
+
+### 다른 시스템 영향
+
+- 생성자로 `SeededRng` 를 받아 쥐는 시스템은 현재 `AudienceSystem` 하나뿐이다(`grep -rn "SeededRng\|\.rng\b" project --include=*.gd`, tests·addons 제외: `project/sim/audience_system.gd`, `project/core/tick.gd` 만). artist·economy·build 는 난수를 쓰지 않고 rng 참조도 없다. view·ui 에도 없다.
+- 이 수정으로 앞으로 rng 를 받는 시스템(events·world·artist 스트림)도 같은 규약(`loop.rng` 를 생성자에서 받아 쥐어도 로드 뒤 유효)을 그대로 쓸 수 있다. tick.md #스냅샷 restore 8(b) 표기("`rng` 교체")는 game-designer 가 "기존 객체에 상태 적용"으로 한 줄 정정하면 좋다(동작 계약 SH6 은 그대로).
+- `project/tests/sim/test_audience_qa.gd.uid`(qa 파일의 Godot 임포트 산출물)는 qa 커밋에 없어 작업 트리에 미추적으로 남아 있다. 이 커밋에는 넣지 않았다.
