@@ -12,6 +12,7 @@ const EXPECTED: Array[String] = [
 	"res://sim/audience_config.gd", "res://sim/audience_system.gd",
 	"res://core/event_bus.gd", "res://core/json_util.gd", "res://core/rng.gd", "res://core/sim_config.gd", "res://core/tick.gd",
 	"res://sim/economy.gd", "res://sim/economy_config.gd",
+	"res://sim/show_config.gd", "res://sim/show_system.gd", "res://sim/reputation_config.gd", "res://sim/reputation_system.gd",
 ]
 ## view/ui 참조 금지(시뮬레이션 → 렌더 방향 의존 없음).
 const PRESENTATION_RE: String = "res://(view|ui)/"

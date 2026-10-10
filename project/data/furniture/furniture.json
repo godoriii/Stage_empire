@@ -73,6 +73,7 @@
       "build_cost": 2200, "upkeep_per_day": 80,
       "rotatable": true, "wall_required": false, "poly_budget": "equipment_large",
       "slots": { "base": "#3A3340", "accent": "#C8423A", "emissive": "#FFD27A" },
+      "model": "res://assets/models/stage_medium.glb",
       "effects": { "sound_radius": 6, "sight_block": true, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 200, "light_grade": 1 }
     },
     {
@@ -80,7 +81,8 @@
       "footprint": [1, 1], "height_m": 1.2,
       "build_cost": 200, "upkeep_per_day": 15,
       "rotatable": true, "wall_required": false, "poly_budget": "furniture_small",
-      "slots": { "base": "#22252B", "accent": "#5A6270" },
+      "slots": { "base": "#22252B", "emissive": "#FFB347" },
+      "model": "res://assets/models/speaker_floor.glb",
       "effects": { "sound_radius": 7, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
     },
     {
@@ -105,6 +107,7 @@
       "build_cost": 100, "upkeep_per_day": 10,
       "rotatable": true, "wall_required": false, "poly_budget": "furniture_small",
       "slots": { "base": "#2E2E33", "emissive": "#FFF1C2" },
+      "model": "res://assets/models/light_spot.glb",
       "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 0, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 1 }
     },
     {
@@ -137,6 +140,7 @@
       "build_cost": 500, "upkeep_per_day": 40,
       "rotatable": true, "wall_required": false, "poly_budget": "equipment_large",
       "slots": { "base": "#6B4A35", "accent": "#D9A441" },
+      "model": "res://assets/models/bar_counter.glb",
       "effects": { "sound_radius": 0, "sight_block": false, "bar_service_radius": 8, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
     },
     {
@@ -144,7 +148,8 @@
       "footprint": [1, 1], "height_m": 1.9,
       "build_cost": 300, "upkeep_per_day": 12,
       "rotatable": true, "wall_required": true, "poly_budget": "furniture_small",
-      "slots": { "base": "#D8DCE0", "accent": "#C8423A", "glass": "#A8D8EA" },
+      "slots": { "base": "#D8DCE0", "emissive": "#E6F4FF", "glass": "#A8D8EA" },
+      "model": "res://assets/models/bar_fridge.glb",
       "effects": { "sound_radius": 0, "sight_block": true, "bar_service_radius": 3, "capacity_add": 0, "evac_capacity": 0, "satisfaction_bonus_bp": 0, "light_grade": 0 }
     },
     {

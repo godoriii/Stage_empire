@@ -78,6 +78,12 @@ def build(path, mats, prim_mats, colors=None, width=1.0, height=1.0, depth_step=
           "buffers": [{"byteLength": 0}]}
     if tweak:
         tweak(gl, add)
+    write_glb(path, gl, bin_)
+
+
+def write_glb(path, gl, bin_):
+    """glTF JSON(dict) + BIN 버퍼를 .glb 한 파일로 쓴다. buffers[0].byteLength 는 여기서 채운다.
+    build() 와 tools/assets/make_test_furniture.py 가 같은 컨테이너 쓰기 코드를 쓴다(SE-041)."""
     gl["buffers"][0]["byteLength"] = len(bin_)
     js = json.dumps(gl).encode()
     js += b" " * (-len(js) % 4)

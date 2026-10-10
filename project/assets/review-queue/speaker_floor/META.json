@@ -1,0 +1,11 @@
+{
+  "asset_id": "speaker_floor",
+  "category": "sound",
+  "footprint": [
+    1,
+    1
+  ],
+  "height_m": 1.2,
+  "poly_budget": "furniture_small",
+  "ticket": "SE-041"
+}
