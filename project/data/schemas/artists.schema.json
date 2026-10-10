@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$comment": "schema version 1 (SE-031). 변경 이력: docs/gdd/artist.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 artist.md 변경 이력에 적는다.",
   "title": "artists",
-  "description": "아티스트 명단(새 게임 초기값). 규칙: docs/gdd/artist.md. 동적 상태(성장한 인기·실력, 공연 수, 관계도)는 여기 없고 ArtistSystem 스냅샷에 있다. 이 파일의 수치(grade·popularity·skill·personality)는 artist.json roster_plan 의 슬롯 값과 같아야 한다(qa AR10). 이름·바이오 문장은 content-writer, 수치는 game-designer.",
+  "description": "아티스트 명단(새 게임 초기값). 규칙: docs/gdd/artist.md. 동적 상태(성장한 인기·실력, 공연 수, 관계도)는 여기 없고 ArtistSystem 스냅샷에 있다. 이 파일의 수치(grade·popularity·skill·personality)는 artist.json roster_plan 의 슬롯 값과 같아야 한다(qa AR11). 이름·바이오 문장은 content-writer, 수치는 game-designer.",
   "type": "object",
   "required": ["version", "rows"],
   "additionalProperties": false,
   "properties": {
     "version": { "type": "integer", "enum": [1] },
     "rows": {
-      "description": "아티스트 행. 빈 배열은 허용하지 않는다(minItems 1 — 섭외할 아티스트가 없는 게임은 성립하지 않는다). MVP 확정 명단은 12행(3장르 × 4)이지만 개수·구성은 스키마가 아니라 qa 스크립트(artist.md AR10)가 검사한다(테스트 사본이 적은 행으로 로드될 수 있게).",
+      "description": "아티스트 행. 빈 배열은 허용하지 않는다(minItems 1 — 섭외할 아티스트가 없는 게임은 성립하지 않는다). MVP 확정 명단은 12행(3장르 × 4)이지만 개수·구성은 스키마가 아니라 qa 스크립트(artist.md AR11)가 검사한다(테스트 사본이 적은 행으로 로드될 수 있게).",
       "type": "array",
       "minItems": 1,
       "items": {

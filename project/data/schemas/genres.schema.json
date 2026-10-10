@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "genres",
-  "description": "8장르 정의. 출처: docs/PRD.md '장르 매트릭스'. 유사도 행렬 수치는 game-designer 가 채운다.",
+  "description": "8장르 정의. 출처: docs/PRD.md '장르 매트릭스'. 유사도 행렬(affinity) 수치는 game-designer 가 채운다(v0: MVP 3장르, SE-030).",
   "type": "object",
   "required": ["version", "rows"],
   "additionalProperties": false,
@@ -20,7 +20,7 @@
           "accent_color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
           "affinity": {
             "type": "object",
-            "description": "다른 장르 id → 0.0~1.0 유사도. 비어 있으면 미정.",
+            "description": "장르 id → 0.0~1.0 유사도(자기 자신 키 포함, 대각 1.0, 대칭). 없으면 미정. v0 는 MVP 3장르(artist.json mvp_genres)만 3×3 으로 채운다(SE-030) — 교차 검사는 reputation 로더 RL3, 쓰는 곳은 docs/gdd/reputation.md #장르-집중과-확산.",
             "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
           }
         }

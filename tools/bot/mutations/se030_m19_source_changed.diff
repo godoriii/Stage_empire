@@ -1,0 +1,12 @@
+# SE-030 QA 변이 m19_source_changed: 만족도 진실의 출처 변경 [SH11 SL4]
+# 사용: tools/bot/mutate_and_test.sh tools/bot/mutations/se030_m19_source_changed.diff
+--- a/project/data/show/show.json
++++ b/project/data/show/show.json
+@@ -1,6 +1,6 @@
+ {
+   "version": 1,
+-  "satisfaction_source": "audience.day_summary.avg_satisfaction_bp",
++  "satisfaction_source": "show.computed",
+   "grades": [
+     { "id": "disaster", "name": "참사", "min_bp": 0 },
+     { "id": "poor",     "name": "부진", "min_bp": 3000 },

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "satisfaction_source": "audience.day_summary.avg_satisfaction_bp",
+  "grades": [
+    { "id": "disaster", "name": "참사", "min_bp": 0 },
+    { "id": "poor",     "name": "부진", "min_bp": 3000 },
+    { "id": "ok",       "name": "보통", "min_bp": 5000 },
+    { "id": "good",     "name": "호평", "min_bp": 6000 },
+    { "id": "rave",     "name": "열광", "min_bp": 7500 }
+  ],
+  "reference_scenarios": [
+    {
+      "id": "no_lineup",
+      "description": "audience no_lineup(섭외 없음, 기준 배치). 공연 구간 진입에 show.skipped, show.ended 없음",
+      "audience_scenario": "no_lineup",
+      "has_stage": true,
+      "expected": { "event": "show.skipped", "reason": "no_lineup" }
+    },
+    {
+      "id": "local_top_baseline",
+      "description": "audience local_top_baseline(s07 indie local, 명성 0, 티켓 20, 시드 0). 손계산 평균 만족 6,732 → 호평",
+      "audience_scenario": "local_top_baseline",
+      "has_stage": true,
+      "expected": {
+        "event": "show.ended", "expected_admissions": 83, "satisfaction_bp": 6732, "grade": "good",
+        "grade_over_range": "good", "admissions": 83, "audience": 83, "revenue_hint": 1660
+      }
+    },
+    {
+      "id": "rookie_baseline",
+      "description": "audience rookie_baseline(s08 indie rookie, 명성 150, 티켓 20, 시드 0). 손계산 6,733 → 호평",
+      "audience_scenario": "rookie_baseline",
+      "has_stage": true,
+      "expected": {
+        "event": "show.ended", "expected_admissions": 120, "satisfaction_bp": 6733, "grade": "good",
+        "grade_over_range": "good", "admissions": 120, "audience": 120, "revenue_hint": 2400
+      }
+    },
+    {
+      "id": "local_top_price30",
+      "description": "audience local_top_price30(s07, 티켓 30). 손계산 5,730 → 보통",
+      "audience_scenario": "local_top_price30",
+      "has_stage": true,
+      "expected": {
+        "event": "show.ended", "expected_admissions": 53, "satisfaction_bp": 5730, "grade": "ok",
+        "grade_over_range": "ok", "admissions": 53, "audience": 53, "revenue_hint": 1590
+      }
+    },
+    {
+      "id": "no_stage",
+      "description": "local_top_baseline 라인업인데 무대 없음(build.coverage_changed.has_stage false). show.skipped(no_stage), show.ended 없음",
+      "audience_scenario": "local_top_baseline",
+      "has_stage": false,
+      "expected": { "event": "show.skipped", "reason": "no_stage" }
+    }
+  ]
+}
