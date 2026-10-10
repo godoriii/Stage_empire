@@ -65,6 +65,11 @@ def resolve_out(argv):
             raise SystemExit(2)
         out = Path(argv[i + 1]).resolve()
     else:
+        # 임시 디렉터리를 만들기 전에 상위(TMPDIR)부터 판정한다: mkdtemp 가 리포지토리 안에 빈 디렉터리를 남기지 않게(SE-048 리뷰 참고 2).
+        tmp_base = Path(tempfile.gettempdir()).resolve()
+        if tmp_base == ROOT or ROOT in tmp_base.parents:
+            print(f"출력 디렉터리는 리포지토리 밖이어야 한다 (TMPDIR): {tmp_base}", file=sys.stderr)
+            raise SystemExit(2)
         out = Path(tempfile.mkdtemp(prefix="se030_mut.")).resolve()
     if out == ROOT or ROOT in out.parents:
         print(f"출력 디렉터리는 리포지토리 밖이어야 한다: {out}", file=sys.stderr)
