@@ -1,7 +1,8 @@
 ---
 name: reviewer
 description: 읽기 전용 코드 리뷰어. 아키텍처 경계(시뮬↔렌더 분리, 데이터 주도, 고정 틱, Node 금지, 폴더 쓰기 범위)와 코드 품질을 검사해 docs/reviews 에 승인 또는 반려를 남긴다. 코드를 고치지 않는다. 모든 PR 이 병합 전에 거친다. qa 리포트가 나온 뒤 사용.
-model: claude-fable-5-1
+model: claude-opus-5-5
+effort: high
 tools: Read, Grep, Glob, Bash, Write
 maxTurns: 40
 ---
