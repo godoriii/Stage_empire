@@ -90,3 +90,29 @@ func test_derived_seed_vectors() -> void:
 	assert_eq(_rng(42).stream("audience").seed, 2851880905, "스트림 RNG 의 seed = 파생 시드")
 	assert_null(_rng(42).stream("nope"), "모르는 스트림 → null")
 	assert_push_error("모르는 스트림")
+
+
+## SE-034-bug: assign 은 객체·스트림 객체를 유지하고 다른 SeededRng 의 시드·상태를 옮긴다.
+func test_assign_keeps_objects_and_copies_state() -> void:
+	var a: SeededRng = _rng(42)
+	for n: String in _cfg.rng_streams:
+		for i: int in 13:
+			a.stream(n).randi()
+	var b: SeededRng = _rng(7)
+	var stream_obj: Object = b.stream("audience")
+	assert_true(b.assign(a), "같은 스트림 목록 → true")
+	assert_true(b.stream("audience") == stream_obj, "스트림 객체 유지")
+	assert_eq(b.master_seed, 42, "마스터 시드 이전")
+	assert_eq(b.get_state(), a.get_state(), "상태 이전")
+	var diff: int = 0
+	for n: String in _cfg.rng_streams:
+		for i: int in 50:
+			if a.stream(n).randi() != b.stream(n).randi():
+				diff += 1
+	assert_eq(diff, 0, "이어지는 열 일치")
+	var other: Array[String] = ["audience"]
+	var c: SeededRng = SeededRng.new(1, other)
+	var before: Dictionary = b.get_state()
+	assert_false(b.assign(c), "스트림 목록이 다르면 false")
+	assert_push_error_count(1)
+	assert_eq([b.get_state(), b.master_seed], [before, 42], "실패 시 상태 불변")
