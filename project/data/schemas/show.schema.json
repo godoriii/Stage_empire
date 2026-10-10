@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-030). 변경 이력: docs/gdd/show.md#변경-이력. 구조를 바꾸면 version enum 을 올리고 show.md 변경 이력에 적는다.",
+  "title": "show",
+  "description": "공연 시스템 수치(공연 등급 임계, 기준 시나리오). 규칙: docs/gdd/show.md. 만족도 자체는 audience.json satisfaction 가중치로 audience 가 계산하고(진실의 출처 = audience.day_summary.avg_satisfaction_bp), 이 표는 그 값을 등급으로 접는 임계만 가진다. 비율은 economy.json rate_scale(10000) 분의 정수 bp. 수치 변경은 game-designer 만.",
+  "type": "object",
+  "required": ["version", "satisfaction_source", "grades", "reference_scenarios"],
+  "additionalProperties": false,
+  "$defs": {
+    "bp": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "show_grade": { "type": "string", "enum": ["disaster", "poor", "ok", "good", "rave"] }
+  },
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "satisfaction_source": {
+      "description": "공연 만족도의 단일 출처(이벤트.필드). show 는 이 값만 등급으로 접는다(show.md SR1). 다른 값은 규칙 개정(스키마 version 올림)",
+      "type": "string", "enum": ["audience.day_summary.avg_satisfaction_bp"]
+    },
+    "grades": {
+      "description": "공연 등급 임계. 순서 = artist.json show_grades(나쁜 것 → 좋은 것, 로더 SL2). min_bp 는 첫 행 0, 엄격히 증가(SL3). 등급 = min_bp ≤ satisfaction_bp 인 마지막 행(SR3)",
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "min_bp"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "$ref": "#/$defs/show_grade" },
+          "name": { "description": "표시 이름(한국어 v0). UI 문자열 테이블이 생기면 그쪽으로 옮긴다", "type": "string", "minLength": 1 },
+          "min_bp": { "description": "이 등급의 최소 평균 만족(포함)", "$ref": "#/$defs/bp" }
+        }
+      }
+    },
+    "reference_scenarios": {
+      "description": "기준 시나리오(테스트·qa 용, 런타임은 읽지 않는다). audience.json reference_scenarios 의 day_summary 를 입력으로 쓴다. show.md #기준-시나리오",
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "audience_scenario", "has_stage", "expected"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "description": { "type": "string" },
+          "audience_scenario": { "description": "audience.json reference_scenarios[].id", "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "has_stage": { "description": "build.coverage_changed.has_stage 입력", "type": "boolean" },
+          "expected": {
+            "type": "object",
+            "required": ["event"],
+            "additionalProperties": false,
+            "properties": {
+              "event": { "type": "string", "enum": ["show.ended", "show.skipped"] },
+              "reason": { "description": "show.skipped 일 때만", "type": "string", "enum": ["no_lineup", "no_stage"] },
+              "expected_admissions": { "description": "show.started.expected_admissions", "type": "integer", "minimum": 0 },
+              "satisfaction_bp": { "description": "= audience 시나리오 avg_satisfaction_bp_hand", "$ref": "#/$defs/bp" },
+              "grade": { "$ref": "#/$defs/show_grade" },
+              "grade_over_range": { "description": "audience avg_satisfaction_bp_range 양 끝 모두의 등급(범위 안에서 등급이 바뀌지 않음)", "$ref": "#/$defs/show_grade" },
+              "admissions": { "type": "integer", "minimum": 0 },
+              "audience": { "type": "integer", "minimum": 0 },
+              "revenue_hint": { "description": "admissions × ticket_price", "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
