@@ -223,7 +223,7 @@ func restore(s: Dictionary) -> bool:
 	var cmds: Variant = EventBus.normalize_commands(s.get("pending_commands"))  # 4 (a)
 	if cmds == null:
 		return _restore_fail("pending_commands 형식 오류(명령 페이로드 숫자는 int 만 허용)")
-	var new_rng: SeededRng = SeededRng.new(n_seed, config.rng_streams)       # 4 (b) 현재 rng 는 그대로
+	var new_rng: SeededRng = SeededRng.new(n_seed, config.rng_streams)       # 4 (b) 사본으로 검증, 현재 rng 는 그대로
 	if not new_rng.set_state(rng_state):
 		return _restore_fail("rng 상태 적용 실패")
 	var systems: Variant = s.get("systems")                                   # 5 (D5)
@@ -267,7 +267,7 @@ func restore(s: Dictionary) -> bool:
 		_rollback_systems(applied, prev)
 		_running = false
 		return false
-	rng = new_rng                                                             # 8 (b)
+	rng.assign(new_rng)                                                       # 8 (b) 객체 유지, 상태만(SE-034-bug)
 	master_seed = n_seed
 	tick = n_tick
 	day = n_day
