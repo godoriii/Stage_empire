@@ -9,10 +9,10 @@ var _economy: Dictionary
 
 
 func before_all() -> void:
-	_artists = ArtistConfig.read_json(ArtistConfig.DEFAULT_ARTISTS_PATH)
-	_rules = ArtistConfig.read_json(ArtistConfig.DEFAULT_RULES_PATH)
-	_genres = ArtistConfig.read_json(ArtistConfig.GENRES_PATH)
-	_economy = ArtistConfig.read_json(ArtistConfig.ECONOMY_PATH)
+	_artists = JsonUtil.read_json(ArtistConfig.DEFAULT_ARTISTS_PATH, ArtistConfig.LOG_TAG)
+	_rules = JsonUtil.read_json(ArtistConfig.DEFAULT_RULES_PATH, ArtistConfig.LOG_TAG)
+	_genres = JsonUtil.read_json(ArtistConfig.GENRES_PATH, ArtistConfig.LOG_TAG)
+	_economy = JsonUtil.read_json(ArtistConfig.ECONOMY_PATH, ArtistConfig.LOG_TAG)
 
 
 # --- 도우미 -------------------------------------------------------------------
@@ -169,6 +169,35 @@ func test_grow_is_pure() -> void:
 	assert_eq(cfg.grow(bad, cfg.show_grades[0]), {})
 	assert_push_error("모르는 등급")
 	assert_push_error_count(2)
+
+
+# --- SE-046 AC2: JsonUtil.as_int 2^63 가드가 artist 로더 경로에도 걸린다 ----------------
+
+## 파일 → JsonUtil.read_json → ArtistConfig.load 경로. |1e19| ≥ 2^63 은 정수로 접지 않는다(test_json_util 과 같은 규약).
+func test_loader_rejects_float_beyond_int64() -> void:
+	var lg: int = _grade_index("local")
+	var rules: Dictionary = _rules.duplicate(true)
+	rules["grades"][lg]["unlock_reputation"] = 1e19
+	var path: String = "user://se046_artist_rules_1e19.json"
+	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(rules))
+	f.close()
+	var reread: Dictionary = JsonUtil.read_json(path, ArtistConfig.LOG_TAG)
+	assert_eq(reread["grades"][lg]["unlock_reputation"], 1e19, "파일 왕복 뒤에도 1e19(float)")
+	assert_null(JsonUtil.as_int(1e19), "전제: as_int(1e19) == null")
+	assert_null(ArtistConfig.load(ArtistConfig.DEFAULT_ARTISTS_PATH, path), "unlock_reputation 1e19 → load null")
+	assert_push_error("unlock_reputation", "등급 규칙 정수 검사에서 거절")
+	assert_push_error_count(1, "push_error 1회")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	# int_deep 경로(reference_scenarios): 1e19 는 int 로 접지 않고 float 그대로 보관한다.
+	var c: Array = _copies()
+	var sid: String = c[1]["reference_scenarios"][0]["id"]
+	c[1]["reference_scenarios"][0]["popularity"] = 1e19
+	var cfg: ArtistConfig = ArtistConfig.from_dicts(c[0], c[1], c[2], c[3])
+	assert_not_null(cfg, "시나리오는 런타임이 읽지 않으므로 로드 성공")
+	if cfg != null:
+		assert_true(cfg.scenario(sid)["popularity"] is float, "시나리오 1e19 는 float 로 남는다")
+	assert_push_error_count(1, "추가 push_error 없음")
 
 
 # --- AC6: 실제 데이터 집계(데이터 회귀 방지) --------------------------------------

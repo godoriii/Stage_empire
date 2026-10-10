@@ -4,10 +4,12 @@ extends RefCounted
 ## 규칙: docs/gdd/artist.md #설정-로드-검사 L1~L8, #공개-api, #성장 GR1~GR5.
 ## 스키마로 못 하는 교차 검사와 CI 검증기가 보지 않는 maxItems·형식(L6·L7)을 여기서 한다. 실패하면 push_error, null.
 ## 명단 구성(12행·3장르 × 4·roster_plan 일치)은 검사하지 않는다(테스트 사본이 적은 행으로 로드될 수 있게, artist.md).
-## 모든 필드는 읽기 전용으로 취급한다. JSON 숫자의 정수값 float 는 int 로 정규화해 보관한다.
+## 모든 필드는 읽기 전용으로 취급한다. JSON 숫자의 정수값 float 는 int 로 정규화해 보관한다(JsonUtil, SE-046).
 
 const DEFAULT_ARTISTS_PATH: String = "res://data/artists/artists.json"
 const DEFAULT_RULES_PATH: String = "res://data/artist/artist.json"
+## JsonUtil.read_json 의 push_error 접두어.
+const LOG_TAG: String = "ArtistConfig"
 const GENRES_PATH: String = "res://data/genres/genres.json"
 const ECONOMY_PATH: String = "res://data/economy/economy.json"
 
@@ -27,8 +29,6 @@ const PAIR_SIZE: int = 2
 ## 새 게임 동적 값(artist.md #상태 roster: shows_played 0, relationship 0).
 const NEW_GAME_SHOWS_PLAYED: int = 0
 const NEW_GAME_RELATIONSHIP: int = 0
-## |float| 이 이 값 이상이면 int64 로 바꿀 수 없다(2^63, 타입 한계 정의).
-const INT64_FLOAT_LIMIT: float = 9223372036854775808.0
 
 const ROW_FIELDS: Array[String] = ["id", "name", "genre", "grade", "popularity", "skill", "personality", "rider", "bio_key"]
 const GRADE_FIELDS: Array[String] = [
@@ -60,10 +60,10 @@ var _guarantee: Dictionary = {}    # grade id -> int (economy.json guarantee_by_
 
 ## 두 테이블을 읽고 genres.json·economy.json 을 기본 경로에서 읽어(읽기 전용) 검증한다. 실패하면 push_error, null.
 static func load(artists_path: String = DEFAULT_ARTISTS_PATH, rules_path: String = DEFAULT_RULES_PATH) -> ArtistConfig:
-	var a: Variant = read_json(artists_path)
-	var r: Variant = read_json(rules_path)
-	var g: Variant = read_json(GENRES_PATH)
-	var e: Variant = read_json(ECONOMY_PATH)
+	var a: Variant = JsonUtil.read_json(artists_path, LOG_TAG)
+	var r: Variant = JsonUtil.read_json(rules_path, LOG_TAG)
+	var g: Variant = JsonUtil.read_json(GENRES_PATH, LOG_TAG)
+	var e: Variant = JsonUtil.read_json(ECONOMY_PATH, LOG_TAG)
 	if a == null or r == null or g == null or e == null:
 		return null
 	return from_dicts(a, r, g, e)
@@ -77,27 +77,6 @@ static func from_dicts(artists: Dictionary, rules: Dictionary, genres: Dictionar
 		push_error("[ArtistConfig] " + err)
 		return null
 	return cfg
-
-
-## 파일을 읽어 JSON 객체를 돌려준다. 없거나 객체가 아니면 push_error, null.
-static func read_json(path: String) -> Variant:
-	if not FileAccess.file_exists(path):
-		push_error("[ArtistConfig] 파일 없음: %s" % path)
-		return null
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not (parsed is Dictionary):
-		push_error("[ArtistConfig] JSON 객체가 아님: %s" % path)
-		return null
-	return parsed
-
-
-## int, 또는 정수값인 유한 float(|f| < 2^63)만 int 로. 그 밖(bool·문자열·1.5·null)은 null.
-static func as_int(v: Variant) -> Variant:
-	if v is int:
-		return v
-	if v is float and is_finite(v) and v == floorf(v) and absf(v) < INT64_FLOAT_LIMIT:
-		return int(v)
-	return null
 
 
 # --- 읽기 전용 조회 ---------------------------------------------------------------
@@ -193,17 +172,17 @@ func grow(entry: Dictionary, show_grade: String) -> Dictionary:
 ## 성공이면 "", 실패면 오류 문자열(첫 위반).
 func _parse(artists: Dictionary, rules: Dictionary, genres: Dictionary, economy: Dictionary) -> String:
 	# L1 버전·상한·관계도 범위
-	var av: Variant = as_int(artists.get("version"))
-	var rv: Variant = as_int(rules.get("version"))
+	var av: Variant = JsonUtil.as_int(artists.get("version"))
+	var rv: Variant = JsonUtil.as_int(rules.get("version"))
 	if av == null or av != SUPPORTED_VERSION or rv == null or rv != SUPPORTED_VERSION:
 		return "L1 artists.json·artist.json version 은 %d 이어야 한다: %s, %s" % [SUPPORTED_VERSION, artists.get("version"), rules.get("version")]
 	version = rv
-	var sm: Variant = as_int(rules.get("stat_max"))
+	var sm: Variant = JsonUtil.as_int(rules.get("stat_max"))
 	if sm == null or sm != REQUIRED_STAT_MAX:
 		return "L1 stat_max 는 %d 이어야 한다: %s" % [REQUIRED_STAT_MAX, rules.get("stat_max")]
 	stat_max = sm
-	var rmin: Variant = as_int(rules.get("relationship_min"))
-	var rmax: Variant = as_int(rules.get("relationship_max"))
+	var rmin: Variant = JsonUtil.as_int(rules.get("relationship_min"))
+	var rmax: Variant = JsonUtil.as_int(rules.get("relationship_max"))
 	if rmin == null or rmax == null or not (rmin <= NEW_GAME_RELATIONSHIP and NEW_GAME_RELATIONSHIP <= rmax):
 		return "L1 relationship_min ≤ %d ≤ relationship_max 가 아니다: %s, %s" % [NEW_GAME_RELATIONSHIP, rules.get("relationship_min"), rules.get("relationship_max")]
 	relationship_min = rmin
@@ -254,7 +233,7 @@ func _parse(artists: Dictionary, rules: Dictionary, genres: Dictionary, economy:
 		var gid: String = parsed["id"]
 		if _grades.has(gid):
 			return "L4 grades[].id '%s' 가 중복이다" % gid
-		var amount: Variant = as_int((gbg as Dictionary).get(gid))
+		var amount: Variant = JsonUtil.as_int((gbg as Dictionary).get(gid))
 		if amount == null or amount < 0:
 			return "L4 등급 '%s' 가 economy.json guarantee_by_grade 에 0 이상 정수로 없다" % gid
 		_grades[gid] = parsed
@@ -322,7 +301,7 @@ func _parse(artists: Dictionary, rules: Dictionary, genres: Dictionary, economy:
 	for sc: Variant in scs:
 		if not (sc is Dictionary):
 			return "reference_scenarios[] 원소는 객체여야 한다"
-		reference_scenarios.append(_int_deep(sc))
+		reference_scenarios.append(JsonUtil.int_deep(sc))
 	return ""
 
 
@@ -336,8 +315,8 @@ func _parse_grade(raw: Variant) -> Variant:
 	var gid: Variant = raw["id"]
 	if not (gid is String):
 		return "grades[].id 는 문자열이어야 한다"
-	var unlock: Variant = as_int(raw["unlock_reputation"])
-	var sps: Variant = as_int(raw["skill_per_show"])
+	var unlock: Variant = JsonUtil.as_int(raw["unlock_reputation"])
+	var sps: Variant = JsonUtil.as_int(raw["skill_per_show"])
 	if unlock == null or unlock < 0 or sps == null or sps < 0:
 		return "grades '%s': unlock_reputation·skill_per_show 는 0 이상 정수여야 한다" % gid
 	var pt: Variant = raw["promote_to"]
@@ -345,7 +324,7 @@ func _parse_grade(raw: Variant) -> Variant:
 		return "grades '%s': promote_to 는 문자열 또는 null 이어야 한다" % gid
 	var pap: Variant = null
 	if raw["promote_at_popularity"] != null:
-		pap = as_int(raw["promote_at_popularity"])
+		pap = JsonUtil.as_int(raw["promote_at_popularity"])
 		if pap == null or pap < 0 or pap > stat_max:
 			return "grades '%s': promote_at_popularity 는 0~%d 정수 또는 null 이어야 한다" % [gid, stat_max]
 	var deltas_raw: Variant = raw["popularity_delta_by_show_grade"]
@@ -353,7 +332,7 @@ func _parse_grade(raw: Variant) -> Variant:
 		return "grades '%s': popularity_delta_by_show_grade 는 객체여야 한다" % gid
 	var deltas: Dictionary = {}
 	for sg: String in show_grades:
-		var dv: Variant = as_int((deltas_raw as Dictionary).get(sg))
+		var dv: Variant = JsonUtil.as_int((deltas_raw as Dictionary).get(sg))
 		if dv == null:
 			return "grades '%s': popularity_delta_by_show_grade.%s 가 정수가 아니다" % [gid, sg]
 		deltas[sg] = dv
@@ -376,8 +355,8 @@ func _parse_row(raw: Variant) -> Variant:
 	for key: String in ["name", "genre", "grade", "bio_key"]:
 		if not (raw[key] is String):
 			return "'%s' 의 %s 는 문자열이어야 한다" % [id, key]
-	var pop: Variant = as_int(raw["popularity"])
-	var skl: Variant = as_int(raw["skill"])
+	var pop: Variant = JsonUtil.as_int(raw["popularity"])
+	var skl: Variant = JsonUtil.as_int(raw["skill"])
 	if pop == null or pop < 0 or pop > stat_max or skl == null or skl < 0 or skl > stat_max:
 		return "'%s' 의 popularity·skill 은 0~%d 정수여야 한다" % [id, stat_max]
 	if not (raw["personality"] is Array) or not (raw["rider"] is Array):
@@ -399,21 +378,3 @@ static func _unique_strings(v: Variant) -> Variant:
 		out.append(e)
 	return out
 
-
-## 정수값 float → int (재귀). 그 밖의 값은 그대로.
-static func _int_deep(v: Variant) -> Variant:
-	match typeof(v):
-		TYPE_FLOAT:
-			var n: Variant = as_int(v)
-			return n if n != null else v
-		TYPE_ARRAY:
-			var arr: Array = []
-			for e: Variant in v:
-				arr.append(_int_deep(e))
-			return arr
-		TYPE_DICTIONARY:
-			var d: Dictionary = {}
-			for k: Variant in v:
-				d[k] = _int_deep(v[k])
-			return d
-	return v
