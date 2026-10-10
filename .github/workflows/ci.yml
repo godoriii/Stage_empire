@@ -41,16 +41,11 @@ jobs:
           SE_REQUIRE_GODOT: "1"
           GODOT_BIN: godot
         run: tools/run_tests.sh
-      - name: 테스트용 가구 커밋본 = 생성기 재생성 바이트 비교 (SE-051, LFS 필요)
-        # 생성기가 만든 <id>/ 폴더만 비교한다(큐에 다른 에셋이 올라와도 깨지지 않게 — SE-051 리뷰 발견).
+      - name: 테스트용 가구 커밋본 = 생성기 재생성 비교 (.glb·META·lint 바이트, preview.png 픽셀 — SE-051·SE-059, LFS 필요)
         run: |
           set -eu
           python3 -I tools/assets/make_test_furniture.py --out "$RUNNER_TEMP/tf" --lint --preview
-          for d in "$RUNNER_TEMP"/tf/*/; do
-            id="$(basename "$d")"
-            echo "== $id"
-            diff -r "$d" "project/assets/review-queue/$id"
-          done
+          python3 -I tools/assets/compare_test_furniture.py "$RUNNER_TEMP/tf" project/assets/review-queue
 
   screenshots:
     name: Xvfb 스크린샷 재캡처 + 셰이더 컴파일 확인 (SE-020)
