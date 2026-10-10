@@ -4,17 +4,22 @@
 확인: (1) 5종 전부 린터 pass·거부 0·경고 0, (2) 두 번 생성한 결과가 바이트 동일(.glb·META.json·lint.json),
 (3) 서피스(슬롯) 구성이 목표 표와 일치, (4) META 의 category·footprint·height_m·poly_budget 이 furniture.json 행과 일치,
 (5) glb 서피스(머티리얼) 이름 집합 == furniture.json 행 `slots` 키 집합 (SE-051; 키를 바꾼 사본에서는 실패해야 한다),
-(6) preview.png 의 슬롯 색(base·accent·emissive)이 furniture.json `slots` 색과 일치 (SE-051 픽셀 표본).
+(6) preview.png 의 슬롯 색(base·accent·emissive)이 furniture.json `slots` 색과 일치 (SE-051 픽셀 표본),
+(7) 비교 도구 compare_test_furniture.py: 같은 픽셀·다른 압축의 preview.png 는 통과, 픽셀 1개 다르면 실패 (SE-059 AC1),
+(8) furniture.json 행 slots 키 ≠ 서피스이면 KeyError 가 아니라 "slots 키 ≠ 서피스: <행 id>" 오류 (SE-059 AC2).
 표준 라이브러리만, Godot 불필요. 출력은 전부 임시 디렉터리(project/ 를 건드리지 않는다).
 """
 import importlib.util
 import json
+import io
 import math
+import shutil
 import struct
 import sys
 import tempfile
 import unittest
 import zlib
+from contextlib import redirect_stdout
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -31,6 +36,7 @@ def load_module(name, path):
 
 
 gen = load_module("make_test_furniture", HERE / "make_test_furniture.py")
+cmp_tool = load_module("compare_test_furniture", HERE / "compare_test_furniture.py")
 
 # 목표 표(티켓 SE-041 목표 + 대응표): 가구 id → 서피스 슬롯(glb 안의 primitive 순서)
 TARGET = {
@@ -199,6 +205,84 @@ class TestMakeTestFurniture(unittest.TestCase):
                 want = {rgb} if slot == "emissive" else shaded_candidates(rgb)
                 got = sum(counts.get(c, 0) for c in want)
                 self.assertGreaterEqual(got, 20, f"{fid}.{slot} {hexv}: 일치 픽셀 {got}")
+
+    # ------------------------------------------------------------ SE-059 AC1: PNG 픽셀 비교
+
+    def _copy_tree(self, name):
+        dst = Path(self.tmp.name) / name
+        shutil.copytree(self.p, dst)
+        return dst
+
+    @staticmethod
+    def _write_png(path, w, h, pixels, level):
+        """RGB 픽셀 bytes → PNG(필터 0, IDAT 를 두 청크로 쪼갬). 압축 수준만 다르게 다시 쓴다."""
+        rows = b"".join(b"\x00" + pixels[y * w * 3:(y + 1) * w * 3] for y in range(h))
+        z = zlib.compress(rows, level)
+        half = len(z) // 2
+
+        def chunk(tag, data):
+            return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+        Path(path).write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                              + chunk(b"IDAT", z[:half]) + chunk(b"IDAT", z[half:]) + chunk(b"IEND", b""))
+
+    def test_png_compare_passes_for_same_pixels_other_compression(self):
+        q = self._copy_tree("q_recompressed")
+        for fid in TARGET:
+            f = q / fid / "preview.png"
+            w, h, ch, pix = cmp_tool.decode_png(f.read_bytes())
+            self._write_png(f, w, h, pix, 1)
+            self.assertNotEqual(f.read_bytes(), (self.p / fid / "preview.png").read_bytes(), f"{fid}: 사본이 바이트까지 같으면 시험이 아님")
+        self.assertEqual(cmp_tool.compare_dirs(self.p, q), [])
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(cmp_tool.main(["x", str(self.p), str(q)]), 0)
+
+    def test_png_compare_fails_for_one_changed_pixel(self):
+        q = self._copy_tree("q_one_pixel")
+        f = q / "bar_counter" / "preview.png"
+        w, h, ch, pix = cmp_tool.decode_png(f.read_bytes())
+        pix = bytearray(pix)
+        i = (100 * w + 200) * 3  # (x=200, y=100)
+        pix[i] ^= 1
+        self._write_png(f, w, h, bytes(pix), 9)
+        diffs = cmp_tool.compare_dirs(self.p, q)
+        self.assertEqual([d[0] for d in diffs], ["bar_counter/preview.png"])
+        self.assertIn("x=200, y=100", diffs[0][1])
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(cmp_tool.main(["x", str(self.p), str(q)]), 1)
+        self.assertIn("DIFF bar_counter/preview.png", buf.getvalue())
+
+    def test_compare_flags_byte_diff_in_glb_and_missing_file(self):
+        q = self._copy_tree("q_bytes")
+        g = q / "light_spot" / "light_spot.glb"
+        b = bytearray(g.read_bytes())
+        b[-1] ^= 1
+        g.write_bytes(bytes(b))
+        (q / "speaker_floor" / "META.json").unlink()
+        got = dict(cmp_tool.compare_dirs(self.p, q))
+        self.assertIn("바이트 다름", got["light_spot/light_spot.glb"])
+        self.assertIn("없음", got["speaker_floor/META.json"])
+
+    # ------------------------------------------------------------ SE-059 AC2: slots 키 진단
+
+    def _json_with_mutated_row(self, fid, old, new):
+        doc = json.loads(FURNITURE_JSON.read_text(encoding="utf-8"))
+        row = next(r for r in doc["rows"] if r["id"] == fid)
+        row["slots"][new] = row["slots"].pop(old)
+        path = Path(self.tmp.name) / f"furniture_{fid}.json"
+        path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+        return path
+
+    def test_preview_slot_key_mismatch_reports_row_id_not_keyerror(self):
+        alt = self._json_with_mutated_row("speaker_floor", "emissive", "glass")
+        with self.assertRaises(gen.SlotKeyMismatch) as cm:  # KeyError 가 아니다
+            gen.preview_colors("speaker_floor", alt)
+        self.assertIn("slots 키 ≠ 서피스: speaker_floor", str(cm.exception))
+        # generate() 도 같은 오류로 멈춘다(첫 행 stage_medium 에서 렌더 전에 멈춰 빠르다).
+        alt2 = self._json_with_mutated_row("stage_medium", "accent", "glass")
+        with self.assertRaisesRegex(gen.SlotKeyMismatch, "slots 키 ≠ 서피스: stage_medium"):
+            gen.generate(Path(self.tmp.name) / "mismatch", preview=True, furniture_json=alt2)
 
 
 if __name__ == "__main__":
