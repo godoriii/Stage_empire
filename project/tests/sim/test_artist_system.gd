@@ -661,6 +661,7 @@ func _bad_snapshots(good: Dictionary) -> Array:
 	s = good.duplicate(true); s["roster"][0]["discovered_here"] = 1; out.append(["discovered_here 1", s, "RA3"])
 	s = good.duplicate(true); s.erase("phase"); out.append(["phase 누락", s, "RA1"])
 	s = good.duplicate(true); s["booked_day"] = 1.5; out.append(["booked_day 1.5", s, "RA1"])
+	s = good.duplicate(true); s["booked_day"] = 1e19; out.append(["booked_day 1e19(JsonUtil.as_int 2^63 가드)", s, "RA1"])
 	s = good.duplicate(true); s["phase"] = "night"; out.append(["phase night", s, "RA2"])
 	s = good.duplicate(true); s["reputation_total"] = -1; out.append(["reputation_total -1", s, "RA2"])
 	s = good.duplicate(true); s["roster"][0]["relationship"] = _acfg.relationship_max + 1; out.append(["relationship 범위 밖", s, "RA4"])
@@ -705,6 +706,42 @@ func test_snapshot_restore_rejects() -> void:
 		errs += 2
 		assert_push_error_count(errs, "TickLoop %s: push_error 2회" % b[0])
 		assert_eq(JSON.stringify(loop.snapshot(), "", true), lhash, "TickLoop %s: 상태 불변" % b[0])
+
+
+## SE-046 AC2 (docs/reviews/SE-033.md 발견 5): roster 원소의 키 순서가 새 게임·성장 직후·복원 뒤 모두 ENTRY_FIELDS 순.
+## 복원 입력은 원소 키를 거꾸로 넣은 사본이라 입력 순서와 무관하게 정렬되는지도 본다.
+func _assert_roster_keys(artist: ArtistSystem, label: String) -> void:
+	var r: Array = artist.roster()
+	assert_eq(r.size(), _acfg.artist_ids().size(), label + ": roster 크기")
+	for e: Dictionary in r:
+		assert_eq(e.keys(), Array(ArtistSystem.ENTRY_FIELDS), "%s: '%s' 키 순서 = ENTRY_FIELDS" % [label, e["id"]])
+
+
+func test_roster_key_order_stable() -> void:
+	var u: Array = _unit()
+	var bus: EventBus = u[0]
+	var artist: ArtistSystem = u[1]
+	var rec: EventRecorder = u[3]
+	_assert_roster_keys(artist, "새 게임")
+	var id: String = _id_of("local")
+	assert_eq(_play_day(bus, artist, id, _acfg.show_grades.back()), "booked")
+	assert_eq(rec.count("artist.grown"), 1, "성장 1회")
+	_assert_roster_keys(artist, "성장 직후")
+	var snap: Dictionary = _rt(artist.snapshot())
+	var reordered: Array = []
+	for e: Dictionary in snap["roster"]:
+		var keys: Array = e.keys()
+		keys.reverse()
+		var r: Dictionary = {}
+		for k: Variant in keys:
+			r[k] = e[k]
+		reordered.append(r)
+	snap["roster"] = reordered
+	var v: Array = _unit()
+	var restored: ArtistSystem = v[1]
+	assert_true(restored.restore(snap), "키 순서를 뒤집은 스냅샷 restore true")
+	_assert_roster_keys(restored, "복원 뒤")
+	assert_eq(JSON.stringify(restored.snapshot()), JSON.stringify(artist.snapshot()), "정렬 없는 직렬화도 바이트 동일")
 
 
 # --- 입력 페이로드 방어 -----------------------------------------------------------

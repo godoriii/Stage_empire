@@ -205,7 +205,7 @@ func _on_charge_resolved(p: Dictionary) -> void:
 			push_error("[ArtistSystem] H3: economy 가 개런티 %s 를 invalid 로 거절했다(설정 오류)" % pend["request_id"])
 		_reject(pend["artist_id"], DECLINE_TO_REASON.get(decline, R_NOT_ALLOWED))
 		return
-	var amount: Variant = ArtistConfig.as_int(p.get("amount"))                                 # H2 (상태 먼저)
+	var amount: Variant = JsonUtil.as_int(p.get("amount"))                                     # H2 (상태 먼저)
 	var paid: int = amount if amount != null else int(pend["amount"])
 	var id: String = pend["artist_id"]
 	lineup_today = id
@@ -326,7 +326,7 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 		return "RA1 lineup_today 가 문자열 또는 null 이 아니다: %s" % [lu]
 	var ints: Dictionary = {}
 	for key: String in ["booked_day", "last_grown_day", "reputation_total", "day"]:
-		var v: Variant = ArtistConfig.as_int(d[key])
+		var v: Variant = JsonUtil.as_int(d[key])
 		if v == null:
 			return "RA1 %s 가 정수가 아니다: %s" % [key, d[key]]
 		ints[key] = v
@@ -382,12 +382,15 @@ func _parse_entry(e: Variant) -> Variant:
 	var grade: Variant = e["grade"]
 	if not (id is String) or not (grade is String) or not (e["discovered_here"] is bool):
 		return "RA3 roster 원소 타입 오류(id·grade 문자열, discovered_here bool): %s" % [e]
-	var out: Dictionary = {"id": id, "grade": grade, "discovered_here": e["discovered_here"]}
+	var ints: Dictionary = {}
 	for key: String in ENTRY_INT_FIELDS:
-		var v: Variant = ArtistConfig.as_int(e[key])
+		var v: Variant = JsonUtil.as_int(e[key])
 		if v == null:
 			return "RA3 '%s' 의 %s 가 정수가 아니다: %s" % [id, key, e[key]]
-		out[key] = v
+		ints[key] = v
+	var out: Dictionary = {}                                                                   # 키 순서 = ENTRY_FIELDS(새 게임·성장과 같게)
+	for key: String in ENTRY_FIELDS:
+		out[key] = ints[key] if ints.has(key) else e[key]
 	if not _index.has(id):
 		return "RA3 모르는 아티스트 id '%s'" % id
 	if not config.grade_ids().has(grade):                                                     # RA4
