@@ -1,5 +1,5 @@
 extends GutTest
-## SE-039 AC4: 마감 리포트 = show.md R1~R13 합성. 순서 = UiParams.report_rows(2차 확정 전 초안).
+## SE-039 AC4: 마감 리포트 = show.md R1~R13 합성. 순서 = UiParams.report_rows(show.md "마감 리포트 필드" 확정 순서).
 
 const SCENE: String = "res://ui/panels/day_report.tscn"
 const R_ALL: PackedStringArray = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11", "R12", "R13"]
@@ -191,3 +191,80 @@ func _screen_texts(n: Node, out: PackedStringArray) -> void:
 		out.append((n as Button).text)
 	for c: Node in n.get_children():
 		_screen_texts(c, out)
+
+
+# --- SE-053 (SE-039 반려 해제) ------------------------------------------------
+
+## AC1: 파산 → session.loaded(새 세계 1일차 낮) → close: "다음 날" 활성·1건, R13 none(소프트락 회귀).
+func test_se053_ac1_bankrupt_then_loaded_unblocks_next_day() -> void:
+	_publish_show_day()
+	bus.publish("economy.bankrupt", {"day": 3, "cash": -1, "bailouts_used": 2})
+	assert_true(report.get_next_button().disabled, "전제: 파산 중 비활성")
+	bus.publish("session.loaded", {"day": 1, "phase": UiTestUtil.phase_ids()[0], "speed": 1, "show_active": false})
+	UiTestUtil.enter_phase(bus, UiTestUtil.close_phase(), 1)
+	assert_false(report.get_next_button().disabled, "새 세계 첫 마감: 다음 날 활성")
+	report.get_next_button().pressed.emit()
+	assert_eq(UiTestUtil.commands(bus, "time.next_day_requested"), [{}], "다음 날 1건")
+	assert_true(report.get_row_text("R13").begins_with("ui.report.r13_none"), "R13 = none: %s" % report.get_row_text("R13"))
+
+
+## 같은 세계의 day_started 에서는 파산 기록이 유지된다(규칙 범위 확인).
+func test_se053_bankrupt_kept_within_same_world() -> void:
+	_publish_show_day()
+	bus.publish("economy.bankrupt", {"day": 3, "cash": -1, "bailouts_used": 2})
+	bus.publish("time.day_started", {"day": 4})
+	UiTestUtil.enter_phase(bus, UiTestUtil.close_phase(), 4)
+	assert_true(report.get_next_button().disabled, "같은 세계: 파산 유지")
+
+
+## AC2: reputation 소스 없이 tier_unlocked → session.loaded → R12 는 현재(데이터 시작) 티어 기준.
+func test_se053_ac2_r12_resets_to_current_tier_on_load() -> void:
+	var next: Dictionary = data.next_tier_row(data.current_tier)
+	bus.publish("reputation.tier_unlocked", {"tier": int(next["tier"]), "day": 25})
+	bus.publish("session.loaded", {"day": 1, "phase": UiTestUtil.phase_ids()[0], "speed": 1, "show_active": false})
+	bus.publish("economy.day_settled", {"day": 1, "net": 0, "cash": 100, "revenue": 0})
+	UiTestUtil.enter_phase(bus, UiTestUtil.close_phase(), 1)
+	var txt: String = report.get_row_text("R12")
+	assert_false(txt.begins_with("ui.report.r12_unlocked"), "지난 세계 해금 문구 없음: %s" % txt)
+	assert_true(txt.contains(str(int(next["unlock_reputation"]))) and txt.contains(str(int(next["unlock_cash"]))),
+		"다음 티어 = 현재 티어 + 1 조건: %s" % txt)
+
+
+## AC3: 공연 중 불러오기(show_active) → show.ended → close: 키 누출 0, R2 는 artist(id) 로 채움.
+func test_se053_ac3_loaded_in_show_fills_r2_without_keys() -> void:
+	report.setup(bus, data, UiText.load_default(), UiParams.load_default())
+	report.set_artist_config(catalog)
+	var id: String = catalog.artist_ids()[0]
+	var row: Dictionary = catalog.artist(id)
+	bus.publish("session.loaded", {"day": 5, "phase": "show", "speed": 1, "show_active": true})
+	bus.publish("show.ended", {"day": 5, "artist_id": id, "satisfaction_bp": 6100, "grade": "good", "admissions": 50,
+		"audience": 50, "revenue_hint": 0, "incidents": []})
+	UiTestUtil.enter_phase(bus, UiTestUtil.close_phase(), 5)
+	_assert_no_keys(report)
+	assert_true(report.is_row_visible("R2"), "artist(id) 로 채움")
+	var r2: String = report.get_row_text("R2")
+	assert_true(r2.contains(str(row["name"])) and r2.contains(data.genre_name(str(row["genre"]))), "이름·장르: %s" % r2)
+
+
+## AC3 보조: 읽기 멤버가 없으면(채울 수 없으면) R2 숨김.
+func test_se053_ac3_r2_hidden_without_artist_source() -> void:
+	report.setup(bus, data, UiText.load_default(), UiParams.load_default())
+	report.set_artist_config(null)
+	bus.publish("session.loaded", {"day": 5, "phase": "show", "speed": 1, "show_active": true})
+	bus.publish("show.ended", {"day": 5, "artist_id": catalog.artist_ids()[0], "satisfaction_bp": 6100, "grade": "good",
+		"admissions": 50, "audience": 50, "revenue_hint": 0, "incidents": []})
+	UiTestUtil.enter_phase(bus, UiTestUtil.close_phase(), 5)
+	assert_false(report.is_row_visible("R2"), "채울 수 없으면 숨김")
+	_assert_no_keys(report)
+
+
+func _assert_no_keys(n: Node) -> void:
+	var re: RegEx = RegEx.create_from_string("(^|\\s)ui\\.[a-z0-9_]+\\.")
+	var texts: PackedStringArray = PackedStringArray()
+	_screen_texts(n, texts)
+	assert_gt(texts.size(), 5, "보이는 텍스트 수집")
+	var bad: PackedStringArray = PackedStringArray()
+	for t: String in texts:
+		if re.search(t) != null:
+			bad.append(t)
+	assert_eq(bad.size(), 0, "키 폴백 노출 0: %s" % " | ".join(bad))

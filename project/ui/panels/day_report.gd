@@ -1,7 +1,7 @@
 class_name DayReport
 extends UiPanel
 ## SE-039 AC4: 마감 리포트(PRD "세션 구조" 마감 = 리포트 화면). 필드는 show.md "마감 리포트 필드" R1~R13 이 전부.
-## 리포트는 close 진입 틱까지 받은 이벤트만 합성한다(sim 상태를 읽지 않는다). 행 순서 = UiParams.report_rows(2차 확정 전 초안).
+## 리포트는 close 진입 틱까지 받은 이벤트만 합성한다(sim 상태를 읽지 않는다). 행 순서 = UiParams.report_rows(show.md "마감 리포트 필드" 표시 순서, SE-039 2차 확정).
 ## 구독: economy.day_settled(R1·R6~R8), artist.lineup_set·show.skipped(R2), show.ended(R3·R4), audience.day_summary(R4·R5),
 ##   reputation.changed(R9·R10), artist.grown(R11), reputation.tier_unlocked + tiers.json(R12), economy.bailout_offered·
 ##   economy.bankrupt(R13), time.phase_changed(close 에서만 보임), time.day_started(그날 값 초기화), session.loaded.
@@ -19,8 +19,8 @@ const ROW_NAME_PATTERN: String = "Row_%s"
 const META_ROW: StringName = &"report_row"
 ## 공연이 없는 날 숨기는 행(show.md R 표 "공연 없는 날" 열).
 const HIDDEN_WITHOUT_SHOW: PackedStringArray = ["R3", "R5", "R11"]
-## 라인업 정보(artist.lineup_set·show.ended·show.skipped)가 하나도 없으면 숨기는 행. 불러오기 직후 close 는
-## 그날 이벤트가 재발행되지 않는다(SE-049) — 빈 값으로 채우면 등급 키가 샌다(SE-039-bug).
+## 라인업을 채울 수 없으면 숨기는 행(has_lineup_info). 불러오기 뒤에는 그날 lineup_set 이 재발행되지 않는다(SE-049) —
+## 빈 값으로 채우면 등급 키가 샌다(SE-039-bug, SE-053 AC3).
 const HIDDEN_WITHOUT_LINEUP: PackedStringArray = ["R2"]
 const LIST_SEP: String = " · "
 ## show.md R3·R5: bp ÷ 100 = %.
@@ -129,9 +129,28 @@ func has_show() -> bool:
 	return _st(S_ENDED).size() > 0
 
 
-## 그날 라인업을 알 수 있는가(라인업 이벤트·공연 끝·공연 건너뜀 중 하나라도 받았다).
+## R2 를 보일 수 있는가: 공연 건너뜀 사유가 있거나, 아티스트·장르·등급을 채울 수 있다.
 func has_lineup_info() -> bool:
-	return has_show() or not _st(S_LINEUP).is_empty() or not _st(S_SKIPPED).is_empty()
+	return (not _st(S_SKIPPED).is_empty() and not has_show()) or not _r2_fields().is_empty()
+
+
+## R2 의 {artist_id, genre, grade}. 출처 순서: artist.lineup_set → (불러오기 뒤 lineup_set 이 재발행되지 않으면)
+## show.ended.artist_id + 읽기 멤버 artist(id)(등급은 artist.grown.grade 가 있으면 그것). 채울 수 없으면 {}.
+func _r2_fields() -> Dictionary:
+	var lineup: Dictionary = _st(S_LINEUP)
+	if lineup.get("artist_id") != null and not str(lineup.get("grade", "")).is_empty():
+		return {"artist_id": str(lineup["artist_id"]), "genre": str(lineup.get("genre", "")), "grade": str(lineup["grade"])}
+	var aid: String = str(_st(S_ENDED).get("artist_id", ""))
+	if aid.is_empty() or _artist_config == null:
+		return {}
+	var row: Dictionary = _artist_config.call("artist", aid) as Dictionary
+	if row.is_empty():
+		return {}
+	var grown: Dictionary = _st(S_GROWN)
+	var grade: String = str(grown.get("grade", row.get("grade", ""))) if str(grown.get("artist_id", "")) == aid else str(row.get("grade", ""))
+	if grade.is_empty():
+		return {}
+	return {"artist_id": aid, "genre": str(row.get("genre", "")), "grade": grade}
 
 
 func _st(key: String) -> Dictionary:
@@ -171,6 +190,7 @@ func on_phase_changed(p: Dictionary) -> void:
 	_refresh()
 
 
+## 같은 세계 안의 새 날: 그날 값만 비운다. 파산 기록은 유지(같은 세계에서는 파산 뒤 진행 없음).
 func on_day_started(_p: Dictionary) -> void:
 	var bankrupt: Dictionary = _st(S_BANKRUPT)
 	_state.clear()
@@ -180,8 +200,13 @@ func on_day_started(_p: Dictionary) -> void:
 	_refresh()
 
 
+## 새 게임·불러오기 = 다른 세계(events.md SN6): 그날 상태를 전부 비운다(파산 기록·해금 티어·장르 명성 포함).
+## 해금 티어는 데이터 시작 티어로 돌리고, reputation 읽기 멤버가 있으면 UiRoot 가 뒤이어 set_unlocked_tier 로 채운다.
 func on_session_loaded(p: Dictionary) -> void:
-	on_day_started(p)
+	_state.clear()
+	_unlocked_tier = 0
+	_tier = _data.current_tier if _data != null else 0
+	_by_genre.clear()
 	_loaded_day = int(p.get("day", 0))
 	_phase = str(p.get("phase", _phase))
 	_refresh()
@@ -218,10 +243,12 @@ func row_text(id: String) -> String:
 		"R2":
 			if not has_show() and not skipped.is_empty():
 				return t("ui.report.r2_none", {"reason": t("ui.report.skip.%s" % str(skipped.get("reason", "")))})
-			var aid: String = str(ended.get("artist_id", lineup.get("artist_id", "")))
+			var f: Dictionary = _r2_fields()
+			if f.is_empty():
+				return ""
 			return t("ui.report.r2", {
-				"artist": _artist_name(aid), "genre": _data.genre_name(str(lineup.get("genre", ""))),
-				"grade": t("ui.artist.grade.%s" % str(lineup.get("grade", ""))),
+				"artist": _artist_name(str(f["artist_id"])), "genre": _data.genre_name(str(f["genre"])),
+				"grade": t("ui.artist.grade.%s" % str(f["grade"])),
 			})
 		"R3":
 			return t("ui.report.r3", {"grade": _data.grade_name(str(ended.get("grade", ""))),

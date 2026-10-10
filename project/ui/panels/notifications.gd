@@ -3,7 +3,7 @@ extends UiPanel
 ## SE-039: 우측 알림 피드(PRD "UI 구성" 우측) + 티어 해금 토스트(R12, "계속 플레이").
 ## 구독(거절·실패 → 피드 1줄, 문구 = ui.notify.<출처> + ui.reason.<출처>.<reason>):
 ##   build.rejected, artist.booking_rejected, economy.ticket_price_rejected, time.speed_rejected, session.load_failed,
-##   session.saved(확인 1줄), reputation.tier_unlocked(토스트 1건).
+##   session.saved(확인 1줄), reputation.tier_unlocked(토스트 1건), session.loaded(토스트 닫힘 — 다른 세계).
 ## 최대 줄 수·표시 시간은 UiParams. 발행 없음.
 
 const FEED_PATH: NodePath = ^"Feed"
@@ -29,6 +29,7 @@ func _event_handlers() -> Dictionary:
 		h[ev] = _on_rejected.bind(str(SOURCES[ev]))
 	h["session.saved"] = on_saved
 	h["reputation.tier_unlocked"] = on_tier_unlocked
+	h["session.loaded"] = func(_p: Dictionary) -> void: hide_toast()
 	return h
 
 

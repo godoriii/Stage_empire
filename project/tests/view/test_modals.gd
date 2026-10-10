@@ -67,3 +67,17 @@ func test_tier_unlocked_shows_one_toast_with_continue() -> void:
 	assert_eq(root.notifications.get_entries().size(), 0, "피드에는 넣지 않는다(토스트 1건만)")
 	root.notifications.get_continue_button().pressed.emit()
 	assert_false(root.notifications.is_toast_visible(), "계속 플레이 → 닫힘")
+
+
+## SE-053 AC4: 파산 → 새 게임(session.loaded) 뒤 리포트에 파산 기록 0, 첫 마감 "다음 날" 활성. 해금 토스트도 닫힘.
+func test_se053_ac4_new_game_clears_bankrupt_in_report() -> void:
+	bus.publish("reputation.tier_unlocked", {"tier": 2, "day": 13})
+	bus.publish("economy.bankrupt", {"day": 14, "cash": -1555, "bailouts_used": 2})
+	root.game_over.get_new_game_button().pressed.emit()
+	bus.publish("session.loaded", {"day": 1, "phase": UiTestUtil.phase_ids()[0], "speed": 1, "show_active": false})
+	assert_false(root.notifications.is_toast_visible(), "새 게임 → 해금 토스트 닫힘")
+	UiTestUtil.enter_phase(bus, UiTestUtil.close_phase(), 1)
+	assert_true(root.day_report.visible)
+	assert_false(root.day_report.get_next_button().disabled, "다음 날 활성")
+	assert_false(root.day_report.get_row_text("R13").begins_with("ui.report.r13_bankrupt"), "파산 기록 0")
+	assert_false(root.game_over.visible)

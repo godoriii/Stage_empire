@@ -17,8 +17,6 @@ const ROWS_PATH: NodePath = ^"Panel/VBox/Scroll/Rows"
 const TITLE_PATH: NodePath = ^"Panel/VBox/Title"
 const CLOSE_PATH: NodePath = ^"Panel/VBox/Close"
 const ROW_NAME_PATTERN: String = "Row_%s"
-## 행 안 칸 간격(px, 표시 상수).
-const ROW_SEPARATION: int = 14
 const META_ARTIST_ID: StringName = &"artist_id"
 ## 사유 id(events.md artist.booking_rejected reason, check_book 반환값과 같은 5종 중 패널이 쓰는 것).
 const R_NONE: String = ""
@@ -209,7 +207,7 @@ func _make_row(id: String) -> Control:
 	box.set_meta(META_ARTIST_ID, id)
 	var line: HBoxContainer = HBoxContainer.new()
 	line.name = "Line"
-	line.add_theme_constant_override("separation", ROW_SEPARATION)
+	line.add_theme_constant_override("separation", _params.artist_row_separation)
 	box.add_child(line)
 	for n: String in ["Name", "Genre", "Grade", "Stats", "Guarantee", "Status"]:
 		var l: Label = Label.new()
