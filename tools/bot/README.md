@@ -36,7 +36,7 @@ tools/bot/mutate_and_test.sh <patch.diff> [tests_subdir=tests/sim] [--keep]
 | 2 | 사용법 오류: 인자 없음, 알 수 없는 옵션, 인자 초과(패치·`tests_subdir` 뒤의 위치 인자), `tests_subdir` 가 절대 경로이거나 `..` 포함, 패치/테스트 디렉터리 없음, 사본 상위 디렉터리(`SE_MUTATE_DIR`/`TMPDIR`)가 리포지토리 안이거나 `/` 이거나, 경로에 `..` 성분이 있거나, `cd` 로 이동할 수 없음 |
 | 3 | 패치 적용 불가 (`patch -p1 --dry-run` 실패, 출력 포함). GUT 는 실행하지 않는다 |
 | 4 | Godot 바이너리 없음 |
-| 5 | 내부 오류 (사본·`docs/` 복사 실패, GUT 애드온 없음, `mkdir`/`mktemp` 실패) |
+| 5 | 내부 오류 (리포지토리 루트 계산 실패, 사본·`docs/` 복사 실패, GUT 애드온 없음, `mkdir`/`mktemp` 실패) |
 
 ### 패치 규칙
 
@@ -61,6 +61,17 @@ tools/bot/mutate_and_test.sh tools/bot/mutations/se015_range_check_6_off.diff
 : > /tmp/empty.diff && tools/bot/mutate_and_test.sh /tmp/empty.diff                 # exit 0 (기준선)
 tools/bot/mutate_and_test.sh /tmp/empty.diff tests/view                             # view 85+ 사본 실행
 ```
+
+### SE-030 데이터 변이 (`se030_*.py`)
+
+show·reputation·genres JSON 을 한 군데씩 틀리게 한 변이 21건(m01~m21)으로 "데이터 검증과 테스트가 잡는가"를 본다.
+패치(`se030_mNN_*.diff`)는 생성기가 실행마다 다시 쓰는 산출물이고 데이터가 바뀌면 낡으므로 **저장소에 두지 않는다**(SE-048). 재생성:
+
+```bash
+python3 -I tools/bot/se030_json_mutants.py [--write-only] [--out DIR]   # 패치를 리포 밖 DIR(기본: 새 임시 디렉터리, 경로 출력)에 쓰고 validate --strict 검출 표를 낸다. DIR 이 리포 안이면 exit 2
+```
+
+그다음 `tools/bot/mutate_and_test.sh <DIR>/se030_m18_good_base_23.diff tests/sim` 처럼 GUT 열을 돌린다. 나머지 둘: `se030_formula_mutants.py`(공식 변이 14건, 읽기 전용 표 출력), `se030_hand_calc.py`(독립 손계산 `HAND OK`).
 
 ### 주의
 

@@ -58,6 +58,22 @@ func before_all() -> void:
 	_rate = int(_eco.get("rate_scale", 0))
 
 
+func _sorted_keys(d: Dictionary) -> Array:
+	var ks: Array = d.keys()
+	ks.sort()
+	return ks
+
+
+## JSON 숫자는 float 로 파싱된다. 소수부가 없는 수만 정수로 본다.
+func _is_int(v: Variant) -> bool:
+	return (v is int) or (v is float and is_equal_approx(float(v), roundf(float(v))))
+
+
+## 문서 표의 "1,234" 같은 숫자 문자열을 int 로.
+func _num(txt: String) -> int:
+	return int(txt.replace(",", ""))
+
+
 ## JSON 숫자는 float 로 파싱되므로 비교 전에 재귀적으로 int 로 접는다.
 func _ints(v: Variant) -> Variant:
 	if v is float:
@@ -205,6 +221,23 @@ func _rookie_unlock() -> int:
 	return -1
 
 
+## 입장 계수(bp): _factor 와 별도로 쓰는 인라인 식. 독립 재계산용.
+func _factor_inline(adm: int) -> int:
+	var f: Dictionary = _rep["admission_factor"]
+	var raw: int = adm * _rate / int(f["admissions_ref"])
+	return mini(maxi(raw, int(f["min_bp"])), int(f["max_bp"]))
+
+
+## 보정 없는 하루 Δ(양수 등급): ⌊base × 계수 ÷ rate⌋.
+func _plain_delta(grade: String, adm: int) -> int:
+	return int(_rep["base_by_grade"][grade]) * _factor_inline(adm) / _rate
+
+
+## 정체성 보정이 붙은 하루 Δ: ⌊⌊base × 계수 ÷ rate⌋ × (rate + 보너스) ÷ rate⌋ (이중 내림, RG5).
+func _identity_delta(grade: String, adm: int) -> int:
+	return _plain_delta(grade, adm) * (_rate + int(_rep["focus"]["identity_bonus_bp"])) / _rate
+
+
 # =====================================================================================================
 # AC4 / SH10 / SH11: show.json 필드 · 등급 임계
 # =====================================================================================================
@@ -296,8 +329,8 @@ func test_show_reference_scenarios_recomputed() -> void:
 	assert_eq(seen, ["no_lineup", "local_top_baseline", "rookie_baseline", "local_top_price30", "no_stage"])
 
 
-func test_show_numeric_targets_st1_st4() -> void:
-	# ST1~ST4 수치 목표. 경계에서 200 bp 이상 떨어짐은 입장 수 기준 시나리오에 대해서만(만석은 test_full_house_margin).
+func test_show_numeric_targets_sg1_sg4() -> void:
+	# SG1~SG4 수치 목표(show.md; 규칙 ST0~ST3 과 구분). 경계에서 200 bp 이상 떨어짐은 입장 수 기준 시나리오에 대해서만(만석은 test_full_house_margin).
 	var aud_by: Dictionary = {}
 	for a: Dictionary in _aud["reference_scenarios"]:
 		aud_by[a["id"]] = a
@@ -310,11 +343,11 @@ func test_show_numeric_targets_st1_st4() -> void:
 			# 범위 전체가 경계의 같은 쪽에 있고 거리 ≥ 200
 			assert_false(int(r[0]) < m and int(r[1]) >= m, "%s 범위가 경계 %d 를 가로지름" % [id, m])
 			var dist: int = mini(absi(int(r[0]) - m), absi(int(r[1]) - m))
-			assert_true(dist >= 200 or m == 0, "%s ↔ 경계 %d 거리 %d ≥ 200 (ST3)" % [id, m, dist])
+			assert_true(dist >= 200 or m == 0, "%s ↔ 경계 %d 거리 %d ≥ 200 (SG3)" % [id, m, dist])
 	assert_eq(_grade_of(6732), "good")
-	assert_eq(_grade_of(5730), "ok", "ST2: 가격 30 은 한 단계 아래")
+	assert_eq(_grade_of(5730), "ok", "SG2: 가격 30 은 한 단계 아래")
 	var no_lineup: int = int(aud_by["no_lineup"]["expected"]["avg_satisfaction_bp_hand"])
-	assert_eq(_grade_of(no_lineup), "poor", "ST4: 단골만 온 날 수준은 poor 구간")
+	assert_eq(_grade_of(no_lineup), "poor", "SG4: 단골만 온 날 수준은 poor 구간")
 
 
 # =====================================================================================================
@@ -328,12 +361,24 @@ func test_reputation_json_fields() -> void:
 	assert_eq(int(_rep["version"]), 1)
 	assert_eq((_rep["base_by_grade"] as Dictionary).keys().size(), 5)
 	assert_eq(_rep["base_by_grade"].keys(), _art["show_grades"], "RL2: base_by_grade 키·순서 = show_grades")
-	assert_eq(_ints(_rep["admission_factor"]), {"admissions_ref": 100, "min_bp": 5000, "max_bp": 10000})
-	assert_eq(_ints(_rep["focus"]), {
-		"min_genre_sum": 50, "identity_share_bp": 7000, "identity_bonus_bp": 2000,
-		"breadth_min_share_bp": 1500, "breadth_bonus_bp": 2000,
-	})
-	assert_eq(_ints(_rep["tier_unlock"]), {"max_tier": 2})
+	# 값은 고정하지 않는다(reputation.md Q3~Q5·Q9 는 "데이터만" 바꾸는 항목). 키 집합·정수 타입·범위만 본다.
+	# 값 일치는 test_reference_scenarios_match_formula(reference_scenarios.expected 재계산)가 맡는다.
+	var af: Dictionary = _rep["admission_factor"]
+	assert_eq(_sorted_keys(af), ["admissions_ref", "max_bp", "min_bp"])
+	for k: String in af:
+		assert_true(_is_int(af[k]), "admission_factor.%s 정수" % k)
+	assert_true(int(af["admissions_ref"]) >= 1, "admissions_ref ≥ 1 (0 으로 나누지 않는다)")
+	assert_true(int(af["min_bp"]) >= 1 and int(af["min_bp"]) <= int(af["max_bp"]), "0 < min_bp ≤ max_bp")
+	var fo: Dictionary = _rep["focus"]
+	assert_eq(_sorted_keys(fo), ["breadth_bonus_bp", "breadth_min_share_bp", "identity_bonus_bp", "identity_share_bp", "min_genre_sum"])
+	for k: String in fo:
+		assert_true(_is_int(fo[k]) and int(fo[k]) >= 0, "focus.%s 0 이상 정수" % k)
+	assert_true(int(fo["min_genre_sum"]) >= 1, "min_genre_sum ≥ 1 (FC1 나눗셈 보호)")
+	for k: String in ["identity_share_bp", "breadth_min_share_bp"]:
+		assert_true(int(fo[k]) <= _rate, "focus.%s ≤ rate_scale" % k)
+	var tu: Dictionary = _rep["tier_unlock"]
+	assert_eq(_sorted_keys(tu), ["max_tier"])
+	assert_true(_is_int(tu["max_tier"]) and int(tu["max_tier"]) >= 2 and int(tu["max_tier"]) <= 6, "RL7: 2 ≤ max_tier ≤ 6")
 	assert_eq(_rep["checks"]["main_scenario"], "local_daily_good_30")
 	var ids: Array = []
 	for sc: Dictionary in _rep["reference_scenarios"]:
@@ -349,7 +394,7 @@ func test_reputation_json_fields() -> void:
 
 func test_base_by_grade_ac3() -> void:
 	var b: Dictionary = _ints(_rep["base_by_grade"])
-	assert_eq(b, {"disaster": -30, "poor": -10, "ok": 12, "good": 22, "rave": 32})
+	assert_eq(_sorted_keys(b), ["disaster", "good", "ok", "poor", "rave"], "5 등급 키 (값은 Q3: 데이터만)")
 	var seq: Array = []
 	for gid: String in _art["show_grades"]:
 		seq.append(int(b[gid]))
@@ -406,9 +451,14 @@ func test_floor_zero_total_and_by_genre_separately() -> void:
 		],
 	}
 	var m: Dictionary = _run(mix)
-	assert_eq(m["total"], [18, 36, 54, 30])
+	# 기대값은 데이터(base_by_grade, admission_factor)에서 닫힌 식으로 다시 계산한다(리터럴 18/54/30 없음).
+	var good_d: int = _plain_delta("good", 83)
+	var bad_d: int = -((-int(_rep["base_by_grade"]["disaster"])) * _factor_inline(83) / _rate)
+	assert_true(2 * good_d < int(_rep["focus"]["min_genre_sum"]), "전제: 3일째까지 FC1 미충족(보정 없음)이라 닫힌 식이 성립")
+	assert_eq(m["total"], [good_d, 2 * good_d, 3 * good_d, maxi(0, 3 * good_d + bad_d)])
 	assert_eq(int(m["by_genre_final"]["rock"]), 0)
-	assert_eq(int(m["by_genre_final"]["indie"]), 54)
+	assert_eq(int(m["by_genre_final"]["indie"]), 3 * good_d)
+	assert_true(3 * good_d + bad_d > 0, "분리 검증 전제: total 은 하한에 막히지 않는다")
 
 
 func test_no_duplicated_unlock_thresholds_ar14() -> void:
@@ -465,37 +515,65 @@ func test_reference_scenarios_match_formula() -> void:
 
 
 func test_appendix_a_hand_calc_literals() -> void:
-	# 부록 A. 독립 손계산 리터럴 (indie 매일, 83명, 평균 만족 6,732).
+	# 부록 A. 독립 재계산 (indie 매일). 입력(입장·평균 만족)은 시나리오에서, 수치는 데이터에서 읽고
+	# 닫힌 식으로 기대값을 만든다: total(d) = d·p (d ≤ k), k·p + (d−k)·q (d > k).
+	# p = 보정 없는 Δ, q = 정체성 Δ, k = 처음으로 장르 합 S = k·p 가 min_genre_sum 에 닿는 날 수(보정은 k+1 일부터).
+	# 리터럴 숫자 기대값(18/21/516 ...)은 손계산 스크립트 tools/bot/se030_hand_calc.py 가 맡는다.
 	var sc: Dictionary = _scenario("local_daily_good_30")
 	assert_false(sc.is_empty())
-	assert_eq(_grade_of(6732), "good")
-	assert_eq(_factor(83), 8300)
-	assert_eq(int(_rep["base_by_grade"]["good"]) * 8300 / _rate, 18, "⌊22 × 0.83⌋ = 18")
-	assert_eq(18 * (_rate + int(_rep["focus"]["identity_bonus_bp"])) / _rate, 21, "⌊18 × 1.2⌋ = 21")
+	var inp: Dictionary = sc["show_cycle"][0]
+	var adm: int = int(inp["admissions"])
+	var grade: String = _grade_of(int(inp["satisfaction_bp"]))
+	assert_eq(grade, "good", "이 시나리오는 호평 입력")
+	var p: int = _plain_delta(grade, adm)
+	var q: int = _identity_delta(grade, adm)
+	assert_true(p >= 1, "RL4: 양수 등급 Δ ≥ 1")
+	var min_sum: int = int(_rep["focus"]["min_genre_sum"])
+	var k: int = (min_sum + p - 1) / p
+	assert_eq(_aff("indie", "indie"), _rate, "순수 인디 벡터의 eff = rate_scale")
+	assert_true(_rate >= int(_rep["focus"]["identity_share_bp"]), "순수 벡터는 identity 문턱을 넘는다")
 	var r: Dictionary = _run(sc)
 	var tot: Array = r["total"]
-	assert_eq(tot.slice(0, 5), [18, 36, 54, 75, 96])
-	assert_eq(r["focus"].slice(0, 4), ["none", "none", "none", "identity"], "정체성 보너스는 4일부터(갱신 전 S=54 ≥ 50)")
-	assert_eq(r["computed_delta"].slice(0, 4), [18, 18, 18, 21])
-	assert_eq(int(tot[6]), 138, "7일")
-	assert_eq(int(tot[7]), 159, "8일")
-	assert_eq(int(tot[23]), 495, "24일")
-	assert_eq(int(tot[24]), 516, "25일")
-	assert_eq(int(tot[29]), 621, "30일")
-	for d: int in range(3, 30):
-		assert_eq(int(tot[d]), 54 + 21 * (d + 1 - 3), "total(d) = 54 + 21(d−3), d=%d" % (d + 1))
-	assert_eq(_first_day(tot, 150), 8, "신인 해금(150) 8일 (T6: 6~12)")
-	assert_eq(_first_day(tot, 500), 25, "명성 500 도달 25일 (RT1: 20~30)")
-	# 현금(economy tier1_baseline: 시작 5,000 − 건설 3,000 = 2,000, 매일 +1,142)
+	var want: Array = []
+	for d: int in range(1, int(sc["days"]) + 1):
+		want.append(d * p if d <= k else k * p + (d - k) * q)
+	assert_eq(tot, want, "total(d) 닫힌 식")
+	var foc: Array = r["focus"].slice(0, k + 1)
+	var want_foc: Array = []
+	for d: int in range(1, k + 2):
+		want_foc.append("none" if d <= k else "identity")
+	assert_eq(foc, want_foc, "정체성 보너스는 k+1 일부터(갱신 전 S ≥ min_genre_sum)")
+	assert_eq(r["computed_delta"].slice(0, k + 1), _rep_arr(p, k, q), "일별 Δ")
+	# 도달일: 닫힌 식의 계열에서 임계를 처음 넘는 날(두 임계는 tiers.json / artist.json 에서 읽는다)
+	var rookie: int = _rookie_unlock()
+	var need: int = int(_tier_row(2)["unlock_reputation"])
+	assert_eq(_first_day(tot, rookie), _first_day(want, rookie), "신인 해금 도달일")
+	assert_eq(_first_day(tot, need), _first_day(want, need), "티어 2 명성 도달일")
+	assert_true(_first_day(want, need) != null, "30일 안에 티어 2 명성 도달")
+	# 현금: economy 기준 시나리오에서 시작·일 순이익을 읽는다
+	var es: Dictionary = {}
+	for e: Dictionary in _eco["reference_scenarios"]:
+		if e["id"] == sc["cash_from_economy_scenario"]:
+			es = e
+	var start: int = int(_eco["starting_cash"]) - int(es["initial_build_spend"])
+	var net: int = int(es["expected"]["net"])
 	var cash: Array = r["cash"]
-	assert_eq(int(cash[0]), 3142)
-	assert_eq(int(cash[23]), 29408, "24일 미달")
-	assert_eq(int(cash[24]), 30550, "25일 도달")
-	assert_eq(_first_day(cash, 30000), 25)
-	assert_eq(r["tier_unlocked_days"], [25], "해금 25일 1회")
-	# 24일에는 자금(29,408)·명성(495) 둘 다 미달 → 해금 없음, 25일에야 둘 다 충족
-	assert_true(int(tot[23]) < 500 and int(cash[23]) < 30000)
-	assert_true(int(tot[24]) >= 500 and int(cash[24]) >= 30000)
+	for d: int in range(1, int(sc["days"]) + 1):
+		assert_eq(int(cash[d - 1]), start + net * d, "현금 d=%d" % d)
+	var cash_need: int = int(_tier_row(2)["unlock_cash"])
+	var day_rep: Variant = _first_day(want, need)
+	var day_cash: Variant = _first_day(cash, cash_need)
+	assert_eq(r["tier_unlocked_days"], [maxi(int(day_rep), int(day_cash))], "해금은 두 조건이 모두 찬 첫날 1회")
+	var gate: int = maxi(int(day_rep), int(day_cash))
+	if gate > 1:
+		assert_true(int(tot[gate - 2]) < need or int(cash[gate - 2]) < cash_need, "전날에는 둘 중 하나 미달")
+
+
+func _rep_arr(p: int, k: int, q: int) -> Array:
+	var out: Array = []
+	for d: int in range(1, k + 2):
+		out.append(p if d <= k else q)
+	return out
 
 
 func test_cash_series_matches_economy_scenario() -> void:
@@ -528,110 +606,189 @@ func test_rt_targets() -> void:
 	var a: Dictionary = _ints(_scenario("local_daily_good_30")["expected"])
 	var b: Dictionary = _ints(_scenario("rotation_good_30")["expected"])
 	assert_true(absi(int(a["day_reach_tier2_reputation"]) - int(b["day_reach_tier2_reputation"])) <= 2, "RT5")
-	assert_eq(a["total"], b["total"], "두 전략의 궤적이 같다(Q5)")
+	if int(_rep["focus"]["identity_bonus_bp"]) == int(_rep["focus"]["breadth_bonus_bp"]):
+		assert_eq(a["total"], b["total"], "보너스가 같으면 두 전략의 궤적이 같다(Q5)")
 
 
-func test_rotation_orders_all_reach_500_on_25() -> void:
-	# 순환 전략의 6가지 순서 모두 25일(확산 보너스는 순서와 무관).
+func test_rotation_orders_all_reach_tier2_same_day() -> void:
+	# 순환 전략의 6가지 순서는 서로 같은 날 도달한다(확산 보너스는 순서와 무관). 집중 전략과의 차이는 RT5(≤ 2일).
+	# 수치 리터럴(25일)은 없다: 도달일은 모두 이 파일의 공식 재계산에서 나온다. 두 보너스가 같은지(Q5)는 요구하지 않는다.
 	var perms: Array = [
 		["rock", "indie", "electronic"], ["rock", "electronic", "indie"], ["indie", "rock", "electronic"],
 		["indie", "electronic", "rock"], ["electronic", "rock", "indie"], ["electronic", "indie", "rock"],
 	]
+	var main: Dictionary = _run(_scenario("local_daily_good_30"))
+	var need: int = int(_tier_row(2)["unlock_reputation"])
+	var main_day: Variant = _first_day(main["total"], need)
+	assert_true(main_day != null, "집중 전략은 30일 안에 티어 2 명성 도달")
+	var first_perm_day: Variant = null
 	for p: Array in perms:
 		var cyc: Array = []
 		for gid: String in p:
 			cyc.append({"genre": gid, "satisfaction_bp": 6732, "admissions": 83})
 		var r: Dictionary = _run({"days": 30, "cash": _scenario("local_daily_good_30")["cash"], "show_cycle": cyc})
-		assert_eq(_first_day(r["total"], 500), 25, "순환 %s" % ",".join(p))
-		assert_eq(r["tier_unlocked_days"], [25])
-		assert_eq(r["focus"][3], "breadth", "4일부터 관객 폭 (%s)" % ",".join(p))
+		var day: Variant = _first_day(r["total"], need)
+		assert_true(day != null, "순환 %s: 30일 안에 도달" % ",".join(p))
+		if first_perm_day == null:
+			first_perm_day = day
+		assert_eq(day, first_perm_day, "순환 %s: 순서와 무관" % ",".join(p))
+		if day != null and main_day != null:
+			assert_true(absi(int(day) - int(main_day)) <= 2, "순환 %s: 집중과 ≤ 2일 차(RT5)" % ",".join(p))
 
 
 func test_failure_floor_scenario_hand_values() -> void:
-	var r: Dictionary = _run(_scenario("failure_floor_6"))
-	assert_eq(r["grade"], ["good", "disaster", null, "poor", "ok", "rave"])
-	assert_eq(r["computed_delta"], [18, -24, null, -5, 9, 32], "계산값(하한 전)")
-	assert_eq(r["delta"], [18, -18, null, 0, 9, 32], "실제 변화량(하한 후)")
-	assert_eq(r["total"], [18, 0, 0, 0, 9, 41])
-	assert_eq(r["factor_bp"], [8300, 8300, null, 5000, 8300, 10000], "최소 5,000 · 상한 10,000")
+	# 등급·입력은 시나리오 데이터에서, Δ 는 닫힌 식(실패는 보정 없음 RG4, 하한 RG6)으로 다시 계산한다.
+	var sc: Dictionary = _scenario("failure_floor_6")
+	var r: Dictionary = _run(sc)
+	var cyc: Array = sc["show_cycle"]
+	var grades: Array = []
+	var factors: Array = []
+	var comp: Array = []
+	var total: Array = []
+	var delta: Array = []
+	var t: int = 0
+	var by_indie: int = 0
+	for i: int in range(cyc.size()):
+		if cyc[i] == null:
+			grades.append(null)
+			factors.append(null)
+			comp.append(null)
+			delta.append(null)
+			total.append(t)
+			continue
+		var gid: String = _grade_of(int(cyc[i]["satisfaction_bp"]))
+		var adm: int = int(cyc[i]["admissions"])
+		var b: int = int(_rep["base_by_grade"][gid])
+		var f: int = _factor_inline(adm)
+		var c: int = -((-b) * f / _rate) if b < 0 else (b * f / _rate)
+		grades.append(gid)
+		factors.append(f)
+		comp.append(c)
+		var nt: int = maxi(0, t + c)
+		delta.append(nt - t)
+		t = nt
+		total.append(t)
+		by_indie = maxi(0, by_indie + c)
+	assert_eq(r["grade"], grades)
+	assert_eq(r["factor_bp"], factors, "계수 하한·상한")
+	assert_eq(r["computed_delta"], comp, "계산값(하한 전)")
+	assert_eq(r["delta"], delta, "실제 변화량(하한 후)")
+	assert_eq(r["total"], total)
 	assert_eq(r["tier_unlocked_days"], [])
+	assert_true((r["delta"] as Array).has(0), "하한에 막혀 실제 변화량 0 인 날이 있다(RG6 검증 입력)")
 
 
 func test_tier_unlock_needs_both_conditions() -> void:
 	# TU3 AND: 명성이 먼저 차도(25일) 자금(35일)이 찰 때까지 해금 없음, 해금은 정확히 1회
 	var r: Dictionary = _run(_scenario("reputation_first_40"))
-	assert_eq(r["tier_unlocked_days"], [35])
-	assert_true(int(r["total"][24]) >= 500 and int(r["cash"][24]) < 30000, "25일: 명성만 충족")
-	assert_eq(int(r["cash"][34]), 30000, "35일 현금 정확히 임계")
+	var row2: Dictionary = _tier_row(2)
+	var day_rep: Variant = _first_day(r["total"], int(row2["unlock_reputation"]))
+	var day_cash: Variant = _first_day(r["cash"], int(row2["unlock_cash"]))
+	assert_true(day_rep != null and day_cash != null and int(day_rep) < int(day_cash), "이 시나리오는 명성이 먼저 찬다")
+	assert_eq(r["tier_unlocked_days"], [day_cash], "명성이 먼저 차도 자금이 찰 때까지 해금 없음")
+	assert_true(int(r["total"][int(day_rep) - 1]) >= int(row2["unlock_reputation"]) and int(r["cash"][int(day_rep) - 1]) < int(row2["unlock_cash"]), "명성 도달일: 명성만 충족")
 	# 자금만 먼저 충족하는 경우(명성 0): 해금 없음
 	var cash_only: Dictionary = _run({"days": 5, "cash": {"start": 40000, "per_day": 0}, "show_cycle": [null]})
 	assert_eq(cash_only["tier_unlocked_days"], [])
-	# max_tier 2 라서 명성·자금이 훨씬 커도 두 번째 해금은 없다
+	# max_tier 를 넘는 해금은 명성·자금이 훨씬 커도 없다
 	var big: Dictionary = _run({"days": 60, "cash": {"start": 100000, "per_day": 1000}, "show_cycle": [{"genre": "indie", "satisfaction_bp": 7600, "admissions": 122}]})
-	assert_eq((big["tier_unlocked_days"] as Array).size(), 1)
+	assert_true((big["tier_unlocked_days"] as Array).size() >= 1 and (big["tier_unlocked_days"] as Array).size() <= int(_rep["tier_unlock"]["max_tier"]) - 1, "해금 횟수는 max_tier − 1 을 넘지 않는다")
 
 
 func test_focus_judgement_table_in_reputation_md() -> void:
-	# reputation.md "보정 판정 예" 7행: 비율 → 오늘 장르별 (eff_bp, focus)
-	var table: Array = [
-		[[0, 100, 0], [[5000, "none"], [10000, "identity"], [4000, "none"]]],
-		[[50, 50, 0], [[7500, "identity"], [7500, "identity"], [3000, "none"]]],
-		[[0, 50, 50], [[3500, "none"], [7000, "identity"], [7000, "identity"]]],
-		[[50, 0, 50], [[6000, "none"], [4500, "none"], [6000, "none"]]],
-		[[33, 33, 33], [[5666, "breadth"], [6333, "breadth"], [5333, "breadth"]]],
-		[[20, 60, 20], [[5400, "breadth"], [7800, "identity"], [4800, "breadth"]]],
-		[[10, 90, 0], [[5500, "none"], [9500, "identity"], [3800, "none"]]],
-	]
+	# reputation.md "보정 판정 예" 7행: 비율 → 오늘 장르별 (eff_bp, focus). 기대값은 문서 표에서 읽는다.
+	var md: String = _doc(REP_MD)
+	if md.is_empty():
+		pending("reputation.md 없음")
+		return
 	assert_eq(_g, ["rock", "indie", "electronic"], "표의 열 순서 = mvp_genres")
-	for row: Array in table:
+	var ratio_re: RegEx = RegEx.create_from_string("^\\s*(\\d+) / (\\d+) / (\\d+)\\s*$")
+	var cell_re: RegEx = RegEx.create_from_string("([\\d,]+)\\s+\\**(none|identity|breadth)\\**")
+	var rows: int = 0
+	for line: String in md.split("\n"):
+		if not line.begins_with("| "):
+			continue
+		var cells: PackedStringArray = line.split("|")
+		if cells.size() < 6:
+			continue
+		var rm: RegExMatch = ratio_re.search(cells[1])
+		if rm == null:
+			continue
+		rows += 1
 		var by: Dictionary = {}
 		for i: int in range(_g.size()):
-			by[_g[i]] = row[0][i]
+			by[_g[i]] = int(rm.get_string(i + 1))
 		for i: int in range(_g.size()):
+			var cm: RegExMatch = cell_re.search(cells[2 + i])
+			assert_not_null(cm, "표 칸 해석 %s" % cells[2 + i])
+			if cm == null:
+				continue
 			var res: Array = _focus(by, _g[i])
-			assert_eq(res[0], row[1][i][1], "focus %s %s" % [str(row[0]), _g[i]])
-			assert_eq(res[1], row[1][i][0], "eff_bp %s %s" % [str(row[0]), _g[i]])
-	# FC1: 장르 합 49 는 판정 불가, 50 은 가능
-	assert_eq(_focus({"rock": 0, "indie": 49, "electronic": 0}, "indie"), ["none", -1])
-	assert_eq(_focus({"rock": 0, "indie": 50, "electronic": 0}, "indie"), ["identity", 10000])
-	# 경계: eff 정확히 7,000 은 identity (0/50/50 의 indie)
-	assert_eq(_focus({"rock": 0, "indie": 50, "electronic": 50}, "indie")[0], "identity")
-	# 정체성이 아니고 세 장르 점유율이 모두 ≥ 15% 이면 관객 폭
-	var below: Array = _focus({"rock": 40, "indie": 40, "electronic": 20}, "electronic")
-	assert_eq(below[0], "breadth", "세 장르 모두 ≥ 15% 이고 정체성 아님 → 관객 폭")
+			assert_eq(res[0], cm.get_string(2), "focus %s %s" % [str(by), _g[i]])
+			assert_eq(res[1], _num(cm.get_string(1)), "eff_bp %s %s" % [str(by), _g[i]])
+	assert_eq(rows, 7, "보정 판정 예 7행")
+	# FC1: 장르 합이 min_genre_sum − 1 이면 판정 불가, min_genre_sum 이면 가능(순수 인디)
+	var ms: int = int(_rep["focus"]["min_genre_sum"])
+	assert_eq(_focus({"rock": 0, "indie": ms - 1, "electronic": 0}, "indie"), ["none", -1])
+	assert_eq(_focus({"rock": 0, "indie": ms, "electronic": 0}, "indie")[0], "identity")
+	# 정체성이 아니고 세 장르 점유율이 모두 문턱 이상이면 관객 폭(40/40/20 은 문턱 ≤ 20% 일 때)
+	if int(_rep["focus"]["breadth_min_share_bp"]) <= 2000:
+		assert_eq(_focus({"rock": 40, "indie": 40, "electronic": 20}, "electronic")[0], "breadth", "세 장르 모두 문턱 이상이고 정체성 아님 → 관객 폭")
 
 
 func test_focus_exact_boundaries() -> void:
-	# FC4 경계: 세 장르 점유율이 정확히 15% 인 장르가 있으면 관객 폭(≥). rock 15 / indie 15 / electronic 70, 오늘 rock:
-	# eff = (15·10000 + 15·5000 + 70·2000) ÷ 100 = 3,650 < 7,000 → 정체성 아님, 점유율 15%·15%·70% 모두 ≥ 15% → breadth.
-	var r: Array = _focus({"rock": 15, "indie": 15, "electronic": 70}, "rock")
-	assert_eq(r, ["breadth", 3650], "점유율 정확히 15% 는 포함(≥)")
-	# 14% 면 탈락: rock 14 / indie 16 / electronic 70
-	assert_eq(_focus({"rock": 14, "indie": 16, "electronic": 70}, "rock")[0], "none", "14% 는 관객 폭 아님")
-	# FC3 경계: eff 정확히 7,000 → identity(≥): 0/50/50 indie (위 표) · 6,999 가 되려면 정수 내림이므로 다른 조합
-	# rock 0 / indie 70 / electronic 30, 오늘 electronic: (70·4000 + 30·10000) ÷ 100 = 5,800 → none
-	assert_eq(_focus({"rock": 0, "indie": 70, "electronic": 30}, "electronic"), ["none", 5800])
+	# FC4 경계: 점유율이 문턱(breadth_min_share_bp)과 정확히 같은 장르가 있으면 관객 폭(≥), 1 단위 모자라면 탈락.
+	# 벡터 합을 rate_scale 로 맞추면 점유율 비교 by×rate ≥ T×S 가 by ≥ T 로 떨어진다.
+	var t: int = int(_rep["focus"]["breadth_min_share_bp"])
+	var idn: int = int(_rep["focus"]["identity_share_bp"])
+	var exact: Dictionary = {"rock": t, "indie": t, "electronic": _rate - 2 * t}
+	var eff: int = int(_focus(exact, "rock")[1])
+	if eff >= idn or exact["electronic"] < t:
+		pending("현재 데이터에서는 이 벡터가 정체성이거나 문턱 미만이라 경계 케이스를 만들 수 없다")
+		return
+	assert_eq(_focus(exact, "rock")[0], "breadth", "점유율 정확히 문턱은 포함(≥)")
+	var under: Dictionary = {"rock": t - 1, "indie": t + 1, "electronic": _rate - 2 * t}
+	assert_eq(_focus(under, "rock")[0], "none", "문턱 − 1 은 관객 폭 아님")
+	# FC3 경계(eff 가 identity_share_bp 와 정확히 같으면 identity)는 문서 표의 경계 행(0 / 50 / 50 의 indie)이
+	# test_focus_judgement_table_in_reputation_md 에서 데이터와 함께 추적한다.
 
 
 func test_delta_table_in_reputation_md() -> void:
-	# reputation.md "하루 Δ 표" 25칸. 열: 입장 50 · 83 · 100 (보정 없음), 83 · 100 (정체성 ×1.2, 순수 인디 벡터).
-	# 'ok' 83명 보정 = 10 은 이중 내림(⌊⌊12×0.83⌋ × 1.2⌋)의 결과다. 한 번에 내리면 11 이라 이 칸이 순서를 잠근다.
-	var expected: Dictionary = {
-		"disaster": [-15, -24, -30, -24, -30],
-		"poor": [-5, -8, -10, -8, -10],
-		"ok": [6, 9, 12, 10, 14],
-		"good": [11, 18, 22, 21, 26],
-		"rave": [16, 26, 32, 31, 38],
-	}
+	# reputation.md "하루 Δ 표" 25칸. 열: 입장 50 · 83 · 100 (보정 없음), 83 · 100 (정체성 보정, 순수 인디 벡터).
+	# 기대값은 문서 표에서 읽는다(리터럴 없음): 데이터를 바꾸고 표를 안 고치면 이 테스트가 문서 불일치를 알린다.
+	# 'ok' 83명 보정은 이중 내림(⌊⌊b×f⌋×(1+보너스)⌋)이라 한 번에 내린 값과 다를 수 있다 — _identity_delta 가 순서를 고정한다.
+	var md: String = _doc(REP_MD)
+	if md.is_empty():
+		pending("reputation.md 없음")
+		return
+	var names: Dictionary = {"참사": "disaster", "부진": "poor", "보통": "ok", "호평": "good", "열광": "rave"}
+	var seen: int = 0
 	var empty: Dictionary = {"rock": 0, "indie": 0, "electronic": 0}
 	var pure: Dictionary = {"rock": 0, "indie": 500, "electronic": 0}
-	for gid: String in expected:
-		var e: Array = expected[gid]
-		assert_eq(int(_delta(empty, "indie", gid, 50)["delta"]), e[0], gid + " 50명")
-		assert_eq(int(_delta(empty, "indie", gid, 83)["delta"]), e[1], gid + " 83명")
-		assert_eq(int(_delta(empty, "indie", gid, 100)["delta"]), e[2], gid + " 100명")
-		assert_eq(int(_delta(pure, "indie", gid, 83)["delta"]), e[3], gid + " 83명 + 보정")
-		assert_eq(int(_delta(pure, "indie", gid, 100)["delta"]), e[4], gid + " 100명 + 보정")
+	for line: String in md.split("\n"):
+		if not line.begins_with("| "):
+			continue
+		var cells: PackedStringArray = line.split("|")
+		if cells.size() < 8 or not names.has(cells[1].strip_edges()):
+			continue
+		var gid: String = names[cells[1].strip_edges()]
+		var vals: Array = []
+		for i: int in range(2, 7):
+			var m: RegEx = RegEx.create_from_string("[−-]?\\d[\\d,]*")
+			var hits: Array[RegExMatch] = m.search_all(cells[i].replace("(보정 없음)", ""))
+			assert_eq(hits.size(), 1, "%s 칸 %d: 숫자 하나" % [gid, i - 1])
+			var txt: String = hits[0].get_string()
+			var neg: bool = txt.begins_with("−") or txt.begins_with("-")
+			vals.append((-1 if neg else 1) * _num(txt.trim_prefix("−").trim_prefix("-")))
+		seen += 1
+		assert_eq(int(_delta(empty, "indie", gid, 50)["delta"]), vals[0], gid + " 50명")
+		assert_eq(int(_delta(empty, "indie", gid, 83)["delta"]), vals[1], gid + " 83명")
+		assert_eq(int(_delta(empty, "indie", gid, 100)["delta"]), vals[2], gid + " 100명")
+		assert_eq(int(_delta(pure, "indie", gid, 83)["delta"]), vals[3], gid + " 83명 + 보정")
+		assert_eq(int(_delta(pure, "indie", gid, 100)["delta"]), vals[4], gid + " 100명 + 보정")
+		if int(_rep["base_by_grade"][gid]) > 0:
+			assert_eq(_identity_delta(gid, 83), vals[3], gid + " 83명 보정: 닫힌 식(이중 내림)")
+	assert_eq(seen, 5, "표의 5 등급 행")
 
 
 # =====================================================================================================
@@ -697,7 +854,9 @@ func test_schemas_pin_core_constraints() -> void:
 	for gid: String in ["ok", "good", "rave"]:
 		assert_eq(_ints(bg["properties"][gid]), {"type": "integer", "minimum": 1})
 	assert_eq(bg["additionalProperties"], false)
-	assert_eq(_ints(rs["properties"]["tier_unlock"]["properties"]["max_tier"])["maximum"], 6)
+	var mt: Dictionary = _ints(rs["properties"]["tier_unlock"]["properties"]["max_tier"])
+	assert_eq(mt["maximum"], 6)
+	assert_eq(mt["minimum"], 2, "RL7 과 일치(SE-048 A: 스키마 하한 1 → 2)")
 
 
 # =====================================================================================================
@@ -773,7 +932,7 @@ func test_docs_consistent_with_ticket_deltas() -> void:
 	# (4) show.json 에 만족 가중치 없음, 진실의 출처 SR1/SR2
 	assert_true(show_md.contains("SR1") and show_md.contains("SR2") and show_md.contains("에는 가중치가 없다"))
 	# 규칙 번호가 수용 기준과 맞물림
-	for id: String in ["SH1", "SH9", "SH13", "ST1", "ST4"]:
+	for id: String in ["SH1", "SH9", "SH13", "ST1", "SG1", "SG4"]:
 		assert_true(show_md.contains("| " + id + " |"), "show.md " + id)
 	for id: String in ["RP1", "RP10", "RP15", "RT1", "RT6"]:
 		assert_true(rep_md.contains("| " + id + " |"), "reputation.md " + id)
@@ -800,12 +959,25 @@ func test_system_order_matches_event_chain_assumption() -> void:
 
 
 func test_full_house_margin_documented() -> void:
-	# 민감도: 부록 C 만석(122명) 평균 6,198 은 호평 하한 6,000 에 198 bp 차이. 호평 → 보통이면 Δ 가 26 → 14 로 거의 절반.
+	# 민감도: 부록 C 의 만석(122명) 평균(문서에서 읽는다)은 호평 구간이고, 한 단계 내려가면 Δ 가 줄어든다.
+	var md: String = _doc(REP_MD)
+	if md.is_empty():
+		pending("reputation.md 없음")
+		return
+	var m: RegExMatch = RegEx.create_from_string("10일 122\\(만석\\) / ([\\d,]+) /").search(md)
+	assert_not_null(m, "부록 C 에 10일 만석 평균이 있다")
+	if m == null:
+		return
+	var sat: int = _num(m.get_string(1))
+	assert_eq(_grade_of(sat), "good", "만석 평균은 호평 구간(문서 서술: 호평 하한 근처)")
 	var good_min: int = 0
 	for gr: Dictionary in _show["grades"]:
 		if gr["id"] == "good":
 			good_min = int(gr["min_bp"])
-	assert_eq(6198 - good_min, 198)
+	assert_true(sat >= good_min, "호평 하한 이상 (여유 %d bp)" % (sat - good_min))
 	var by: Dictionary = {"rock": 0, "indie": 400, "electronic": 0}
-	assert_eq(int(_delta(by, "indie", "good", 122)["delta"]), 26)
-	assert_eq(int(_delta(by, "indie", "ok", 122)["delta"]), 14)
+	var good_d: int = int(_delta(by, "indie", "good", 122)["delta"])
+	var ok_d: int = int(_delta(by, "indie", "ok", 122)["delta"])
+	assert_eq(good_d, _identity_delta("good", 122), "호평 Δ 닫힌 식")
+	assert_eq(ok_d, _identity_delta("ok", 122), "보통 Δ 닫힌 식")
+	assert_true(ok_d < good_d, "호평 → 보통이면 Δ 가 줄어든다")

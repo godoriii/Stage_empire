@@ -226,6 +226,8 @@ func restore(s: Dictionary) -> bool:
 	var new_rng: SeededRng = SeededRng.new(n_seed, config.rng_streams)       # 4 (b) 사본으로 검증, 현재 rng 는 그대로
 	if not new_rng.set_state(rng_state):
 		return _restore_fail("rng 상태 적용 실패")
+	if new_rng.stream_names != rng.stream_names:                             # 4 (b) 끝: 8(b) assign 사전 검사(SE-052)
+		return _restore_fail("rng 스트림 목록이 현재 rng 와 다르다: %s (현재 %s)" % [new_rng.stream_names, rng.stream_names])
 	var systems: Variant = s.get("systems")                                   # 5 (D5)
 	if not (systems is Dictionary):
 		return _restore_fail("systems 가 객체가 아니다")
@@ -262,12 +264,18 @@ func restore(s: Dictionary) -> bool:
 			_running = false
 			return false
 		applied.append(id)
+	var prev_cmds: Array = bus.get_pending_commands()
 	if not bus.set_pending_commands(cmds):                                    # 8 (a) 4단계가 검사를 끝냄(도달 불가)
 		push_error("[TickLoop] restore: pending_commands 적용 실패. 시스템을 되돌린다")
 		_rollback_systems(applied, prev)
 		_running = false
 		return false
-	rng.assign(new_rng)                                                       # 8 (b) 객체 유지, 상태만(SE-034-bug)
+	if not rng.assign(new_rng):                                               # 8 (b) 객체 유지, 상태만(SE-034-bug). 4(b) 가 막음(도달 불가)
+		push_error("[TickLoop] restore: rng 상태 적용 실패. 명령 큐와 시스템을 되돌린다")
+		bus.set_pending_commands(prev_cmds)
+		_rollback_systems(applied, prev)
+		_running = false
+		return false
 	master_seed = n_seed
 	tick = n_tick
 	day = n_day
