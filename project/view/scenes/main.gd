@@ -3,7 +3,7 @@ extends Node3D
 ## SE-040: 메인 씬. GameSession 하나 + 그리드·카메라·커서(SE-002 재사용) + 가구·고스트·오버레이·팔레트(SE-037) + 군중·스포트
 ## (SE-038) + HUD·패널(SE-039) + SimDriver(실시간 step). 실행: godot --path project res://view/scenes/main.tscn
 ##
-## 경계(AC1·AC-37a·AC-37b, test_view_boundary 허용 목록): sim 쪽 참조는 GameSession 하나뿐이다(BuildSystem·res://world/ 0).
+## 경계(AC1·AC-37a·AC-37b, test_view_boundary 허용 목록): sim 쪽 참조는 GameSession 하나뿐이다(BuildSystem·world 폴더 경로 0).
 ##   - GameSession.new() + new_game(seed) 는 core 팩토리 호출이다(세계 생성은 core 가 한다). EventBus.new() 를 부르지 않고
 ##     session.bus(TickLoop 버스)를 하위 뷰에 배포한다.
 ##   - 고스트 유효성 = Callable(session, "check_place")(build.md Q4 읽기 전용 쿼리) 주입.
