@@ -1,0 +1,8 @@
+{
+  "asset_id": "bar_counter",
+  "glb": "bar_counter.glb",
+  "meta": "META.json",
+  "verdict": "pass",
+  "items": [],
+  "config_sha256": "f87f2fe7e816c25b7ebc2cb41722ed969ae63b79c740139a9bdc11b82e9c4d38"
+}
