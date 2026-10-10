@@ -4,7 +4,7 @@
   "title": "artist",
   "description": "아티스트 규칙 수치(섭외 구간, 등급 가용 명성, 성장 Δ, 승급 임계, 성격 태그 어휘, MVP 명단 설계, 기준 시나리오). 규칙: docs/gdd/artist.md. 개런티 금액은 여기 없다 — v0 는 economy.json guarantee_by_grade 를 그대로 쓴다(guarantee_mode by_grade). 수치 변경은 game-designer 만.",
   "type": "object",
-  "required": ["version", "mvp_genres", "booking_phases", "guarantee_mode", "stat_max", "relationship_min", "relationship_max", "show_grades", "grades", "personality_tags", "personality_exclusive_pairs", "roster_plan", "reference_scenarios"],
+  "required": ["version", "mvp_genres", "booking_phases", "guarantee_mode", "stat_max", "relationship_min", "relationship_max", "show_grades", "grades", "personality_tags", "personality_exclusive_pairs", "roster_plan", "reference_scenarios", "checks"],
   "additionalProperties": false,
   "$defs": {
     "genre_id": { "type": "string", "enum": ["rock", "hiphop", "electronic", "indie", "jazz", "pop", "metal", "world"] },
@@ -141,6 +141,36 @@
             }
           }
         }
+      }
+    },
+    "checks": {
+      "description": "수치 목표(qa·테스트용, 런타임 로더는 읽지 않는다). artist.md #승급까지-공연-수 표·T1·T2 의 데이터 사본(SE-046 B). grades·roster_plan 의 승급 임계·델타·인기를 바꾸면 같은 PR 에서 이 값을 다시 계산해 갱신한다",
+      "type": "object",
+      "required": ["promotion_from", "promotion_shows", "fastest_promotion_min_shows", "slowest_promotion_max_shows"],
+      "additionalProperties": false,
+      "properties": {
+        "promotion_from": {
+          "description": "promotion_shows 가 재는 승급의 출발 등급. 승급 규칙은 grades[id == 이 값](promote_to·promote_at_popularity·popularity_delta_by_show_grade)",
+          "$ref": "#/$defs/grade_id"
+        },
+        "promotion_shows": {
+          "description": "roster_plan 에서 grade == promotion_from 인 슬롯마다 1행(슬롯 순). 같은 공연 등급만 반복할 때 승급까지 공연 수 n = ⌈(promote_at_popularity − popularity) ÷ Δ⌉ (Δ = popularity_delta_by_show_grade[ok|good|rave]). popularity 는 roster_plan 같은 slot 의 popularity 와 같아야 한다",
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["slot", "popularity", "ok", "good", "rave"],
+            "additionalProperties": false,
+            "properties": {
+              "slot": { "type": "string", "pattern": "^s[0-9]{2}$" },
+              "popularity": { "$ref": "#/$defs/stat" },
+              "ok": { "description": "매번 보통(ok)일 때 승급까지 공연 수", "type": "integer", "minimum": 1 },
+              "good": { "description": "매번 호평(good)일 때 승급까지 공연 수", "type": "integer", "minimum": 1 },
+              "rave": { "description": "매번 열광(rave)일 때 승급까지 공연 수", "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "fastest_promotion_min_shows": { "description": "T1: promotion_shows[].rave 의 최솟값 ≥ 이 값", "type": "integer", "minimum": 1 },
+        "slowest_promotion_max_shows": { "description": "T2: promotion_shows[].good 의 최댓값 ≤ 이 값(티어 2 목표일)", "type": "integer", "minimum": 1 }
       }
     }
   }
