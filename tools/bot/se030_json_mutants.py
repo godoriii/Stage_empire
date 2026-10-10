@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """SE-030 QA JSON 변이 생성기.
 
-project/data 의 show·reputation·genres JSON 을 한 군데씩 틀리게 하는 패치(`tools/bot/mutations/se030_mNN_*.diff`)를 만들고,
-각 변이에서 `tools/validate_data.py --strict` 가 잡는지를 사본(리포 밖 임시 디렉터리)에서 확인한다.
-GUT 쪽은 `tools/bot/mutate_and_test.sh tools/bot/mutations/se030_mNN_*.diff` 로 돌린다(이 스크립트는 하지 않는다).
+project/data 의 show·reputation·genres JSON 을 한 군데씩 틀리게 하는 패치(`se030_mNN_*.diff`) 21개를 **리포지토리 밖**
+디렉터리에 만들고(기본: 새 임시 디렉터리, 경로를 출력), 각 변이에서 `tools/validate_data.py --strict` 가 잡는지를
+사본(리포 밖 임시 디렉터리)에서 확인한다. 패치는 저장소에 커밋하지 않는다(SE-048: 데이터가 바뀌면 낡는 산출물이라 생성기만 둔다).
+GUT 쪽은 `tools/bot/mutate_and_test.sh <출력 디렉터리>/se030_mNN_*.diff` 로 돌린다(이 스크립트는 하지 않는다).
 
-사용: python3 tools/bot/se030_json_mutants.py [--write-only]
+사용: python3 -I tools/bot/se030_json_mutants.py [--write-only] [--out DIR]
+  --write-only  validate 확인 없이 패치만 쓴다.
+  --out DIR     패치를 쓸 디렉터리. 리포지토리 안이면 거부한다(exit 2).
 """
 import difflib
 import shutil
@@ -15,7 +18,6 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "tools" / "bot" / "mutations"
 
 # (id, 파일(project/data 기준), 찾을 문자열, 바꿀 문자열, 설명, 연결된 규칙)
 M = [
@@ -55,13 +57,29 @@ def patch_text(rel, old, new):
     return "".join(diff), dst
 
 
-def main(write_only):
-    OUT.mkdir(parents=True, exist_ok=True)
+def resolve_out(argv):
+    if "--out" in argv:
+        i = argv.index("--out")
+        if i + 1 >= len(argv):
+            print("--out 에 디렉터리가 필요하다", file=sys.stderr)
+            raise SystemExit(2)
+        out = Path(argv[i + 1]).resolve()
+    else:
+        out = Path(tempfile.mkdtemp(prefix="se030_mut.")).resolve()
+    if out == ROOT or ROOT in out.parents:
+        print(f"출력 디렉터리는 리포지토리 밖이어야 한다: {out}", file=sys.stderr)
+        raise SystemExit(2)
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def main(write_only, out):
+    print(f"패치 출력: {out}")
     print(f"{'id':28} {'validate --strict':18} 설명 (규칙)")
     for mid, rel, old, new, desc, rule in M:
         text, dst = patch_text(rel, old, new)
-        header = f"# SE-030 QA 변이 {mid}: {desc} [{rule}]\n# 사용: tools/bot/mutate_and_test.sh tools/bot/mutations/se030_{mid}.diff\n"
-        (OUT / f"se030_{mid}.diff").write_text(header + text, encoding="utf-8")
+        header = f"# SE-030 QA 변이 {mid}: {desc} [{rule}]\n# 사용: tools/bot/mutate_and_test.sh {out}/se030_{mid}.diff\n"
+        (out / f"se030_{mid}.diff").write_text(header + text, encoding="utf-8")
         if write_only:
             continue
         tmp = Path(tempfile.mkdtemp(prefix="se030_val."))
@@ -79,4 +97,4 @@ def main(write_only):
 
 
 if __name__ == "__main__":
-    main("--write-only" in sys.argv)
+    main("--write-only" in sys.argv, resolve_out(sys.argv[1:]))

@@ -32,14 +32,25 @@ import make_probe_glb as probe  # noqa: E402  (write_glb 와 m() 재사용)
 TICKET = "SE-041"
 SLOT_ORDER = ["base", "accent", "emissive", "glass"]
 
-# 저작 미리보기용 색(런타임 색은 슬롯 파라미터에서 온다 — GLTF_SPEC §2). furniture.json 의 slots 색을 따르고,
-# 표에 없는 슬롯은 같은 계열의 임의 값이다.
-PREVIEW = {
+# 이 파일의 .glb 머티리얼 baseColorFactor 는 5종 공통 자리표시 색이다(런타임 색은 슬롯 파라미터에서 온다 - GLTF_SPEC §2).
+# 형태·바이트 불변을 위해 SE-041 1차 값을 그대로 둔다. 미리보기 PNG 색은 이 표가 아니라 furniture.json 행의
+# `slots` 색(preview_colors)을 쓴다. glTF 안에서 슬롯 이름만 의미가 있고 색은 의미가 없다.
+GLB_PLACEHOLDER = {
     "base": (0.23, 0.20, 0.25, 1.0),
     "accent": (0.78, 0.26, 0.23, 1.0),
     "emissive": (1.0, 0.82, 0.48, 1.0),
     "glass": (0.66, 0.85, 0.92, 0.4),
 }
+FURNITURE_JSON = HERE.parent.parent / "project" / "data" / "furniture" / "furniture.json"
+
+
+def preview_colors(fid, furniture_json=None):
+    """furniture.json 행 `fid` 의 slots('#RRGGBB') → {슬롯: (r, g, b, a) 0..1}. glass 만 알파 0.4(미리보기 반투명 표시용)."""
+    rows = {r["id"]: r for r in json.loads(Path(furniture_json or FURNITURE_JSON).read_text(encoding="utf-8"))["rows"]}
+    out = {}
+    for slot, hexv in rows[fid]["slots"].items():
+        out[slot] = tuple(int(hexv[i:i + 2], 16) / 255 for i in (1, 3, 5)) + (0.4 if slot == "glass" else 1.0,)
+    return out
 
 
 # ---------------------------------------------------------------- 벡터 보조
@@ -178,9 +189,9 @@ def write_mesh_glb(path, mesh):
                  {"min": [min(p[k] for p in pos) for k in range(3)], "max": [max(p[k] for p in pos) for k in range(3)]})
         na = add(b"".join(struct.pack("<3f", *v) for v in s["nrm"]), 34962, 5126, "VEC3", len(pos))
         ia = add(struct.pack(f"<{len(s['idx'])}H", *s["idx"]), 34963, 5123, "SCALAR", len(s["idx"]))
-        mat = probe.m(slot, PREVIEW[slot], "BLEND" if slot == "glass" else None)
+        mat = probe.m(slot, GLB_PLACEHOLDER[slot], "BLEND" if slot == "glass" else None)
         if slot == "emissive":
-            mat["emissiveFactor"] = list(PREVIEW["emissive"][:3])
+            mat["emissiveFactor"] = list(GLB_PLACEHOLDER["emissive"][:3])
         mats.append(mat)
         prims.append({"attributes": {"POSITION": pa, "NORMAL": na}, "indices": ia, "material": len(mats) - 1})
 
@@ -194,9 +205,10 @@ def write_mesh_glb(path, mesh):
 
 # ---------------------------------------------------------------- 미리보기 PNG (선택, 순수 파이썬 소프트웨어 래스터)
 
-def render_png(path, mesh, size=384, ssaa=2):
+def render_png(path, mesh, colors, size=384, ssaa=2):
     """아이소메트릭(요 45°, 피치 30°, 앞면 -Z·오른쪽 +X 쪽에서 본 직교) 플랫 셰이딩 미리보기. 검수용 대략 확인이지
-    게임 룩(툰 셰이더)이 아니다. glass 는 불투명 면을 그린 뒤 50% 로 덮는다."""
+    게임 룩(툰 셰이더)이 아니다. colors = preview_colors() (furniture.json slots 색). emissive 는 무음영 원색,
+    그 밖은 면 밝기(0.45..1.0)를 곱한다. glass 는 불투명 면을 그린 뒤 50% 로 덮는다."""
     yaw, pitch = math.radians(45), math.radians(30)
     cam = (math.cos(pitch) * math.sin(yaw), math.sin(pitch), -math.cos(pitch) * math.cos(yaw))
     fwd = (-cam[0], -cam[1], -cam[2])
@@ -223,7 +235,7 @@ def render_png(path, mesh, size=384, ssaa=2):
     zb = [[1e9] * w for _ in range(w)]
     ordered = [t for t in tris if t[0] != "glass"] + [t for t in tris if t[0] == "glass"]
     for slot, v, shade in ordered:
-        base = [int(c * 255) for c in PREVIEW[slot][:3]]
+        base = [int(round(c * 255)) for c in colors[slot][:3]]
         col = tuple(base) if slot == "emissive" else tuple(min(255, int(c * shade)) for c in base)
         sp = [(ox + scale * a, oy - scale * b, d) for a, b, d in v]
         x0, x1 = max(0, int(min(q[0] for q in sp))), min(w - 1, int(max(q[0] for q in sp)) + 1)
@@ -318,7 +330,8 @@ def light_spot():
 
 
 # id → (생성 함수, 카테고리, 풋프린트 [w,d], height_m, poly_budget, 기대 슬롯)
-# 값은 project/data/furniture/furniture.json 과 같다(스크립트 테스트가 아니라 qa 대조 대상 — 린터는 테이블을 읽지 않는다).
+# 값은 project/data/furniture/furniture.json 과 같다(린터는 테이블을 읽지 않는다. 카테고리·풋프린트·높이·예산은
+# test_make_test_furniture.py 가, 서피스 집합 == slots 키 집합도 같은 테스트가 대조한다).
 FURNITURE = {
     "stage_medium": (stage_medium, "stage", [6, 4], 0.8, "equipment_large", ["base", "accent", "emissive"]),
     "bar_counter": (bar_counter, "bar", [3, 1], 1.1, "equipment_large", ["base", "accent"]),
@@ -334,7 +347,7 @@ def meta_for(fid):
             "height_m": height_m, "poly_budget": budget}
 
 
-def generate(out, lint=False, preview=False):
+def generate(out, lint=False, preview=False, furniture_json=None):
     """<out>/<id>/<id>.glb + META.json (+ lint.json). 돌려주는 값: {id: 린터 exit code}(lint=True 일 때)."""
     out = Path(out)
     codes = {}
@@ -345,7 +358,7 @@ def generate(out, lint=False, preview=False):
         mesh = fn()
         write_mesh_glb(glb, mesh)
         if preview:
-            render_png(d / "preview.png", mesh)
+            render_png(d / "preview.png", mesh, preview_colors(fid, furniture_json))
         meta.write_text(json.dumps(meta_for(fid), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
         if lint:
             r = subprocess.run([sys.executable, "-I", str(HERE / "lint_gltf.py"), str(glb), str(meta),
@@ -359,7 +372,7 @@ def generate(out, lint=False, preview=False):
 def main():
     ap = argparse.ArgumentParser(description="테스트용 가구 5종 .glb + META.json (+ lint.json) 결정적 생성")
     ap.add_argument("--out", required=True, help="출력 루트(검수 큐면 project/assets/review-queue)")
-    ap.add_argument("--preview", action="store_true", help="<id>/preview.png 도 쓴다(순수 파이썬 래스터, 느림)")
+    ap.add_argument("--preview", action="store_true", help="<id>/preview.png 도 쓴다(furniture.json slots 색, 순수 파이썬 래스터, 느림)")
     ap.add_argument("--lint", action="store_true", help="lint_gltf.py 를 돌려 <id>/lint.json 도 쓴다")
     args = ap.parse_args()
     codes = generate(args.out, args.lint, args.preview)

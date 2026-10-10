@@ -244,7 +244,7 @@ PRD 출력 "관객 기대치"의 v0 판은 audience 입장 공식의 명성 항�
 
 | 필드 | 값 | 근거 |
 |---|---|---|
-| `admissions_ref` | 100 | economy 기준 시나리오의 입장(`reference_scenarios[tier1_baseline].admissions`) |
+| `admissions_ref` | 100 | economy 기준 시나리오와 독립인 튜닝값(명성 계수가 포화되는 입장 수). 값은 `reference_scenarios[tier1_baseline].admissions`와 같게 잡았지만 교차 검사는 없다 — economy 시나리오가 바뀌면 재검토(Q4) |
 | `min_bp` | 5,000 | 관객 50 명 이하도 등급의 절반. 실패 등급 Δ 가 0 이 되지 않음(RL4: 10 × 0.5 = 5 ≥ 1) |
 | `max_bp` | 10,000 | 100 명에서 멈춘다(Q4). 연동 추정에서 명성 500 도달이 자금 30,000 도달보다 1~4일 먼저 오게 하는 값(부록 C) |
 
@@ -492,4 +492,5 @@ PY
 
 | 날짜 | 버전 | 티켓 | 내용 |
 |---|---|---|---|
+| 2026-10-10 | reputation.md v0.1, `reputation.json` v1 그대로, `reputation.schema.json` version 1 그대로 | SE-048 A | 문구·스키마 하한만. 스키마 description 의 테스트 번호(RP2·RP3·RP4·RP5)를 규칙 번호 RG2·RG3·RG4(FC1~FC4)·RG5 로 고침. `tier_unlock.max_tier` 스키마 `minimum` 1 → 2(RL7 `2 ≤ max_tier`와 일치, 범위를 좁히는 변경이라 기존 데이터 2 는 그대로 통과 — `version` 유지). `admissions_ref` 100 을 "economy 기준 시나리오와 독립인 튜닝값(교차 검사 없음, economy 시나리오 변경 시 재검토)"으로 수치표·스키마에 명시. 규칙·수치 변경 없음 |
 | 2026-10-09 | reputation.md v0, `reputation.json` v1 + `reputation.schema.json` version 1, `genres.json` MVP 3장르 `affinity` | SE-030 | 신규. 상태 6필드(`total`, `by_genre`, `show_day`, `show_genre`, `last_applied_day`, `unlocked_tier`), 명성 갱신 RG0~RG7(등급 기본값 × 입장 계수 × 장르 보정, 실패 감소, 하한 0), 장르 집중/확산 FC1~FC4(유사도 가중 점유율), 티어 해금 TU1~TU4(게임당 1회, MVP `max_tier` 2), 섭외 등급·관객 기대치는 참조만(AR14), 이벤트 2종(`reputation.changed`·`reputation.tier_unlocked`), 결정성(난수 없음), 스냅샷 RR1~RR5, 로드 검사 RL1~RL7, 기준 시나리오 4개 + 손계산 부록 A·B + 연동 추정 부록 C, 수용 기준 RP1~RP15·RT1~RT6. `genres.json`: rock·indie·electronic 행에 `affinity` 3×3(대각 1.0, 대칭) — 데이터 `version` 1 유지(필드는 스키마에 이미 있음), `genres.schema.json`은 `affinity`·최상위 `description` 문구만(구조 불변). 티켓 초안에서 바꾼 것: 구독에 `show.started`(장르, show.md Q4)·`time.day_started` 추가, 구독 목록의 `time.phase_changed`는 쓰지 않음(상태에 구간이 필요 없다), `reputation.changed.delta` = 하한 적용 뒤 값 |
