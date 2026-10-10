@@ -2,7 +2,7 @@ class_name Coverage
 extends RefCounted
 ## 커버리지 계산 (SE-032). 규칙: docs/gdd/build.md#커버리지 C0~C8, 시야 레이 line().
 ## 전부 정적 순수 함수다: 같은 입력 → 같은 출력, 입력을 바꾸지 않고 이벤트·난수 없음. 전체 재계산(증분 없음).
-## 출력 타일 배열은 G6 순서(z 오름차순 → x 오름차순), 좌표는 [x, z] int.
+## 출력 타일 배열은 G6 순서(z 오름차순 → x 오름차순), 좌표는 [x, z] int. `blocked_cells`(SE-044)는 C0 의 점유 셀 전체다.
 
 ## 브레젠험 오차 배수(build.md 의사코드 `e2 = 2 * err`).
 const BRESENHAM_ERR_SCALE: int = 2
@@ -11,7 +11,7 @@ const BRESENHAM_ERR_SCALE: int = 2
 const KEYS: Array[String] = [
 	"has_stage", "floor_free", "viewing_count", "viewing_tiles", "sound_tiles", "sight_tiles", "bar_tiles",
 	"sound_bp", "sight_bp", "bar_bp", "capacity", "evac_capacity", "evac_shortfall", "light_grade",
-	"satisfaction_bonus_bp", "upkeep_per_day",
+	"satisfaction_bonus_bp", "upkeep_per_day", "blocked_cells",
 ]
 
 
@@ -104,7 +104,20 @@ static func compute(map: MapConfig, furniture: FurnitureConfig, rate_scale: int,
 		"light_grade": light,
 		"satisfaction_bonus_bp": mini(furniture.satisfaction_bonus_cap_bp, sat),
 		"upkeep_per_day": upkeep,
+		"blocked_cells": blocked_cells(blocked),
 	}
+
+
+## 점유 셀 집합 {Vector2i: true} → G6 순서(z → x 오름차순) [[x, z], …] (build.md C0 `blocked_cells`, SE-044). 빈 집합이면 [].
+static func blocked_cells(blocked: Dictionary) -> Array:
+	var cells: Array[Vector2i] = []
+	for c: Vector2i in blocked:
+		cells.append(c)
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or (a.y == b.y and a.x < b.x))
+	var out: Array = []
+	for c: Vector2i in cells:
+		out.append([c.x, c.y])
+	return out
 
 
 ## ⌊count × rate_scale ÷ total⌋, total == 0 이면 0.

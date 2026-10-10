@@ -345,7 +345,7 @@ func _pretax(n: int, guarantee: int) -> int:
 	var buyers: int = n * int(row["bar_purchase_rate_bp"]) / rs
 	var bar_rev: int = buyers * int(row["bar_avg_spend"])
 	var bar_cost: int = bar_rev * int(row["bar_cost_rate_bp"]) / rs
-	return ticket + bar_rev - bar_cost - int(row["rent_per_day"]) - 200 - guarantee
+	return ticket + bar_rev - bar_cost - int(row["rent_per_day"]) - int(_economy["reference_scenarios"][0]["upkeep_per_day"]) - guarantee
 
 
 func test_rookie_breakeven_vs_local() -> void:

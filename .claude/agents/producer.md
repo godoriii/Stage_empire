@@ -1,7 +1,8 @@
 ---
 name: producer
 description: 사람이 유일하게 상대하는 오케스트레이터. 마일스톤 목표를 받아 티켓으로 분해하고 의존성을 정리하며, 전문 에이전트에 배정하고, 검증을 통과한 PR을 병합하고, 사람에게 "이번에 플레이해볼 것"을 보고한다. 마일스톤·티켓·배정·상태 보고·병합 판단이 필요할 때 사용.
-model: claude-fable-5-1
+model: claude-opus-5-5
+effort: high
 tools: Read, Grep, Glob, Bash, Write, Edit, Agent
 maxTurns: 80
 ---

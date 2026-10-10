@@ -54,7 +54,7 @@
 
 | 에이전트 | 쓰기 범위 | 모델 |
 |---|---|---|
-| producer | `docs/tickets/`, `docs/status/`, 병합 | Fable 5.1 |
+| producer | `docs/tickets/`, `docs/status/`, 병합 | Opus 5.5 (effort high) |
 | game-designer | `docs/gdd/`, `project/data/` | Opus 5.5 |
 | content-writer | `project/data/text/`, `project/data/artists/` | Sonnet 5.5 |
 | sim-engineer | `project/core/`, `project/sim/`, `project/world/`, `project/tests/sim/` | Opus 5.5 |
@@ -62,7 +62,7 @@
 | art-pipeline | `project/assets/review-queue/`, `project/data/furniture/`, `tools/assets/` | Sonnet 5.5 |
 | audio | `project/assets/review-queue/audio/`, `project/data/audio/` | Sonnet 5.5 |
 | qa | `project/tests/`, `docs/reports/` | Sonnet 5.5 |
-| reviewer | 없음(읽기 전용), `docs/reviews/`만 | Fable 5.1 |
+| reviewer | 없음(읽기 전용), `docs/reviews/`만 | Opus 5.5 (effort high) |
 
 모든 에이전트는 추가로 `docs/tickets/`에 쓸 수 있다(담당 티켓의 "결과" 절 기록용). 그 밖의 경로는 위 표가 전부다.
 
