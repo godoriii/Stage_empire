@@ -124,7 +124,7 @@ v0 의 show 는 공연 구간에 하는 일이 없다. 만족은 audience 가 �
 | DS2 | `payload.day != day` | `push_warning`, 무시 |
 | DS3 | `status == "skipped"` | 무시(경고 없음 — audience 는 공연이 없는 날에도 요약을 낸다) |
 | DS4 | `status != "running"`(`idle`·`ended`) | `push_warning`, 무시(공연 시작 누락 또는 같은 날 두 번째 요약) |
-| DS5 | 그 밖 | 아래 SE1~SE4 → `status = "ended"` → `show.ended` |
+| DS5 | 그 밖 | 아래 SE1~SE4 → `status = "ended"` → `show.ended`. **입장 0 명이면 `disaster`**: audience SF9 가 `avg_satisfaction_bp` 0 을 내고 SR3 이 0 을 `disaster`로 접는다(명성 RG2 −30 × 하한 계수 → −15). 이 처리를 바꿀지(SE-035 F7)는 [bot_metrics.md](bot_metrics.md) M12 빈도를 보고 정한다 — 바꾸면 `test_zero_admissions_day_is_disaster`도 함께 |
 
 | # | 값 | 공식 |
 |---|---|---|
@@ -406,6 +406,7 @@ PY
 
 | 날짜 | 버전 | 티켓 | 내용 |
 |---|---|---|---|
+| 2026-10-10 | show.md v0.2 (데이터·스키마 변경 없음) | SE-042 1차 (SE-035 리뷰 이관) | DS5 에 "입장 0 명이면 `disaster`"(SF9 → SR3)와 F7 판정 경로(bot_metrics.md M12)를 적었다. 동작 변경 없음 |
 | 2026-10-10 | show.md v0.1 (데이터·스키마 변경 없음) | SE-048 A | 문구만. 공연 진입 시점 4곳(#공연-시작, #이벤트 순서 목록, 이벤트 표 `show.started`·`show.skipped`)을 tick.md 기준 "저녁 마지막 틱(2,400) 단계 4 에서 전환"으로 고침(공연 구간 첫 틱은 2,401). 수치 목표 ID 접두어 ST → SG(SG1~SG4, 규칙 ST0~ST3 와 접두어 충돌 해소), 본문 참조(Q2 "SG3 위반")와 SE-030 이력 행 갱신. 규칙 ST0~ST3·"ST2 제거"(변이, Q3)는 규칙을 가리키므로 그대로. 규칙·수치·이벤트 계약 변경 없음 |
 | 2026-10-10 | show.md v0.1 (데이터 변경 없음) | SE-039 2차 | 마감 리포트 표시 순서 확정(#표시-순서-se-039-2차-확정): R13 을 R8 바로 아래로. Q6(등급 표시 이름)은 (a) 유지 — `ui_ko.json` 으로 옮기려면 UI 코드가 `ui.show.grade.<id>` 를 읽어야 해 후속 티켓으로 미룬다 |
 | 2026-10-09 | show.md v0, `show.json` v1 + `show.schema.json` version 1 | SE-030 | 신규. 만족도 진실의 출처 SR1~SR3(관객 평균 → 등급, PRD 항 대응표), 입력 계약 7개 이벤트·라인업 LN1~LN3, 상태 8필드, 공연 시작 ST0~ST3(`no_lineup`·`no_stage`), 공연 끝 DS1~DS5·SE1~SE4·CL1, 이벤트 3종(`show.started`·`show.skipped`·`show.ended`), 결정성(난수 없음), 스냅샷 SS1~SS4, 로드 검사 SL1~SL4, 마감 리포트 필드 R1~R13(SE-039 인계), 등급 임계 5단계, 기준 시나리오 5개, 수용 기준 SH1~SH13·수치 목표 SG1~SG4(SE-048 에서 개명, 이전 접두어는 규칙 ST0~ST3 와 겹쳤다). 티켓 초안에서 바꾼 것: 구독에 `audience.admissions_decided`(`expected_admissions`)·`economy.ticket_price_changed`(`revenue_hint`)·`time.day_started`(리셋) 추가, `show.skipped` 페이로드 `{day, reason}` 확정(티켓은 이름만), 무대 없는 날도 `show.skipped`(Q3) |
