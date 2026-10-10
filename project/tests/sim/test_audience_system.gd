@@ -199,6 +199,22 @@ func test_au3_capacity_40() -> void:
 	assert_eq([p["admissions"], p["capped_by"], p["capacity"]], [40, "capacity", 40])
 
 
+## AU15 (SE-052, SF5 관객 0): capacity 0·무대 있음·라인업 있음으로 하루 → AD9 admissions 0·capped_by "capacity",
+## 마감 요약 crowd_bp 0(옛 규칙은 capacity 0 이면 10,000)·audience 0·avg_satisfaction_bp 0.
+func test_au15_capacity_zero_crowd_zero() -> void:
+	var u: Dictionary = _h.unit(0)
+	var rec: EventRecorder = u["rec"]
+	var cov: Dictionary = _cov_with({"capacity": 0})
+	assert_true(cov["has_stage"], "전제: 무대 있음")
+	_h.decide(u, _sc("rookie_baseline"), cov)
+	var p: Dictionary = rec.of("audience.admissions_decided")[0]
+	assert_eq([p["admissions"], p["capped_by"], p["capacity"], p["has_lineup"]], [0, "capacity", 0, true], "AD9 capacity 0")
+	_h.run_day(u)
+	assert_eq(rec.count("audience.day_summary"), 1, "요약 1회")
+	var sm: Dictionary = rec.of("audience.day_summary")[0]
+	assert_eq([sm["admissions"], sm["audience"], sm["avg_satisfaction_bp"], sm["crowd_bp"]], [0, 0, 0, 0], "SF5 관객 0 → crowd_bp 0")
+
+
 ## 수용 150·인기 100·명성 2,000 → 150 명, 동시 에이전트 최대 150.
 func test_au3_stress_150_agents() -> void:
 	var lu: Dictionary = _sc("rookie_baseline")["lineup"].duplicate()

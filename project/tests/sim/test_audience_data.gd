@@ -196,8 +196,10 @@ func _sat(t: Dictionary, lineup: Variant, price: int, crowd_bp: int, bonus_bp: i
 	return mini(10000, maxi(0, pos - neg) / 10000 + bonus_bp)
 
 
-## SF5 공통 혼잡.
+## SF5 공통 혼잡. 관객 0 이면 0(SF5 관객 0, SE-052).
 func _crowd(audience: int, capacity: int) -> int:
+	if audience == 0:
+		return 0
 	var comfort: int = int(_a["satisfaction"]["crowd_comfort_bp"])
 	var ratio: int = audience * 10000 / capacity if capacity > 0 else 10000
 	if ratio <= comfort:

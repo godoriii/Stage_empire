@@ -297,8 +297,10 @@ static func agent_satisfaction(cfg: AudienceConfig, agent: Dictionary, lineup: V
 	}
 
 
-## SF5 공통 혼잡(공연 끝 1회). capacity 0 이면 ratio = rate_scale.
+## SF5 공통 혼잡(공연 끝 1회). 관객 0 이면 0(SF5 관객 0, SE-052). 그 밖에 capacity 0 이면 ratio = rate_scale.
 static func crowd_bp_of(cfg: AudienceConfig, audience: int, capacity: int) -> int:
+	if audience == 0:
+		return 0
 	var scale: int = cfg.rate_scale
 	var ratio: int = audience * scale / capacity if capacity > 0 else scale
 	if ratio <= cfg.crowd_comfort_bp:
