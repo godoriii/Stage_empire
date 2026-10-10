@@ -7,7 +7,10 @@ extends UiPanel
 ##   economy.bankrupt(R13), time.phase_changed(close 에서만 보임), time.day_started(그날 값 초기화), session.loaded.
 ## 공연 없는 날(show.ended 없음): R3·R5·R11 숨김, R9 "변화 없음"(SE-030 인계).
 ## SE-040 AC-39a: 불러오기 직후 close 면 day_settled 가 재발행되지 않는다 — R8·R12 의 현금은 메인 씬이 set_session_cash 로
-##   넣은 sim 값(GameSession.hud_state().cash)을 쓴다. R6·R7·R8 순이익은 그날 정산 페이로드뿐(결과 절 열린 질문).
+##   넣은 sim 값(GameSession.hud_state().cash)을 쓴다.
+## SE-062: 같은 경로로 set_session_settlement(hud_state().last_settlement — 마지막 day_settled 페이로드와 같은 키)를 받아
+##   S_SETTLED 자리에 넣어 R6·R7·R8 순이익을 채운다(economy.md #스냅샷 "표시 접근"). {}(새 게임·구버전 세이브)면 0.
+##   이 값의 cash 는 쓰지 않는다 — R8·R12 현금은 계속 hud_state().cash(구제 수동 수락 뒤 현재 값).
 ## 발행: time.next_day_requested {}("다음 날" 버튼, tick.md: close 는 이 명령으로만 이탈).
 
 signal next_day_pressed
@@ -100,6 +103,18 @@ func set_reputation(total: int) -> void:
 func set_session_cash(cash: int) -> void:
 	_session_cash = cash
 	_has_session_cash = true
+	_refresh()
+
+
+## SE-062: sim 의 마지막 정산 값(GameSession.hud_state().last_settlement, 읽기 전용 복사본). 메인 씬이 session.loaded 뒤
+## set_session_cash 와 함께 넣는다(on_session_loaded 가 비운 뒤). economy.day_settled 를 받은 것과 같은 자리(S_SETTLED)에
+## 넣되 cash 키는 빼서 R8·R12 현금이 set_session_cash 값을 쓰게 한다. {} 면 그대로(R6~R8 = 0).
+func set_session_settlement(settlement: Dictionary) -> void:
+	if settlement.is_empty():
+		return
+	var s: Dictionary = settlement.duplicate(true)
+	s.erase("cash")
+	_state[S_SETTLED] = s
 	_refresh()
 
 

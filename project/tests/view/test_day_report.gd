@@ -292,3 +292,28 @@ func _assert_no_keys(n: Node) -> void:
 		if re.search(t) != null:
 			bad.append(t)
 	assert_eq(bad.size(), 0, "키 폴백 노출 0: %s" % " | ".join(bad))
+
+
+# --- SE-062 -----------------------------------------------------------------
+
+## 불러오기 뒤 set_session_settlement(hud_state().last_settlement): R6~R8 = 정산 값, R8·R12 현금 = set_session_cash
+## (last_settlement.cash 아님 — 구제 수동 수락 뒤 현재 값). {} 면 0, 다음 session.loaded 에서 비워진다.
+func test_se062_session_settlement_fills_r6_r8_cash_from_session() -> void:
+	var close: String = UiTestUtil.close_phase()
+	bus.publish("session.loaded", {"day": 4, "phase": close, "speed": 0, "show_active": false})
+	report.set_session_cash(777)
+	report.set_session_settlement({})
+	assert_eq(report.get_row_text("R6"), report.t("ui.report.r6", {"ticket_revenue": 0, "bar_revenue": 0, "revenue": 0}), "{} → R6 0")
+	assert_eq(report.get_row_text("R8"), report.t("ui.report.r8", {"net": 0, "cash": 777}), "{} → R8 순이익 0")
+	var settled: Dictionary = {"day": 4, "ticket_revenue": 880, "bar_revenue": 312, "revenue": 1192, "rent": 600, "upkeep": 123,
+		"guarantee": 400, "bar_cost": 109, "tax": 0, "loan_repayment": 0, "net": -40, "cash": 111}
+	report.set_session_settlement(settled)
+	assert_eq(report.get_row_text("R6"), report.t("ui.report.r6", {"ticket_revenue": 880, "bar_revenue": 312, "revenue": 1192}))
+	assert_eq(report.get_row_text("R7"), report.t("ui.report.r7", {"rent": 600, "upkeep": 123, "guarantee": 400, "bar_cost": 109,
+		"tax": 0, "loan_repayment": 0}))
+	assert_eq(report.get_row_text("R8"), report.t("ui.report.r8", {"net": -40, "cash": 777}), "R8 현금 = set_session_cash")
+	assert_true(report.get_row_text("R12").contains("777"), "R12 현금 = set_session_cash")
+	assert_eq(int(settled["cash"]), 111, "받은 사전은 고치지 않는다")
+	bus.publish("session.loaded", {"day": 1, "phase": close, "speed": 0, "show_active": false})
+	assert_eq(report.get_row_text("R6"), report.t("ui.report.r6", {"ticket_revenue": 0, "bar_revenue": 0, "revenue": 0}),
+		"다른 세계 → 비움")

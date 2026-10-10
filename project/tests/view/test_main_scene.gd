@@ -272,6 +272,37 @@ func test_load_close_autosave_fills_report_cash_ac39a() -> void:
 	assert_true(ui.day_report.get_row_text("R12").contains(str(cash)), "R12 현금 = sim: %s" % ui.day_report.get_row_text("R12"))
 
 
+## SE-062 AC1: close 저장(마감 오토세이브) → 새 인스턴스 로드 → R6~R8 문자열이 저장 시점과 같다
+## (economy.day_settled 는 재발행되지 않는다 — hud_state().last_settlement 로 채움).
+func test_se062_ac1_load_close_report_r6_r8_match_save() -> void:
+	var a: MainScene = _main()
+	_menu_new_game(a)
+	a.publish_autoplay_setup(false)
+	a.session.advance(0)
+	a.session.advance(_cfg.day_ticks)
+	assert_eq(_phase(a), "close")
+	var settled: Dictionary = a.session.hud_state()["last_settlement"] as Dictionary
+	assert_false(settled.is_empty(), "정산 뒤 last_settlement 있음")
+	var want: Dictionary = {}
+	for id: String in ["R6", "R7", "R8"]:
+		want[id] = a.get_ui_root().day_report.get_row_text(id)
+	assert_ne(int(settled["rent"]), 0, "rent 0 아님 — 0 표시와 구별된다")
+	assert_true(str(want["R7"]).contains(str(settled["rent"])), "저장 시점 R7 = 정산 페이로드(대조)")
+	var slot: String = GameSession.autosave_slot(1)
+	assert_true(FileAccess.file_exists(a.session.slot_path(slot)), "마감 오토세이브")
+	a.queue_free()
+	await get_tree().process_frame
+	var b: MainScene = _main(["--se-load=%s" % slot])
+	b.session.advance(0)
+	var r: DayReport = b.get_ui_root().day_report
+	assert_eq(_phase(b), "close")
+	assert_true(r.visible, "close 로드 → 리포트")
+	for id: String in ["R6", "R7", "R8"]:
+		assert_eq(r.get_row_text(id), want[id], "AC1: %s = 저장 시점" % id)
+	assert_true(r.get_row_text("R8").contains(str(b.session.economy.cash)), "R8 현금 = hud_state().cash")
+	assert_eq(_push_error_count(), 0, "push_error 0")
+
+
 # --- AC-38a ---------------------------------------------------------------------------
 
 ## 배속 3, 60fps: 틱이 2프레임마다 오고(SimDriver 가 먼저), 표시 위치가 프레임마다 같은 거리만큼 움직인다.

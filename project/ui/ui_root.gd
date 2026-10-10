@@ -8,6 +8,7 @@ extends Node
 ## 구독: session.loaded(명성 초기값 다시 읽기), time.phase_changed(close 진입 시 섭외 패널 닫기). 발행 없음.
 ## SE-040: apply_session_state(GameSession.hud_state() 사전 — 메인 씬이 session.loaded 뒤 넘긴다)로 HUD 현금·가격·리포트 현금을
 ##   채운다(AC-39a). menu_input_blocker 가 true 를 돌려주면 Esc 를 메뉴가 쓰지 않고 넘긴다(배치 고스트 취소 우선, AC-39b).
+## SE-062: 같은 사전의 last_settlement(마지막 정산)로 리포트 R6~R8 을 채운다.
 
 const HUD_SCENE: String = "res://ui/hud/top_hud.tscn"
 const ARTIST_SCENE: String = "res://ui/panels/artist_panel.tscn"
@@ -89,11 +90,15 @@ func inject(event_name: String, payload: Dictionary) -> int:
 	return n
 
 
-## SE-040 AC-39a: sim 읽기 전용 상태(hud_state 키)를 HUD·리포트에 넣는다. 발행 없음.
+## SE-040 AC-39a·SE-062: sim 읽기 전용 상태(hud_state 키 cash·last_settlement 등)를 HUD·리포트에 넣는다. 발행 없음.
 func apply_session_state(state: Dictionary) -> void:
 	hud.apply_session_state(state)
 	if state.has("cash"):
 		day_report.set_session_cash(int(state["cash"]))
+	# SE-062: 마지막 정산(R6~R8). 키가 없거나 {} 면 리포트는 지금처럼 0.
+	var settled: Variant = state.get("last_settlement")
+	if settled is Dictionary:
+		day_report.set_session_settlement(settled as Dictionary)
 
 
 ## Esc 를 메뉴가 쓰지 않아야 하는가(menu_input_blocker).
