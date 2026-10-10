@@ -19,6 +19,9 @@ const ROW_NAME_PATTERN: String = "Row_%s"
 const META_ROW: StringName = &"report_row"
 ## 공연이 없는 날 숨기는 행(show.md R 표 "공연 없는 날" 열).
 const HIDDEN_WITHOUT_SHOW: PackedStringArray = ["R3", "R5", "R11"]
+## 라인업 정보(artist.lineup_set·show.ended·show.skipped)가 하나도 없으면 숨기는 행. 불러오기 직후 close 는
+## 그날 이벤트가 재발행되지 않는다(SE-049) — 빈 값으로 채우면 등급 키가 샌다(SE-039-bug).
+const HIDDEN_WITHOUT_LINEUP: PackedStringArray = ["R2"]
 const LIST_SEP: String = " · "
 ## show.md R3·R5: bp ÷ 100 = %.
 const BP_PER_PERCENT: int = 100
@@ -126,6 +129,11 @@ func has_show() -> bool:
 	return _st(S_ENDED).size() > 0
 
 
+## 그날 라인업을 알 수 있는가(라인업 이벤트·공연 끝·공연 건너뜀 중 하나라도 받았다).
+func has_lineup_info() -> bool:
+	return has_show() or not _st(S_LINEUP).is_empty() or not _st(S_SKIPPED).is_empty()
+
+
 func _st(key: String) -> Dictionary:
 	return _state.get(key, {}) as Dictionary
 
@@ -189,7 +197,7 @@ func _refresh() -> void:
 	get_next_button().disabled = not _st(S_BANKRUPT).is_empty()
 	for id: String in get_row_ids():
 		var l: Label = get_row_label(id)
-		l.visible = has_show() or not HIDDEN_WITHOUT_SHOW.has(id)
+		l.visible = (has_show() or not HIDDEN_WITHOUT_SHOW.has(id)) and (has_lineup_info() or not HIDDEN_WITHOUT_LINEUP.has(id))
 		l.text = row_text(id)
 
 

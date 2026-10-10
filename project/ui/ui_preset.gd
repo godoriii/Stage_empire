@@ -23,6 +23,9 @@ const REPUTATION_PATH: String = "res://data/reputation/reputation.json"
 const AUDIENCE_PATH: String = "res://data/audience/audience.json"
 const SHOW_PATH: String = "res://data/show/show.json"
 ## economy.day_settled 페이로드 키(events.md) — expected 에서 같은 이름만 옮긴다.
+## 만족 요소(audience.day_summary.avg_components) 가짜 값 = 공연 만족 satisfaction_bp + 오프셋. 오프셋 합 0 →
+## 다섯 요소 평균 = satisfaction_bp(캡처용 그럴듯한 값, 규칙 수치 아님).
+const COMPONENT_OFFSETS_BP: Dictionary = {"lineup_bp": 470, "sound_bp": 70, "sight_bp": -130, "value_bp": -330, "wait_bp": -80}
 const SETTLED_KEYS: PackedStringArray = [
 	"ticket_revenue", "bar_buyers", "bar_revenue", "bar_cost", "revenue", "rent", "upkeep", "guarantee",
 	"operating_costs", "pretax", "tax", "net", "loan_repayment", "settlement_delta",
@@ -92,7 +95,7 @@ static func events(id: String, data: UiData, catalog: UiArtistCatalog) -> Array:
 		["audience.day_summary", {"day": day, "has_lineup": true, "admissions": adm, "audience": int(show_x.get("audience", 0)),
 			"left_early": int(aud_x.get("left_early", 0)), "bar_buyers": int(eco_x.get("bar_buyers", 0)),
 			"avg_satisfaction_bp": int(show_x.get("satisfaction_bp", 0)), "crowd_bp": int(aud_x.get("crowd_bp", 0)),
-			"avg_components": {}, "by_type": {}}],
+			"avg_components": _components(int(show_x.get("satisfaction_bp", 0))), "by_type": {}}],
 		["show.ended", {"day": day, "artist_id": artist_id, "satisfaction_bp": int(show_x.get("satisfaction_bp", 0)),
 			"grade": str(show_x.get("grade", "")), "admissions": adm, "audience": int(show_x.get("audience", 0)),
 			"revenue_hint": int(show_x.get("revenue_hint", 0)), "incidents": []}],
@@ -116,6 +119,13 @@ static func _grown(rules: Dictionary, row: Dictionary, artist_id: String, day: i
 	var ds: int = int(rule.get("skill_per_show", 0))
 	return {"day": day, "artist_id": artist_id, "grade": grade, "popularity": int(row.get("popularity", 0)) + dp,
 		"skill": int(row.get("skill", 0)) + ds, "popularity_delta": dp, "skill_delta": ds, "shows_played": day, "promoted": false}
+
+
+static func _components(satisfaction_bp: int) -> Dictionary:
+	var out: Dictionary = {}
+	for k: String in COMPONENT_OFFSETS_BP:
+		out[k] = satisfaction_bp + int(COMPONENT_OFFSETS_BP[k])
+	return out
 
 
 ## 장르가 맞고 첫 등급인 아티스트 중 인기 최고(동률이면 데이터 순서 앞).

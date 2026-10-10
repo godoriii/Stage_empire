@@ -146,3 +146,48 @@ func test_loaded_in_close_without_events() -> void:
 	assert_true(report.visible)
 	assert_true(report.get_row_text("R1").contains("15"), "R1 = loaded day")
 	assert_false(report.is_row_visible("R3"), "공연 값 없음 → 숨김")
+
+
+## SE-039-bug 회귀: 불러오기 직후 close(실제 ui_ko.json) — 보이는 모든 텍스트에 ui.* 키 폴백 0건, R2 숨김.
+func test_loaded_close_leaks_no_keys_se039_bug() -> void:
+	var s: GridSandbox = (load("res://view/scenes/grid_sandbox.tscn") as PackedScene).instantiate() as GridSandbox
+	add_child_autofree(s)
+	assert_true(s.setup_ui(UiPreset.DAY))
+	var r: UiRoot = s.get_ui_root()
+	var close: String = UiTestUtil.close_phase()
+	r.inject("session.loaded", {"day": 3, "phase": close, "speed": 0, "show_active": false})
+	r.inject("time.phase_changed", {"from": "show", "to": close, "day": 3, "tick": 0})
+	assert_true(r.day_report.visible, "close 리포트 보임")
+	assert_false(r.day_report.is_row_visible("R2"), "라인업 정보 없음 → R2 숨김")
+	var re: RegEx = RegEx.create_from_string("(^|\\s)ui\\.[a-z0-9_]+\\.")
+	var texts: PackedStringArray = PackedStringArray()
+	_screen_texts(r.day_report, texts)
+	assert_gt(texts.size(), 5, "보이는 텍스트 수집")
+	var bad: PackedStringArray = PackedStringArray()
+	for t: String in texts:
+		if re.search(t) != null:
+			bad.append(t)
+	assert_eq(bad.size(), 0, "키 폴백 노출 0: %s" % " | ".join(bad))
+	# 대조: 같은 정규식이 키 문자열은 잡는다.
+	assert_not_null(re.search("공연 · ui.artist.grade."), "대조군")
+
+
+func test_lineup_info_shows_r2_again() -> void:
+	bus.publish("session.loaded", {"day": 3, "phase": UiTestUtil.close_phase(), "speed": 0, "show_active": false})
+	assert_false(report.is_row_visible("R2"))
+	bus.publish("show.skipped", {"day": 3, "reason": "no_stage"})
+	assert_true(report.is_row_visible("R2"), "건너뜀 사유가 오면 R2 보임")
+
+
+## 보이는 Label/Button 텍스트(숨긴 노드·CanvasLayer 제외) — test_ui_text_table._screen_texts 와 같은 규칙.
+func _screen_texts(n: Node, out: PackedStringArray) -> void:
+	if n is CanvasItem and not (n as CanvasItem).visible:
+		return
+	if n is CanvasLayer and not (n as CanvasLayer).visible:
+		return
+	if n is Label:
+		out.append((n as Label).text)
+	elif n is Button:
+		out.append((n as Button).text)
+	for c: Node in n.get_children():
+		_screen_texts(c, out)
