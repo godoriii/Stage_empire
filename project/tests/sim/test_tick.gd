@@ -871,3 +871,25 @@ func test_system_hooks_reject_reentry() -> void:
 	assert_eq(_loop.tick, tick0, "tick 불변")
 	_reentry_on = false
 	assert_true(_loop.register_system("staff", _fake_system.bind("staff")), "훅 안 시도가 등록을 남기지 않음")
+
+
+## SE-045 AC2: core 의 정수 정규화가 JsonUtil.as_int(|float| ≥ 2^63 거절)로 통일됐다. TickLoop.restore 는 seed ±1e19 를,
+## SimConfig.from_dict 는 1e19 정수 필드를 거절한다(각각 push_error 1회, 상태 불변).
+func test_rejects_float_beyond_int64() -> void:
+	var good: Dictionary = _new_loop().snapshot()
+	var target: TickLoop = _new_loop(9)
+	target.advance(10)
+	var before: String = _hash(target)
+	var errs: int = 0
+	for v: float in [1e19, -1e19]:
+		var s: Dictionary = good.duplicate(true)
+		s["seed"] = v
+		assert_false(target.restore(s), "TickLoop seed %s → false" % v)
+		errs += 1
+		assert_push_error_count(errs, "seed %s: push_error 1회" % v)
+		assert_eq(_hash(target), before, "seed %s: 상태 불변" % v)
+	var raw: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SimConfig.DEFAULT_PATH))
+	assert_not_null(SimConfig.from_dict(raw.duplicate(true)), "전제: 원본 사본은 통과")
+	raw["ticks_per_second"] = 1e19
+	assert_null(SimConfig.from_dict(raw), "SimConfig ticks_per_second 1e19 → null")
+	assert_push_error_count(errs + 1, "SimConfig: push_error 1회")
