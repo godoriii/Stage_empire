@@ -50,7 +50,7 @@ func test_view_does_not_touch_sim_or_data() -> void:
 	# SE-038: 군중·무대 연출(view/crowd, view/stage)도 구독용으로 EventBus 를 쓴다(발행 0, test_crowd_stage_boundary_se038).
 	var emits: PackedStringArray = PackedStringArray()
 	for h: String in ViewTestUtil.grep(srcs, "EventBus|event_bus"):
-		if not _is_build_ui_file(h) and not _is_se038_file(h) and not _is_se039_file(h):
+		if not _is_build_ui_file(h) and not _is_se038_file(h) and not _is_se039_file(h) and not _is_se040_file(h):
 			emits.append(h)
 	assert_eq(emits.size(), 0, "배치 UI·군중/무대 연출·HUD 패널(SE-039) 밖에서는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
 
@@ -232,7 +232,13 @@ func test_build_ui_boundary_ac6() -> void:
 	for n: String in names:
 		if n == "EventBus":
 			continue
-		other.append_array(ViewTestUtil.grep(srcs, "^[^#]*\\b%s\\b" % n))
+		for h: String in ViewTestUtil.grep(srcs, "^[^#]*\\b%s\\b" % n):
+			# SE-040 AC1: 루트 씬(main.gd)과 실시간 구동기(sim_driver.gd)만 GameSession 타입을 참조한다 —
+			# sim+view 를 한 버스에 묶는 조립점이 view 쪽에 하나 있어야 하고(producer 결정, SE-040 티켓 보충), 그 조립점이
+			# 아는 sim 타입을 core 팩토리(GameSession) 하나로 제한한다. 다른 sim/core/world 클래스는 여기서도 0건.
+			if n == SE040_ALLOWED_CLASS and _is_se040_file(h):
+				continue
+			other.append(h)
 	assert_eq(other.size(), 0, "EventBus 외 sim/core/world 클래스 참조 0건 (%d종 검사): %s" % [names.size() - 1, ", ".join(other)])
 	# (3) EventBus 사용 = 타입 표기(: EventBus / -> EventBus)뿐. 생성(EventBus.new)은 샌드박스 전용 버스 1곳만.
 	var usage: PackedStringArray = PackedStringArray()
@@ -539,3 +545,79 @@ func test_se039_screenshots_exist_1080p() -> void:
 		var img: Image = Image.new()
 		assert_eq(img.load(abs_path), OK, "PNG 로드")
 		assert_eq(Vector2i(img.get_width(), img.get_height()), Vector2i(1920, 1080), "1920×1080")
+
+
+# --- SE-040 메인 씬 ---------------------------------------------------------------
+
+## GameSession 타입 참조를 허용하는 두 파일(허용 사유는 test_build_ui_boundary_ac6 (2) 주석).
+const SE040_FILES: Array[String] = ["res://view/scenes/main.gd", "res://view/runtime/sim_driver.gd"]
+const SE040_ALLOWED_CLASS: String = "GameSession"
+## main.gd 가 session 에서 읽거나 부를 수 있는 멤버(팩토리·버스·읽기 전용 쿼리·섭외 패널 출처·세이브 폴더 주입).
+const SE040_SESSION_MEMBERS: Array[String] = [
+	"new_game", "bus", "check_place", "hud_state", "artist", "reputation", "saves_dir",
+]
+## main.gd 가 발행할 수 있는 명령(메뉴 경로 SN5·불러오기 AC-36a·자동 플레이 AC4).
+const SE040_COMMANDS: Array[String] = [
+	"session.new_game_requested", "session.load_requested", "build.place_requested", "artist.book_requested",
+	"time.speed_requested", "time.next_day_requested",
+]
+
+
+func _is_se040_file(hit: String) -> bool:
+	for p: String in SE040_FILES:
+		if hit.begins_with(p + ":") or hit == p:
+			return true
+	return false
+
+
+func test_se040_sim_driver_calls_step_only_ac1() -> void:
+	var path: String = "res://view/runtime/sim_driver.gd"
+	var calls: PackedStringArray = _grep_code(PackedStringArray([path]), "\\bsession\\.[a-z_]+\\(")
+	assert_eq(calls.size(), 1, "sim_driver.gd 의 session.<메서드>( 호출 1건: %s" % ", ".join(calls))
+	for h: String in calls:
+		assert_true(h.contains("session.step("), "그 1건은 step(: %s" % h)
+	# _process 는 drive 하나만 부른다(drive 안의 호출이 위 1건).
+	var src: String = FileAccess.get_file_as_string(path)
+	assert_true(src.contains("func _process(delta: float) -> void:\n\tdrive(delta)"), "_process → drive(delta) 뿐")
+	# 대조군: 다른 메서드 호출은 걸린다.
+	var re: RegEx = RegEx.create_from_string("\\bsession\\.[a-z_]+\\(")
+	assert_not_null(re.search("session.advance(1)"), "대조군: advance 호출도 정규식에 걸린다")
+
+
+func test_se040_main_scene_boundary() -> void:
+	var main: String = "res://view/scenes/main.gd"
+	var srcs: PackedStringArray = _gd_sources()
+	for f: String in SE040_FILES:
+		assert_true(srcs.has(f), "검사 대상에 %s 포함" % f)
+	var files: PackedStringArray = PackedStringArray([main])
+	# (1) session 멤버 사용은 허용 목록만.
+	# 문자열 안의 이벤트 이름("session.loaded")·다른 객체의 .session 은 제외(앞 글자가 따옴표·단어·점이 아님).
+	var re: RegEx = RegEx.create_from_string("(?<![\"\\w.])session\\.([a-z_]+)")
+	var used: Dictionary = {}
+	for h: String in _grep_code(files, "(?<![\"\\w.])session\\."):
+		for m: RegExMatch in re.search_all(_code_part(h.substr(h.find(": ") + 2))):
+			used[m.get_string(1)] = true
+			assert_true(SE040_SESSION_MEMBERS.has(m.get_string(1)), "허용된 session 멤버만: %s" % h)
+	for must: String in ["new_game", "bus", "check_place", "hud_state"]:
+		assert_true(used.has(must), "session.%s 사용 확인(검사 동작)" % must)
+	# (2) 발행은 정해진 *_requested 명령 리터럴만.
+	var pub_re: RegEx = RegEx.create_from_string("\\.publish\\(\\s*\"([a-z_]+\\.[a-z_]+_requested)\"")
+	var pubs: PackedStringArray = _grep_code(files, "\\.publish\\(")
+	assert_gt(pubs.size(), 0, "main.gd 발행 지점 있음")
+	for h: String in pubs:
+		var m: RegExMatch = pub_re.search(h)
+		assert_not_null(m, "*_requested 리터럴만: %s" % h)
+		if m != null:
+			assert_true(SE040_COMMANDS.has(m.get_string(1)), "정해진 명령만: %s" % m.get_string(1))
+	# (3) AC-37b·AC-36a: EventBus.new() 0, restore( 0, res://world·BuildSystem 0(전체 view/ui).
+	assert_eq(_grep_code(files, "EventBus\\.new\\(").size(), 0, "main.gd 는 EventBus.new() 를 부르지 않는다")
+	var restores: PackedStringArray = _grep_code(srcs, "\\.restore\\(")
+	assert_eq(restores.size(), 0, "view/ui 에 .restore( 호출 0(AC-36a): %s" % ", ".join(restores))
+	assert_eq(_grep_code(srcs, "\\bBuildSystem\\b").size(), 0, "view/ui 에 BuildSystem 참조 0(AC-37a)")
+	# (4) 고스트 유효성은 check_place 주입.
+	assert_eq(_grep_code(files, "Callable\\(session, \"check_place\"\\)").size(), 1, "Callable(session, \"check_place\") 주입 1곳")
+	# (5) GameSession 참조는 두 파일에만(다른 view/ui 0).
+	for h: String in _grep_code(srcs, "\\bGameSession\\b"):
+		assert_true(_is_se040_file(h), "GameSession 참조는 main.gd·sim_driver.gd 만: %s" % h)
+	# (6) 명령 큐 조작 0.
+	assert_eq(_grep_code(files, "\\b(dispatch_commands|set_pending_commands|normalize_commands)\\(").size(), 0, "명령 큐 조작 0")
