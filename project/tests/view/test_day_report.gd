@@ -258,6 +258,30 @@ func test_se053_ac3_r2_hidden_without_artist_source() -> void:
 	_assert_no_keys(report)
 
 
+## SE-053 QA 보강(AC3 경로): 불러오기 뒤 공연 중 승급 — R2 등급은 artist.grown.grade(승급 뒤)를 쓴다. 기대 문구는 ui_ko.json·artist.json 에서 읽는다.
+func test_se053_qa_loaded_in_show_r2_uses_grown_grade() -> void:
+	report.setup(bus, data, UiText.load_default(), UiParams.load_default())
+	report.set_artist_config(catalog)
+	var id: String = catalog.artist_ids()[0]
+	var base_grade: String = str(catalog.artist(id)["grade"])
+	var promoted: String = ""
+	for g: Variant in UiTestUtil.json(UiTestUtil.ARTIST_PATH).get("grades", []) as Array:
+		if str((g as Dictionary).get("id", "")) == base_grade:
+			promoted = str((g as Dictionary).get("promote_to", ""))
+	assert_false(promoted.is_empty(), "전제: %s 는 승급 대상 등급이 있다" % base_grade)
+	bus.publish("session.loaded", {"day": 5, "phase": "show", "speed": 1, "show_active": true})
+	bus.publish("show.ended", {"day": 5, "artist_id": id, "satisfaction_bp": 6100, "grade": "good", "admissions": 50,
+		"audience": 50, "revenue_hint": 0, "incidents": []})
+	bus.publish("artist.grown", {"day": 5, "artist_id": id, "grade": promoted, "popularity": 50, "skill": 40,
+		"popularity_delta": 2, "skill_delta": 2, "shows_played": 3, "promoted": true})
+	UiTestUtil.enter_phase(bus, UiTestUtil.close_phase(), 5)
+	_assert_no_keys(report)
+	var table: Dictionary = UiTestUtil.json(UiText.UI_PATH).get("strings", {}) as Dictionary
+	var r2: String = report.get_row_text("R2")
+	assert_true(r2.contains(str(table["ui.artist.grade.%s" % promoted])), "승급 뒤 등급 문구: %s" % r2)
+	assert_false(r2.contains(str(table["ui.artist.grade.%s" % base_grade])), "승급 전 등급 문구 아님: %s" % r2)
+
+
 func _assert_no_keys(n: Node) -> void:
 	var re: RegEx = RegEx.create_from_string("(^|\\s)ui\\.[a-z0-9_]+\\.")
 	var texts: PackedStringArray = PackedStringArray()
