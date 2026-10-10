@@ -5,6 +5,12 @@ extends GutTest
 ## SE-056 AC1~AC5(session.* 계약 SN1~SN5, docs/gdd/events.md #session-명령-규칙)는 파일 끝 절.
 
 const DIR: String = "user://test_se036_session"
+## SE-057 데이터 루트 사본(res://data 복사, save/ 만 바꾼다).
+const ROOT_NO_SAVE: String = "user://test_se057_root_nosave"
+const ROOT_KEEP2: String = "user://test_se057_root_keep2"
+const ROOT_SCRATCH: String = "user://test_se057_scratch"
+const SAVE_JSON_REL: String = "save/save.json"
+const MANUAL_SLOT: String = "1"
 const SEED: int = 36
 const ARTIST: String = "thumbnail_soda"
 const LAYOUT: String = "baseline_show"
@@ -30,6 +36,11 @@ func before_all() -> void:
 
 func after_each() -> void:
 	_rm_dir(DIR)
+
+
+func after_all() -> void:
+	for r: String in [ROOT_NO_SAVE, ROOT_KEEP2, ROOT_SCRATCH]:
+		_rm_tree(r)
 
 
 # --- 도우미 ----------------------------------------------------------------------
@@ -212,9 +223,13 @@ func test_autosave_each_close_and_keep() -> void:
 	assert_eq(s.list_autosave_days(), [2, 3], "보관 수 2 초과분(1일차) 삭제")
 
 
+## SE-057: 기본 데이터 루트에는 save.json autosave_keep 이 있으므로 "필드 없음 → 무제한" 은 save/ 없는 데이터 루트로 본다.
 func test_autosave_unlimited_by_default_and_disable() -> void:
-	var s: GameSession = _session(false)
-	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED, "데이터 필드가 없으면 무제한")
+	var root: String = _data_root_copy(ROOT_NO_SAVE, {})
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED, root), "save/ 없는 데이터 루트로 시작")
+	s.saves_dir = DIR
+	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED, "save.json 이 없으면 무제한(SV4)")
 	for d: int in range(2):
 		s.advance(_day_ticks())
 		s.bus.publish("time.next_day_requested", {})
@@ -624,3 +639,181 @@ func test_se040_check_place_invalid_matches_build_system() -> void:
 		assert_eq(r.slice(1), [true, 0, true], "상태 해시 불변, 이벤트 0, 대기 명령 불변")
 	assert_eq(GameSession.new().check_place(fid, Vector2i.ZERO, rot), BuildSystem.R_INVALID, "새 게임 전 → invalid")
 	assert_push_error_count(0)
+
+# --- SE-057 save.json autosave_keep (docs/gdd/tick.md #세이브-설정-savejson SV1~SV5) --------------------------
+
+## res://data 를 dst 로 복사한다. save/ 는 복사하지 않고, save_json 이 비어 있지 않으면 dst/save/save.json 으로 쓴다.
+## 이미 있으면 다시 만들지 않는다(after_all 이 지운다). 반환 = dst.
+func _data_root_copy(dst: String, save_json: Dictionary) -> String:
+	if not DirAccess.dir_exists_absolute(dst):
+		_copy_tree(GameSession.DEFAULT_DATA_ROOT, dst, ["save"])
+		if not save_json.is_empty():
+			_write_text(dst.path_join(SAVE_JSON_REL), JSON.stringify(save_json))
+	return dst
+
+
+func _copy_tree(src: String, dst: String, skip_dirs: Array) -> void:
+	DirAccess.make_dir_recursive_absolute(dst)
+	for f: String in DirAccess.get_files_at(src):
+		DirAccess.copy_absolute(src.path_join(f), dst.path_join(f))
+	for d: String in DirAccess.get_directories_at(src):
+		if not skip_dirs.has(d):
+			_copy_tree(src.path_join(d), dst.path_join(d), [])
+
+
+func _rm_tree(path: String) -> void:
+	if not DirAccess.dir_exists_absolute(path):
+		return
+	for d: String in DirAccess.get_directories_at(path):
+		_rm_tree(path.path_join(d))
+	for f: String in DirAccess.get_files_at(path):
+		DirAccess.remove_absolute(path.path_join(f))
+	DirAccess.remove_absolute(path)
+
+
+func _write_text(path: String, text: String) -> void:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+
+
+## 기본 save.json 사본에서 autosave_keep 만 바꾼 Dictionary(다른 필드는 데이터 그대로).
+func _save_json_with_keep(keep: Variant) -> Dictionary:
+	var d: Dictionary = JsonUtil.read_json(GameSession.SAVE_CONFIG_PATH)
+	d[GameSession.KEY_AUTOSAVE_KEEP] = keep
+	return d
+
+
+## 낮부터 close 까지 1일, 다음 날로 넘기지 않는다(close 경계 = 오토세이브 시점).
+func _to_close(s: GameSession) -> void:
+	assert_eq(s.advance(_day_ticks()), _day_ticks())
+	assert_eq(s.loop.phase, "close")
+
+
+func _next(s: GameSession) -> void:
+	s.bus.publish("time.next_day_requested", {})
+	s.advance(0)
+
+
+## 수동 슬롯 "1" 저장(경계 명령). 오토세이브 보관 수에 세지 않아야 한다(SV3).
+func _manual_save(s: GameSession) -> void:
+	s.bus.publish("session.save_requested", {"slot": MANUAL_SLOT})
+	s.advance(0)
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯 파일")
+
+
+## AC2 (tick.md SV 절 수용 기준): autosave_keep 2 를 주입한 데이터 루트로 3일 → 3일차 close 뒤 day1 없음, day2·day3 있음.
+## 수동 슬롯 "1" 은 남는다.
+func test_se057_ac2_keep2_data_root_drops_oldest_on_third() -> void:
+	var root: String = _data_root_copy(ROOT_KEEP2, _save_json_with_keep(2))
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED, root))
+	s.saves_dir = DIR
+	assert_eq(s.autosave_keep, 2, "save.json autosave_keep 적용(SV1)")
+	_manual_save(s)
+	_to_close(s)
+	_next(s)
+	_to_close(s)
+	assert_eq(s.list_autosave_days(), [1, 2], "2개까지는 지우지 않는다")
+	_next(s)
+	_to_close(s)
+	assert_false(FileAccess.file_exists(s.autosave_path(1)), "3개째에서 가장 오래된 day1 삭제")
+	assert_true(FileAccess.file_exists(s.autosave_path(2)))
+	assert_true(FileAccess.file_exists(s.autosave_path(3)), "방금 쓴 파일은 남는다")
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯은 세지도 지우지도 않는다")
+	assert_eq(get_errors().size(), 0, "오류 0")
+
+
+## AC2: 데이터 루트에 save/ 가 없으면 3일 뒤 세 파일이 다 있다(SV4). 수동 슬롯도 남는다.
+func test_se057_ac2_no_save_dir_keeps_all() -> void:
+	var root: String = _data_root_copy(ROOT_NO_SAVE, {})
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED, root))
+	s.saves_dir = DIR
+	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED)
+	_manual_save(s)
+	for d: int in range(3):
+		if d > 0:
+			_next(s)
+		_to_close(s)
+	assert_eq(s.list_autosave_days(), [1, 2, 3], "무제한")
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)))
+	assert_eq(get_errors().size(), 0, "save.json 없음은 오류가 아니다")
+
+
+## SV1: 기본 데이터 루트는 res://data/save/save.json 의 값을 쓴다(리터럴이 아니라 파일에서 읽어 비교).
+func test_se057_default_data_root_reads_save_json() -> void:
+	var want: Variant = JsonUtil.as_int((JsonUtil.read_json(GameSession.SAVE_CONFIG_PATH) as Dictionary)[GameSession.KEY_AUTOSAVE_KEEP])
+	assert_not_null(want, "기본 save.json 에 autosave_keep(int)")
+	assert_eq(GameSession.load_configs()[GameSession.KEY_AUTOSAVE_KEEP], want, "load_configs 가 읽는다")
+	assert_eq(_cfgs[GameSession.KEY_AUTOSAVE_KEEP], want)
+	var s: GameSession = GameSession.new()
+	assert_true(s.new_game(SEED))
+	assert_eq(s.autosave_keep, want, "new_game 이 적용")
+	var t: GameSession = GameSession.new()
+	var cfgs: Dictionary = _cfgs.duplicate()
+	cfgs.erase(GameSession.KEY_AUTOSAVE_KEEP)
+	assert_true(t.new_game_from_configs(SEED, cfgs), "키 없는 configs 도 시작한다(선택 키)")
+	assert_eq(t.autosave_keep, GameSession.KEEP_UNLIMITED, "키 없음 → 무제한")
+
+
+## SV4: 파일 없음·키 없음 → 0, 오류 0. 정수값 float(JSON 숫자)은 int 로.
+func test_se057_sv4_missing_file_or_key_unlimited() -> void:
+	assert_eq(GameSession.read_autosave_keep(ROOT_SCRATCH.path_join("none/save.json")), GameSession.KEEP_UNLIMITED)
+	var d: Dictionary = _save_json_with_keep(0)
+	d.erase(GameSession.KEY_AUTOSAVE_KEEP)
+	var p: String = ROOT_SCRATCH.path_join("nokey.json")
+	_write_text(p, JSON.stringify(d))
+	assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "키 없음")
+	_write_text(p, JSON.stringify(_save_json_with_keep(2)))
+	assert_eq(GameSession.read_autosave_keep(p), 2, "JSON 숫자 2(float) → 2")
+	_write_text(p, JSON.stringify(_save_json_with_keep(0)))
+	assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "0 = 무제한")
+	assert_eq(get_errors().size(), 0, "오류 0")
+
+
+## SV5: int 아님·음수 → push_error 1회 후 0. JSON 객체가 아닌 파일도 push_error 1회 후 0. configs 주입값도 같은 규칙.
+func test_se057_sv5_invalid_value_error_once_then_unlimited() -> void:
+	var p: String = ROOT_SCRATCH.path_join("bad.json")
+	var bads: Array = [-1, "3", 1.5, true, null, [2]]
+	for i: int in range(bads.size()):
+		_write_text(p, JSON.stringify(_save_json_with_keep(bads[i])))
+		assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "잘못된 값 %s → 무제한" % [bads[i]])
+		assert_push_error_count(i + 1, "값 %s 당 push_error 1" % [bads[i]])
+	_write_text(p, "[1, 2]")
+	assert_eq(GameSession.read_autosave_keep(p), GameSession.KEEP_UNLIMITED, "객체가 아닌 JSON")
+	assert_push_error_count(bads.size() + 1, "객체 아님 push_error 1")
+	var s: GameSession = GameSession.new()
+	var cfgs: Dictionary = _cfgs.duplicate()
+	cfgs[GameSession.KEY_AUTOSAVE_KEEP] = -2
+	assert_true(s.new_game_from_configs(SEED, cfgs), "잘못된 보관 수는 시작을 막지 않는다")
+	assert_eq(s.autosave_keep, GameSession.KEEP_UNLIMITED)
+	assert_push_error_count(bads.size() + 2, "configs 주입값 push_error 1")
+
+
+## SV3: 오토세이브 쓰기가 실패한 경계에서는 지우지 않는다. 다음 성공 경계에서 보관 수를 적용한다.
+func test_se057_sv3_no_prune_on_autosave_write_failure() -> void:
+	var s: GameSession = _session(false)
+	s.autosave_keep = GameSession.KEEP_UNLIMITED
+	_manual_save(s)
+	_to_close(s)
+	_next(s)
+	_to_close(s)
+	assert_eq(s.list_autosave_days(), [1, 2])
+	s.autosave_keep = 1
+	var blocker: String = s.autosave_path(3) + SaveFile.TMP_SUFFIX
+	DirAccess.make_dir_recursive_absolute(blocker)               # 임시 파일 경로가 디렉터리 → 3일차 쓰기 실패
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.saved"])
+	_next(s)
+	_to_close(s)
+	assert_eq(rec.events, [], "쓰기 실패 → session.saved 0")
+	assert_gte(get_errors().size(), 1, "SaveFile push_error")
+	for e: Variant in get_errors():
+		e.handled = true
+	assert_eq(s.list_autosave_days(), [1, 2], "실패 경계에서는 보관 수 1 이어도 지우지 않는다")
+	DirAccess.remove_absolute(blocker)
+	_next(s)
+	_to_close(s)
+	assert_eq(s.list_autosave_days(), [4], "다음 성공 경계에서 보관 수 적용")
+	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯은 남는다")

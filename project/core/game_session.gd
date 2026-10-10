@@ -24,6 +24,7 @@ extends RefCounted
 ## build.placed(설치 인스턴스 순서대로 전부) → build.coverage_changed {cause:"sync"} → reputation.changed {delta:0}.
 ## economy 는 재발행하지 않는다(cash()·ticket_price()·hud_state() 접근자로 읽는다). show.started·time.phase_changed·
 ## artist.lineup_set 은 재발행하지 않는다(구독 시스템이 다시 반응해 상태·난수가 바뀐다, SE-049).
+## 오토세이브 보관 수(SE-057, tick.md SV1~SV5): <data_root>/save/save.json 의 autosave_keep. 없으면 무제한.
 
 const CMD_SAVE: String = "session.save_requested"
 const CMD_LOAD: String = "session.load_requested"
@@ -52,8 +53,13 @@ const DEFAULT_DATA_ROOT: String = "res://data"
 const DEFAULT_SAVES_DIR: String = "user://saves"
 const SAVE_EXT: String = ".sav"
 const AUTOSAVE_PREFIX: String = "autosave_day"
-## autosave_keep 의 "무제한" 값. 보관 수 데이터 필드(game-designer 요청, SE-036 결과 절)가 생길 때까지 기본값이다.
+## autosave_keep 의 "무제한" 값(tick.md SV3·SV4). save.json 이 없거나 키가 없거나 값이 잘못됐을 때도 이 값이다.
 const KEEP_UNLIMITED: int = 0
+## 세이브 설정 테이블(tick.md #세이브-설정-savejson SV1, SE-057). load_configs 가 data_root 기준으로 옮겨 읽는다.
+const SAVE_CONFIG_PATH: String = "res://data/save/save.json"
+## save.json 의 오토세이브 보관 수 필드이자 load_configs() 결과의 같은 이름 키(선택 키, 없으면 무제한).
+## manual_slots 는 sim 이 읽지 않는다(SV2 — 메뉴 SE-040 몫).
+const KEY_AUTOSAVE_KEEP: String = "autosave_keep"
 const NO_DAY: int = 0
 
 ## load_configs() 가 돌려주는 키. 값이 null 이면 new_game 실패.
@@ -64,7 +70,8 @@ const SYSTEM_IDS: Array[String] = ["build", "artist", "audience", "show", "econo
 ## 저장 위치(테스트는 임시 경로를 주입한다). 슬롯 s 의 파일 = saves_dir/s.sav.
 var saves_dir: String = DEFAULT_SAVES_DIR
 var autosave_enabled: bool = true
-## 오토세이브 보관 수. KEEP_UNLIMITED(0) = 무제한. 데이터 필드가 없어 기본은 무제한이고 테스트는 주입한다.
+## 오토세이브 보관 수. KEEP_UNLIMITED(0) = 무제한. new_game 이 configs[KEY_AUTOSAVE_KEEP](save.json, SV1)로 정하고,
+## 그 뒤 테스트가 덮어쓸 수 있다.
 var autosave_keep: int = KEEP_UNLIMITED
 ## 마지막으로 쓴 오토세이브 경로("" = 없음).
 var last_autosave_path: String = ""
@@ -112,6 +119,7 @@ static var _slot_re: RegEx = null
 ## data_root 아래 설정 테이블을 읽는다. 경로는 각 Config 의 기본 경로에서 DEFAULT_DATA_ROOT 를 data_root 로 바꾼 것.
 ## (Config 가 내부에서 읽는 교차 테이블 — tiers·economy·genres 등 — 은 각 Config 의 고정 경로 그대로다.)
 ## 값이 null 인 항목은 그 Config 의 로드 실패(Config 가 push_error 를 이미 냈다).
+## KEY_AUTOSAVE_KEEP(int) 는 <data_root>/save/save.json 의 보관 수(read_autosave_keep, SV4·SV5 적용 뒤 값)다.
 static func load_configs(data_root: String = DEFAULT_DATA_ROOT) -> Dictionary:
 	var sim: SimConfig = SimConfig.load(_rebase(SimConfig.DEFAULT_PATH, data_root))
 	var bcfg: BuildConfig = BuildConfig.load(_rebase(FurnitureConfig.DEFAULT_PATH, data_root), _rebase(MapConfig.DEFAULT_PATH, data_root))
@@ -123,7 +131,30 @@ static func load_configs(data_root: String = DEFAULT_DATA_ROOT) -> Dictionary:
 		"show": ShowConfig.load(_rebase(ShowConfig.DEFAULT_PATH, data_root)),
 		"economy": EconomyConfig.load(_rebase(EconomyConfig.DEFAULT_PATH, data_root)),
 		"reputation": ReputationConfig.load(_rebase(ReputationConfig.DEFAULT_PATH, data_root)),
+		KEY_AUTOSAVE_KEEP: read_autosave_keep(_rebase(SAVE_CONFIG_PATH, data_root)),
 	}
+
+
+## save.json 의 autosave_keep(tick.md SV4·SV5). 파일 없음·키 없음 → KEEP_UNLIMITED(오류 없음).
+## 파일이 JSON 객체가 아니거나 값이 int 가 아니거나 0 미만 → push_error 1회, KEEP_UNLIMITED(잘못된 데이터로 세이브를 지우지 않는다).
+static func read_autosave_keep(path: String) -> int:
+	if not FileAccess.file_exists(path):
+		return KEEP_UNLIMITED
+	var d: Variant = JsonUtil.read_json(path, "GameSession")
+	if d == null:
+		return KEEP_UNLIMITED
+	if not (d as Dictionary).has(KEY_AUTOSAVE_KEEP):
+		return KEEP_UNLIMITED
+	return _valid_keep((d as Dictionary)[KEY_AUTOSAVE_KEEP], path)
+
+
+## int(정수값 float 포함)이고 0 이상이면 그 값, 아니면 push_error 1회 후 KEEP_UNLIMITED(SV5).
+static func _valid_keep(v: Variant, where: String) -> int:
+	var n: Variant = JsonUtil.as_int(v)
+	if n == null or int(n) < KEEP_UNLIMITED:
+		push_error("[GameSession] %s: %s 가 0 이상의 int 가 아니다(%s) — 무제한으로 둔다" % [where, KEY_AUTOSAVE_KEEP, v])
+		return KEEP_UNLIMITED
+	return n
 
 
 ## 새 게임. 설정 로드·시스템 생성·등록이 하나라도 실패하면 push_error 1회(GameSession), false.
@@ -131,7 +162,7 @@ func new_game(seed_value: int, data_root: String = DEFAULT_DATA_ROOT) -> bool:
 	return new_game_from_configs(seed_value, load_configs(data_root))
 
 
-## 이미 읽은 설정으로 새 게임(테스트가 설정을 한 번만 읽고 재사용한다). configs 키 = CONFIG_KEYS.
+## 이미 읽은 설정으로 새 게임(테스트가 설정을 한 번만 읽고 재사용한다). configs 키 = CONFIG_KEYS(필수) + KEY_AUTOSAVE_KEEP(선택).
 ## 생성·구독·register_system 순서 = sim.json system_order(build → artist → audience → show → economy → reputation).
 func new_game_from_configs(seed_value: int, configs: Dictionary) -> bool:
 	if _loop != null:
@@ -179,6 +210,9 @@ func new_game_from_configs(seed_value: int, configs: Dictionary) -> bool:
 	_economy = made["economy"]
 	_reputation = made["reputation"]
 	_configs = configs
+	autosave_keep = KEEP_UNLIMITED
+	if configs.has(KEY_AUTOSAVE_KEEP):                 # 선택 키(직접 만든 configs 에는 없을 수 있다 → 무제한, SV4)
+		autosave_keep = _valid_keep(configs[KEY_AUTOSAVE_KEEP], "configs")
 	_loop.bus.subscribe(CMD_SAVE, _on_save_requested)
 	_loop.bus.subscribe(CMD_LOAD, _on_load_requested)
 	_loop.bus.subscribe(CMD_NEW_GAME, _on_new_game_requested)

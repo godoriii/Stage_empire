@@ -27,11 +27,12 @@ const COMPARE_EVENTS: Array[String] = [
 	"reputation.changed", "reputation.tier_unlocked", "economy.cash_changed", "economy.day_settled",
 	"economy.bailout_offered", "economy.bankrupt",
 ]
-## AC2 방향 단언(30일 모드): 자금 30,000·명성 500·티어 해금 1회가 20~30일 사이(economy tier1_baseline 25일, reputation RT1 20~30).
-const TIER2_CASH: int = 30000
-const TIER2_REP: int = 500
-const RT_MIN_DAY: int = 20
-const RT_MAX_DAY: int = 30
+## AC2 방향 단언(30일 모드) = reputation.md "통합 기준 시나리오" IB1~IB3 (SE-057). 임계·범위는 리터럴이 아니라 데이터에서 읽는다:
+## 해금 티어 = ReputationConfig.START_TIER + 1, 임계 = tiers.json(ReputationConfig.tier_threshold),
+## 해금일 범위 = reputation.json checks 의 이 키(IB1).
+const UNLOCK_DAY_RANGE_KEY: String = "tier2_reputation_day_range"
+const KEY_UNLOCK_CASH: String = "unlock_cash"
+const KEY_UNLOCK_REP: String = "unlock_reputation"
 
 var _days: int = DAYS_SHORT
 var _save_day: int = SAVE_DAY_SHORT
@@ -73,6 +74,8 @@ func _new_session(dir: String) -> GameSession:
 	var s: GameSession = GameSession.new()
 	assert_true(s.new_game_from_configs(SEED, _cfgs))
 	s.saves_dir = dir
+	# 저장/로드 비교가 SAVE_DAY 오토세이브를 쓰므로 save.json autosave_keep(SE-057)과 무관하게 전부 보관한다.
+	s.autosave_keep = GameSession.KEEP_UNLIMITED
 	return s
 
 
@@ -148,7 +151,7 @@ func test_a_runs_clean_and_counts() -> void:
 	assert_eq(rec.count("show.skipped"), 0)
 	assert_eq(rec.count("economy.day_settled"), _days)
 	assert_eq(rec.count("economy.bailout_offered") + rec.count("economy.bankrupt"), 0, "구제·파산 없음")
-	assert_eq(DirAccess.get_files_at(DIR_A).size(), _days, "매 close 오토세이브(보관 무제한)")
+	assert_eq(DirAccess.get_files_at(DIR_A).size(), _days, "매 close 오토세이브(보관 무제한 주입)")
 
 
 func test_economy_reputation_direction() -> void:
@@ -159,12 +162,25 @@ func test_economy_reputation_direction() -> void:
 		assert_gt(int(rows[i][2]), int(rows[i - 1][2]), "%d일 명성 증가" % rows[i][0])
 	var unlocked: Array = (a["rec"] as EventRecorder).of("reputation.tier_unlocked")
 	assert_lte(unlocked.size(), 1, "티어 해금 최대 1회")
-	if _days >= RT_MAX_DAY:
-		assert_eq(unlocked.size(), 1, "30일 안에 티어 2 해금 1회")
+	var rcfg: ReputationConfig = _cfgs["reputation"]
+	var tier: int = ReputationConfig.START_TIER + 1
+	var th: Dictionary = rcfg.tier_threshold(tier)
+	var rng: Array = rcfg.checks.get(UNLOCK_DAY_RANGE_KEY, [])
+	assert_eq(rng.size(), 2, "reputation.json checks.%s = [min, max]" % UNLOCK_DAY_RANGE_KEY)
+	assert_true(th.has(KEY_UNLOCK_CASH) and th.has(KEY_UNLOCK_REP), "tiers.json tier %d 임계" % tier)
+	if rng.size() != 2 or th.is_empty():
+		return
+	var min_day: int = int(rng[0])
+	var max_day: int = int(rng[1])
+	if _days >= max_day:
+		assert_eq(unlocked.size(), 1, "IB1: %d일 안에 티어 %d 해금 1회" % [max_day, tier])
+		if unlocked.size() != 1:
+			return
+		assert_eq(int(unlocked[0]["tier"]), tier, "IB1: 해금 티어")
 		var ud: int = int(unlocked[0]["day"])
-		assert_between(ud, RT_MIN_DAY, RT_MAX_DAY, "해금일 20~30")
-		assert_gte(int(rows[ud - 1][1]), TIER2_CASH, "해금일 자금 ≥ 30,000")
-		assert_gte(int(rows[ud - 1][2]), TIER2_REP, "해금일 명성 ≥ 500")
+		assert_between(ud, min_day, max_day, "IB1: 해금일 %d~%d" % [min_day, max_day])
+		assert_gte(int(rows[ud - 1][1]), int(th[KEY_UNLOCK_CASH]), "IB2: 해금일 자금 ≥ tiers.json unlock_cash")
+		assert_gte(int(rows[ud - 1][2]), int(th[KEY_UNLOCK_REP]), "IB2: 해금일 명성 ≥ tiers.json unlock_reputation")
 
 
 # --- 결정성 · 저장/로드 --------------------------------------------------------------
