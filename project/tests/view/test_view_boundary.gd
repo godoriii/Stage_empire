@@ -47,11 +47,12 @@ func test_view_does_not_touch_sim_or_data() -> void:
 	assert_eq(scene_refs.size(), 0, "씬/리소스가 sim/core 참조 없음: %s" % ", ".join(scene_refs))
 	# SE-002 의 표시 전용 코드는 이벤트 버스를 쓰지 않는다. SE-037 부터 배치 UI(view/build, ui/build)와
 	# 그것을 붙이는 샌드박스만 EventBus 를 쓴다(구독 + *_requested 발행, test_build_ui_boundary_ac6 이 검사).
+	# SE-038: 군중·무대 연출(view/crowd, view/stage)도 구독용으로 EventBus 를 쓴다(발행 0, test_crowd_stage_boundary_se038).
 	var emits: PackedStringArray = PackedStringArray()
 	for h: String in ViewTestUtil.grep(srcs, "EventBus|event_bus"):
-		if not _is_build_ui_file(h):
+		if not _is_build_ui_file(h) and not _is_se038_file(h):
 			emits.append(h)
-	assert_eq(emits.size(), 0, "배치 UI 밖에서는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
+	assert_eq(emits.size(), 0, "배치 UI·군중/무대 연출 밖에서는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
 
 
 func test_view_does_not_reference_tests() -> void:
@@ -291,6 +292,91 @@ func test_build_data_numbers_not_hardcoded() -> void:
 func test_se037_screenshot_exists_1080p() -> void:
 	var abs_path: String = ProjectSettings.globalize_path(SE037_SHOT)
 	assert_true(FileAccess.file_exists(abs_path), "SE-037 캡처 존재: %s" % SE037_SHOT)
+	if not FileAccess.file_exists(abs_path):
+		return
+	var img: Image = Image.new()
+	assert_eq(img.load(abs_path), OK, "PNG 로드")
+	assert_eq(Vector2i(img.get_width(), img.get_height()), Vector2i(1920, 1080), "1920×1080")
+
+
+# --- SE-038 AC7 -------------------------------------------------------------
+
+## 구독 전용으로 EventBus 를 쓰는 SE-038 폴더.
+const SE038_PREFIXES: Array[String] = ["res://view/crowd/", "res://view/stage/"]
+const SE038_FILES: Array[String] = [
+	"res://view/crowd/crowd_view.gd", "res://view/crowd/crowd_data.gd", "res://view/crowd/crowd_proxy_mesh.gd",
+	"res://view/crowd/crowd_preset.gd", "res://view/crowd/crowd_view_params.gd", "res://view/stage/stage_lights.gd",
+	"res://view/stage/stage_light_params.gd", "res://view/stage/stage_geometry.gd",
+]
+const SE038_SHOT: String = "res://tests/view/screenshots/SE-038/crowd150_show_yaw45_zoom2.png"
+
+
+func _is_se038_file(hit: String) -> bool:
+	for p: String in SE038_PREFIXES:
+		if hit.begins_with(p):
+			return true
+	return false
+
+
+func test_crowd_stage_boundary_se038() -> void:
+	var srcs: PackedStringArray = _gd_sources()
+	for must: String in SE038_FILES:
+		assert_true(srcs.has(must), "검사 대상에 %s 포함" % must)
+	var mine: PackedStringArray = ViewTestUtil.list_sources(SE038_PREFIXES, "gd")
+	var res_files: PackedStringArray = ViewTestUtil.list_sources(SE038_PREFIXES, "tres")
+	assert_eq(res_files.size(), 2, "룩 상수 .tres 2개(crowd_view_params, stage_light_params)")
+	var all_mine: PackedStringArray = mine.duplicate()
+	all_mine.append_array(res_files)
+	# (1) sim/core/world 경로 0건, EventBus 외 sim 클래스 0건(위 test_build_ui_boundary_ac6 가 전체 view/ui 로 검사 — 여기선 대상 포함만 재확인).
+	assert_eq(ViewTestUtil.grep(all_mine, "res://(sim|core|world)/").size(), 0, "res://sim·core·world 0건")
+	# (2) 발행 0: publish·dispatch·명령 큐 조작 없음.
+	var pubs: PackedStringArray = ViewTestUtil.grep(mine, "^[^#]*\\.(publish|dispatch_commands|set_pending_commands)\\(")
+	assert_eq(pubs.size(), 0, "군중·무대 연출은 발행 0: %s" % ", ".join(pubs))
+	# (3) EventBus 는 타입 표기뿐(생성 없음).
+	for h: String in ViewTestUtil.grep(mine, "^[^#]*\\bEventBus\\b"):
+		var code: String = h.get_slice("#", 0).replace(": EventBus", "")
+		assert_null(RegEx.create_from_string("\\bEventBus\\b").search(code), "EventBus 타입 참조만: %s" % h)
+	# (4) _process 는 표시 진행 함수 하나만 부른다(게임 상태 변경 없음).
+	for path: String in ["res://view/crowd/crowd_view.gd", "res://view/stage/stage_lights.gd"]:
+		var body: PackedStringArray = _func_body(path, "_process")
+		assert_eq(body.size(), 1, "%s _process 본문 1줄: %s" % [path.get_file(), " / ".join(body)])
+		if body.size() == 1:
+			assert_eq(body[0].strip_edges(), "advance_display(delta)", "%s _process = advance_display 만" % path.get_file())
+	# (5) 틱 길이·좌표 단위·유형 색은 데이터에서: crowd_view/crowd_data 에 sim.json 값 리터럴 없음.
+	var sim: Dictionary = ViewTestUtil.read_json("res://data/sim/sim.json") as Dictionary
+	var tps: String = str(int(sim["ticks_per_second"]))
+	var tick_lit: PackedStringArray = ViewTestUtil.grep(PackedStringArray(["res://view/crowd/crowd_view.gd", "res://view/crowd/crowd_data.gd"]),
+		"^[^#]*(\\b%s\\b|/\\s*%s(\\.0)?\\b)" % [str(1.0 / float(sim["ticks_per_second"])).replace(".", "\\."), tps])
+	assert_eq(tick_lit.size(), 0, "틱 길이 리터럴 없음: %s" % ", ".join(tick_lit))
+	var hexes: PackedStringArray = PackedStringArray()
+	for t: Dictionary in (ViewTestUtil.read_json("res://data/audience/audience.json") as Dictionary)["types"]:
+		hexes.append(str(t["color"]).trim_prefix("#"))
+	assert_eq(ViewTestUtil.grep(all_mine, "(?i)(%s)" % "|".join(hexes)).size(), 0, "유형 색 hex 리터럴 없음")
+	# 역검증.
+	assert_eq(ViewTestUtil.grep_lines(PackedStringArray(["_bus.publish(\"x.y\", {})", "# _bus.publish(\"x\")"]),
+		"^[^#]*\\.(publish|dispatch_commands|set_pending_commands)\\(").size(), 1, "대조군: publish 1건")
+
+
+## 스크립트에서 func <name>( 의 본문 줄(빈 줄 제외, 다음 최상위 줄 전까지).
+func _func_body(path: String, fname: String) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	var inside: bool = false
+	for line: String in FileAccess.get_file_as_string(path).split("\n"):
+		if line.begins_with("func %s(" % fname):
+			inside = true
+			continue
+		if inside:
+			if line.strip_edges().is_empty():
+				continue
+			if not line.begins_with("\t"):
+				break
+			out.append(line)
+	return out
+
+
+func test_se038_screenshot_exists_1080p() -> void:
+	var abs_path: String = ProjectSettings.globalize_path(SE038_SHOT)
+	assert_true(FileAccess.file_exists(abs_path), "SE-038 캡처 존재: %s" % SE038_SHOT)
 	if not FileAccess.file_exists(abs_path):
 		return
 	var img: Image = Image.new()

@@ -20,6 +20,11 @@ extends Node3D
 ##   이벤트 버스는 이 샌드박스 전용 EventBus 하나(sim 미등록): 클릭한 배치·철거 명령은 명령 큐에 남는다(SE-040 통합 전).
 ##   baseline = 기준 배치(tier1_club reference_layouts[baseline_show]) + 음향 오버레이(BuildPreset 의 가짜 sim 출력).
 ##   없는 프리셋 id 면 push_error + 종료 코드 2.
+##
+## 군중·무대 연출(SE-038): -- --se-crowd-preset=<n> (1 ≤ n ≤ audience.json max_agents) 일 때만 CrowdView·StageLights 를
+##   붙인다. 배치 프리셋이 없으면 baseline 을 함께 붙이고, 오버레이는 끈다(군중이 잘 보이게). CrowdPreset 의 가짜 sim 출력
+##   (조명 가구 + 관객 n 명 watching + show.started)을 핸들러에 직접 넣는다(버스 발행 없음). 범위 밖·숫자 아님이면
+##   push_error + 종료 코드 2. 캡처: -- --se-crowd-preset=150 --se-screenshot=<경로>(줌 기본 = 2).
 
 const SCREENSHOT_ARG: String = "--se-screenshot="
 const HOVER_ARG: String = "--se-hover="
@@ -29,6 +34,8 @@ const PLACEHOLDERS_SCENE: String = "res://view/scenes/shader_placeholders.tscn"
 const EXIT_BAD_MATERIAL: int = 2
 ## 종료 코드: 없는 배치 프리셋 id.
 const EXIT_BAD_BUILD_PRESET: int = 2
+## 종료 코드: 군중 프리셋 값이 틀림(SE-038).
+const EXIT_BAD_CROWD_PRESET: int = 2
 const BUILD_PALETTE_SCENE: String = "res://ui/build/build_palette.tscn"
 ## 스크린샷 전 렌더가 안정될 때까지 기다리는 프레임 수(디버그 기능 전용).
 const SCREENSHOT_WARMUP_FRAMES: int = 10
@@ -51,6 +58,9 @@ var _furniture_view: FurnitureView
 var _ghost: PlacementGhost
 var _overlay: CoverageOverlay
 var _palette: BuildPalette
+## SE-038 군중·무대 연출(군중 프리셋이 있을 때만). 없으면 null.
+var _crowd_view: CrowdView
+var _stage_lights: StageLights
 
 
 func _ready() -> void:
@@ -69,6 +79,10 @@ func _ready() -> void:
 	var preset: String = BuildPreset.resolve(args)
 	if preset != BuildPreset.NONE and not setup_build(preset):
 		get_tree().quit(EXIT_BAD_BUILD_PRESET)
+		return
+	var crowd_raw: String = CrowdPreset.resolve(args)
+	if crowd_raw != CrowdPreset.NONE and not setup_crowd(crowd_raw):
+		get_tree().quit(EXIT_BAD_CROWD_PRESET)
 		return
 	_run_screenshot_if_requested()
 
@@ -95,6 +109,8 @@ func apply_material(id: String) -> bool:
 	_material_id = wanted
 	if _furniture_view != null:
 		_furniture_view.set_material_id(wanted)
+	if _crowd_view != null:
+		_crowd_view.set_material_id(wanted)
 	hud.set_shader_variant(wanted)
 	return true
 
@@ -149,6 +165,68 @@ func setup_build(preset_id: String) -> bool:
 		_overlay.on_coverage_changed(BuildPreset.coverage_payload(_catalog, placed, BuildPreset.BASELINE_LAYOUT_ID))
 		_overlay.set_mode(BuildPreset.BASELINE_OVERLAY_MODE)
 	return true
+
+
+## SE-038: 군중·스포트를 붙이고 CrowdPreset 을 넣는다. raw = --se-crowd-preset 값. 틀리면 push_error 후 false.
+## 이미 붙어 있으면 false. 배치 UI 가 없으면 baseline 을 먼저 붙인다.
+func setup_crowd(raw: String) -> bool:
+	if _crowd_view != null:
+		push_warning("GridSandbox: 군중이 이미 있다")
+		return false
+	var data: CrowdData = CrowdData.load_default()
+	if data == null:
+		return false
+	var n: int = CrowdPreset.parse_count(raw, data.max_agents)
+	if n < 0:
+		push_error("GridSandbox: 군중 프리셋 '%s' 는 1..%d 정수여야 한다" % [raw, data.max_agents])
+		return false
+	if _bus == null and not setup_build(BuildPreset.BASELINE):
+		return false
+	var t: float = grid.get_tile_size_m()
+	_crowd_view = CrowdView.new()
+	_crowd_view.name = "CrowdView"
+	add_child(_crowd_view)
+	if not _crowd_view.bind(_bus, _catalog, data):
+		return false
+	_crowd_view.set_material_id(_material_id if not _material_id.is_empty() else ShaderVariants.DEFAULT_ID)
+	_stage_lights = StageLights.new()
+	_stage_lights.name = "StageLights"
+	add_child(_stage_lights)
+	_stage_lights.bind(_bus, _catalog, t)
+	# 가구: 배치 프리셋의 배치(baseline 이면 기준 배치 6) + 조명 가구(CrowdPreset).
+	var placed: Array[Dictionary] = []
+	if _build_preset == BuildPreset.BASELINE:
+		placed = BuildPreset.placed_payloads(_catalog, BuildPreset.BASELINE_LAYOUT_ID)
+	var stage: Dictionary = {}
+	for p: Dictionary in placed:
+		var st: Dictionary = StageGeometry.from_placed(_catalog, p)
+		if not st.is_empty():
+			stage = st
+	var params: CrowdViewParams = _crowd_view.params
+	placed.append_array(CrowdPreset.light_payloads(_catalog, stage, _stage_lights.params.max_spots,
+		params.preset_light_offset_cells, placed.size() + 1))
+	for p: Dictionary in placed:
+		if _furniture_view.get_instance(str(p["entity_id"])).is_empty():
+			_furniture_view.on_placed(p)
+		_crowd_view.on_placed(p)
+		_stage_lights.on_placed(p)
+	var viewing: Array = BuildPreset.coverage_payload(_catalog, placed).get("viewing_tiles", []) as Array
+	var focus: Vector2i = IsoGridMath.INVALID_TILE
+	if not stage.is_empty():
+		focus = StageGeometry.focus_cell(stage["footprint"], stage["cell"], stage["rotation"])
+	var moved: Dictionary = CrowdPreset.agents_payload(data, viewing, focus, n, params.preset_seed, 0)
+	_crowd_view.on_agent_moved(moved)
+	_stage_lights.on_show_started(CrowdPreset.show_started_payload((moved["agents"] as Array).size()))
+	_overlay.set_mode(CoverageOverlay.MODE_OFF)
+	return true
+
+
+func get_crowd_view() -> CrowdView:
+	return _crowd_view
+
+
+func get_stage_lights() -> StageLights:
+	return _stage_lights
 
 
 func get_build_preset() -> String:
