@@ -1,0 +1,11 @@
+{
+  "asset_id": "light_spot",
+  "category": "light",
+  "footprint": [
+    1,
+    1
+  ],
+  "height_m": 2.4,
+  "poly_budget": "furniture_small",
+  "ticket": "SE-041"
+}

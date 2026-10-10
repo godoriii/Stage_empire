@@ -80,7 +80,7 @@ func test_ac2_row_counts() -> void:
 	assert_gte(multi, 4, "2칸 이상 가구 ≥ 4")
 	assert_gte(int(per_cat.get("stage", 0)), 1, "무대 ≥ 1")
 	# build.md 요약 문단의 리터럴(문서-데이터 동기화 가드).
-	assert_eq([glass, emissive, wall, multi], [1, 6, 8, 9], "build.md 요약: glass 1 / emissive 6 / 벽 8 / 2칸 이상 9")
+	assert_eq([glass, emissive, wall, multi], [1, 8, 8, 9], "build.md 요약: glass 1 / emissive 8 / 벽 8 / 2칸 이상 9")
 
 
 func test_ac2_rows_internal_consistency() -> void:

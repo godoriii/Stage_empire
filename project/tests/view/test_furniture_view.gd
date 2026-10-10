@@ -149,3 +149,30 @@ func test_model_branch_loads_scene_when_model_exists() -> void:
 	assert_not_null(view.get_instance_node("f1").get_node_or_null(^"Model"), "model 리소스가 있으면 Model")
 	assert_null(view.get_instance_node("f1").get_node_or_null(^"Proxy"), "Model 이면 Proxy 없음")
 	assert_not_null(view.get_instance_node("f2").get_node_or_null(^"Proxy"), "model 경로에 리소스가 없으면 Proxy")
+
+
+## SE-041 QA: furniture.json 에 실제로 등록된 model 행(5종)은 리소스가 없는 동안(검수 전) 프록시로 그린다.
+## 검수 통과 뒤 사람이 .glb 를 assets/models 로 옮기면 같은 테스트가 Model 분기를 기대한다(데이터·테스트 수정 불필요).
+## 경고 무발행은 코드 경로로 보장한다: push_warning 은 exists()==true 인데 PackedScene 로드가 실패할 때만 호출된다(furniture_view.gd).
+func test_registered_models_follow_resource_existence() -> void:
+	var rows: Array = BuildTestUtil.furniture_json()["rows"]
+	var registered: Array[String] = []
+	for r: Dictionary in rows:
+		if str(r.get("model", "")).is_empty():
+			continue
+		registered.append(str(r["id"]))
+		assert_eq(str(r["model"]), "res://assets/models/%s.glb" % r["id"], "FC4 규약 경로: %s" % r["id"])
+	assert_gte(registered.size(), 5, "SE-041: model 등록 행 ≥ 5")
+	for i: int in rows.size():
+		var r: Dictionary = rows[i]
+		if str(r.get("model", "")).is_empty():
+			continue
+		var fid: String = "m%d" % i
+		_bus.publish("build.placed", BuildTestUtil.placed(fid, r["id"], _cell_for(i), 0))
+		var node: Node3D = _view.get_instance_node(fid)
+		assert_not_null(node, "%s 노드" % r["id"])
+		if node == null:
+			continue
+		var has_res: bool = ResourceLoader.exists(str(r["model"]))
+		assert_eq(node.get_node_or_null(^"Model") != null, has_res, "%s: 리소스 %s → Model" % [r["id"], has_res])
+		assert_eq(node.get_node_or_null(^"Proxy") != null, not has_res, "%s: 리소스 %s → Proxy" % [r["id"], not has_res])

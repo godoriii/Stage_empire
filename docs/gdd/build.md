@@ -128,7 +128,7 @@ z23  ########################
 | `poly_budget` | `furniture_small` \| `equipment_large` | style-guide "폴리곤 예산"의 칸(값은 style-guide 에만, GLTF_SPEC §7) |
 | `slots` | `{base, accent?, emissive?, glass?}` | 슬롯별 색. 임시 hex `#RRGGBB` 또는 팔레트 id `pal_*`(materials.md Q1 (a)). 키가 있는 슬롯 = 그 서피스가 있는 모델 |
 | `effects` | 7키 전부 필수 | 커버리지 입력(#커버리지). 0/false = 효과 없음 |
-| `model` | String(선택) | **예약.** `res://assets/models/<id>.glb`. 없거나 `""`이면 플레이스홀더(SE-041 이 등록). v0 는 20행 전부 키 없음 |
+| `model` | String(선택) | **예약.** `res://assets/models/<id>.glb`. 없거나 `""`이면 플레이스홀더. 값이 있어도 그 경로에 리소스가 없으면(검수 전) 플레이스홀더(FurnitureView `ResourceLoader.exists` 분기, 경고 없음). SE-041: `stage_medium`·`bar_counter`·`speaker_floor`·`bar_fridge`·`light_spot` 5행 등록(테스트용 에셋, 교체 시 파일만 바꾸고 경로는 그대로), 나머지 15행은 키 없음 |
 
 ### 상태
 
@@ -351,7 +351,7 @@ FC6(economy 가정 목록 `reference_sets[economy_tier1_baseline]`의 합 == `ec
 | 철거 | 철거 도구로 인스턴스 셀 클릭 → `build.demolish_requested {entity_id}`. 확인창의 환불액 표시는 `⌊paid × demolish_refund_rate_bp ÷ rate_scale⌋`(`economy.json` 읽기) |
 | 구간 | 낮이 아니면 팔레트·철거 도구를 비활성으로 보여도 된다. 그래도 보낸 명령은 B2/D2 로 거절된다 |
 | 오버레이 | 음향·시야·바 = `build.coverage_changed`의 `sound_tiles`·`sight_tiles`·`bar_tiles`(관람 타일 중 덮인 것) vs `viewing_tiles`. 설비 반경 미리보기 = 선택 가구의 `effects.*_radius`를 C1 의 거리식으로 그린다 |
-| 렌더 | 위치·회전 = G5. 모델이 없으면(`model` 없음) `footprint × height_m` 상자 플레이스홀더, 색은 `slots.base` |
+| 렌더 | 위치·회전 = G5. 모델이 없으면(`model` 없음, 또는 경로에 리소스 없음) `footprint × height_m` 상자 플레이스홀더, 색은 `slots.base` |
 
 ## 수치표
 
@@ -363,7 +363,7 @@ FC6(economy 가정 목록 `reference_sets[economy_tier1_baseline]`의 합 == `ec
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `stage_small` | 소형 무대 | stage | 4×3 | 0.6 | 1,000 | 45 | 300 | O | — | large | base, accent | 음향 5, 시야차단 |
 | `stage_medium` | 중형 무대 | stage | 6×4 | 0.8 | 2,200 | 80 | 660 | O | — | large | base, accent, emissive | 음향 6, 시야차단, 만족 200, 연출 1 |
-| `speaker_floor` | 바닥 스피커 | sound | 1×1 | 1.2 | 200 | 15 | 60 | O | — | small | base, accent | 음향 7 |
+| `speaker_floor` | 바닥 스피커 | sound | 1×1 | 1.2 | 200 | 15 | 60 | O | — | small | base, emissive | 음향 7 |
 | `speaker_stack` | 스피커 스택 | sound | 2×1 | 2.2 | 550 | 25 | 165 | O | — | large | base, accent | 음향 10, 시야차단 |
 | `stage_monitor` | 모니터 스피커 | sound | 1×1 | 0.4 | 120 | 5 | 36 | O | — | small | base | 음향 2, 만족 100 |
 | `light_spot` | 스포트 조명 | light | 1×1 | 2.4 | 100 | 10 | 30 | O | — | small | base, emissive | 연출 1 |
@@ -371,7 +371,7 @@ FC6(economy 가정 목록 `reference_sets[economy_tier1_baseline]`의 합 == `ec
 | `fog_machine` | 포그 머신 | light | 1×1 | 0.5 | 180 | 8 | 54 | — | — | small | base | 연출 1 |
 | `led_panel` | LED 패널 | light | 2×1 | 2.4 | 900 | 35 | 270 | O | — | large | base, emissive | 연출 2, 시야차단 |
 | `bar_counter` | 바 카운터 | bar | 3×1 | 1.1 | 500 | 40 | 150 | O | — | large | base, accent | 바 8 |
-| `bar_fridge` | 음료 냉장고 | bar | 1×1 | 1.9 | 300 | 12 | 90 | O | O | small | base, accent, **glass** | 바 3, 시야차단 |
+| `bar_fridge` | 음료 냉장고 | bar | 1×1 | 1.9 | 300 | 12 | 90 | O | O | small | base, emissive, **glass** | 바 3, 시야차단 |
 | `toilet_booth` | 화장실 칸 | amenity | 1×2 | 2.2 | 250 | 15 | 75 | O | O | large | base, accent | 만족 300, 시야차단 |
 | `locker` | 물품보관함 | amenity | 2×1 | 1.8 | 220 | 6 | 66 | O | O | small | base, accent | 만족 150, 시야차단 |
 | `bench` | 벤치 | amenity | 2×1 | 0.45 | 120 | 4 | 36 | O | — | small | base | 수용 +4, 만족 50 |
@@ -382,7 +382,7 @@ FC6(economy 가정 목록 `reference_sets[economy_tier1_baseline]`의 합 == `ec
 | `poster_board` | 포스터 보드 | decor | 1×1 | 1.6 | 40 | 1 | 12 | O | O | small | base, accent | 만족 50 |
 | `neon_sign` | 네온 사인 | decor | 1×1 | 1.8 | 200 | 6 | 60 | O | O | small | base, emissive | 만족 100 |
 
-요약(AC2): 카테고리 7종 전부 ≥ 1(무대 2·음향 3·조명 4·바 2·편의 4·안전 3·장식 2). `glass` 1(`bar_fridge`). `emissive` 6(`stage_medium`, `light_spot`, `light_moving_head`, `led_panel`, `exit_sign`, `neon_sign`). 벽 필요 8. 2칸 이상 9(`stage_small`, `stage_medium`, `speaker_stack`, `led_panel`, `bar_counter`, `toilet_booth`, `locker`, `bench`, `exit_door`). 회전 불가 2(`fog_machine`, `standing_table` — 위에서 보아 대칭이고 벽이 필요 없다). `poly_budget` large 7 / small 13.
+요약(AC2): 카테고리 7종 전부 ≥ 1(무대 2·음향 3·조명 4·바 2·편의 4·안전 3·장식 2). `glass` 1(`bar_fridge`). `emissive` 8(`stage_medium`, `speaker_floor`, `light_spot`, `light_moving_head`, `led_panel`, `bar_fridge`, `exit_sign`, `neon_sign`). 벽 필요 8. 2칸 이상 9(`stage_small`, `stage_medium`, `speaker_stack`, `led_panel`, `bar_counter`, `toilet_booth`, `locker`, `bench`, `exit_door`). 회전 불가 2(`fog_machine`, `standing_table` — 위에서 보아 대칭이고 벽이 필요 없다). `poly_budget` large 7 / small 13.
 FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. 전부 > 0.
 
 ### 가격 근거
@@ -503,6 +503,7 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 | 2026-10-09 | build.md v0, `furniture.json` v1 + `furniture.schema.json` version 1, `tier1_club.json` v1 + `maps.schema.json` version 1 | SE-028 | 신규. 맵(타일 5종), 가구 20종, 배치 B1~B11·철거 D1~D4·핸드셰이크 H1~H5, 커버리지 C0~C8, 스냅샷 RS1~RS7, 로드 검사 MK1~MK6·FC1~FC5, 수용 기준 BC1~BC31·DT1~DT8. events.md 의 `build.*` "골격" 3행을 6행으로 확정(`build.rejected` 페이로드에 `action`·`rotation`·`entity_id` 추가, 명령 `build.demolish_requested`, 상태 `build.demolished`·`build.coverage_changed` 신규). `economy.json`·`tiers.json`·`sim.json` 변경 없음(가정 목록 합을 economy 값에 맞춤) |
 | 2026-10-09 | build.md, `tier1_club.json`(파일 `version` 1 유지, 항목 추가만), events.md `build.*` | SE-044 | SE-032 리뷰 후속 A·B. `reference_layouts`에 `baseline_plus_two_speakers` 추가(BC21 기대값을 데이터로, `build_oracle.py --layouts` 18키 일치). `build.coverage_changed`·`coverage()`에 `blocked_cells`(C0 점유 셀 전체, G6, 증분 아님, 마지막 키) 추가. 공개 API 표 `Build` → `BuildSystem`, `find_path`·`path_from_entrance` 행 추가(UI·테스트용, sim 시스템은 부르지 않음). `build.rejected` 필드 타입 문장(any / `reason != invalid`이면 좁혀짐). 스키마 변경 없음 |
 | 2026-10-09 | build.md, 데이터·스키마 변경 없음 | SE-044 A2 (SE-044 C 인계 1) | #상태 `phase` 행에 "`to`가 `sim.json` `phases[].id`가 아니면 `push_error` 1회 후 무시(`phase` 불변, `sync` 없음)" 한 줄 — SE-044 C `build_system.gd` `_on_phase_changed`·`test_build_system.gd::test_ac5_unknown_phase_ignored` 와 같은 규칙. 관객이 `blocked_cells`를 스냅샷에 저장하는 쪽 정정은 audience.md(SE-044 A2) |
+| 2026-10-10 | build.md, `furniture.json`(파일 `version` 1 유지, 값·선택 필드만), `furniture.schema.json` `model` description 문구만(구조·`version` 불변) | SE-041 | (1) `model` 5행 등록: `stage_medium`·`bar_counter`·`speaker_floor`·`bar_fridge`·`light_spot` → `res://assets/models/<id>.glb`(FC4). 검수 통과 후 사람이 `.glb` 를 옮기기 전까지는 리소스가 없어 FurnitureView 가 프록시로 그린다(`ResourceLoader.exists` false → 경고 없이 Proxy). (2) 슬롯 구성을 테스트용 에셋(art-pipeline 서피스)에 맞춤: `speaker_floor` base+accent → base+**emissive**(`#FFB347`, 앰프 전원 LED 호박색), `bar_fridge` base+accent+glass → base+**emissive**+glass(`#E6F4FF`, 냉장고 내부 조명 냉백색). 근거: 런타임이 쓰는 슬롯 색은 아직 `slots.base` 뿐(프록시 정점색, SE-037)이고 accent 색(`#5A6270`·`#C8423A`)은 어느 코드도 읽지 않는다. materials.md 슬롯 표가 emissive 예로 '앰프 표시등, 냉장고 조명'을 든다. 요약 문단 `emissive` 6 → 8. 수치(비용·유지비·효과·footprint·height_m·poly_budget·category) 변경 없음 |
 
 ## 부록 A. 기준 배치 손계산
 

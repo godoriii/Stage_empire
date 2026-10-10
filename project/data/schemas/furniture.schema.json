@@ -161,7 +161,7 @@
             }
           },
           "model": {
-            "description": "예약(SE-041 에셋 등록용). res://assets/models/<id>.glb. 없거나 빈 문자열이면 플레이스홀더. v0 는 전부 비움",
+            "description": "SE-041 에셋 등록용. res://assets/models/<id>.glb(FC4). 없거나 빈 문자열이면 플레이스홀더. 경로에 리소스가 아직 없으면(검수 전) 역시 플레이스홀더",
             "type": "string",
             "pattern": "^(res://assets/models/[a-z][a-z0-9_]*\\.glb)?$"
           }
