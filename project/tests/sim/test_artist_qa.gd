@@ -1,13 +1,14 @@
 extends GutTest
 ## SE-033 QA 추가 테스트(qa). test_artist_system.gd 가 덮지 않는 수용 기준·계약을 채운다.
-##  1. 승급 공연 수 표(artist.md "승급까지 공연 수", T1·T2) — 파이썬으로 따로 계산한 손계산 리터럴 8x3 칸과
+##  1. 승급 공연 수 표(artist.md "승급까지 공연 수", T1·T2) — artist.json `checks.promotion_shows` 8x3 칸(SE-046, 리터럴 아님)과
 ##     ArtistConfig.grow() 반복 결과, 그리고 ArtistSystem 버스 경로(artist.grown)를 대조한다.
+##     checks 자체는 artist.md 표(파싱)·GR1~GR4 닫힌 식·roster_plan 과 따로 대조한다(test_promotion_checks_*).
 ##  2. H2 `guarantee` = economy 가 돌려준 amount(결정 1).
 ##  3. 같은 틱 경계의 두 명령(E5 선례): 첫 명령의 현금 변화를 둘째가 본다.
 ##  4. build 와 artist 가 같은 버스·같은 경계에서 공존할 때 서로의 charge_resolved 를 무시한다(H4).
 ##  5. artist.lineup_set 소비 계약(audience.md LS3): 키 6개·타입·장르가 audience 유형 genre_fit_bp 키에 있음.
 ##  6. system_order 에서 artist 위치(tick.md), 복원한 구간이 K2 판정에 반영됨.
-## 승급 공연 수 리터럴은 artist.json 의 local 인기(6~27)·승급 임계(40)·델타(+1/+2/+3)가 바뀌면 의도적으로 실패한다(데이터 회귀 방지).
+## checks 값은 artist.json 의 local 인기(6~27)·승급 임계(40)·델타(+1/+2/+3)가 바뀌면 의도적으로 실패한다(데이터 회귀 방지; 표만 고쳐도 문서·규칙 대조가 잡는다).
 
 const RECORDED: Array[String] = [
 	"economy.charge_proposed", "economy.cash_changed", "economy.charge_resolved",
@@ -20,17 +21,21 @@ const HANDSHAKE_OK: Array[String] = [
 const HANDSHAKE_NO: Array[String] = [
 	"economy.charge_proposed", "economy.charge_resolved", "artist.booking_rejected",
 ]
-## 시작 인기 → 승급까지 공연 수 [보통(ok), 호평(good), 열광(rave)]. 파이썬 독립 재계산(artist.md 공식)과 손계산 표가 같다.
-const PROMOTION_SHOWS: Dictionary = {
-	6: [34, 17, 12], 9: [31, 16, 11], 12: [28, 14, 10], 15: [25, 13, 9],
-	18: [22, 11, 8], 21: [19, 10, 7], 24: [16, 8, 6], 27: [13, 7, 5],
-}
+const ARTIST_JSON: String = "res://data/artist/artist.json"
+const ARTIST_MD: String = "res://../docs/gdd/artist.md"
 const TABLE_GRADES: Array[String] = ["ok", "good", "rave"]
+const TABLE_HEADING: String = "### 승급까지 공연 수"
 
 var _acfg: ArtistConfig
 var _ecfg: EconomyConfig
 var _scfg: SimConfig
 var _bcfg: BuildConfig
+## artist.json `checks`(SE-046 B). 정수는 JsonUtil.as_int 로 접는다.
+var _checks: Dictionary
+## 시작 인기 → 승급까지 공연 수 [보통(ok), 호평(good), 열광(rave)]. checks.promotion_shows 에서 만든다.
+var _promo: Dictionary = {}
+var _fastest_min: int = 0
+var _slowest_max: int = 0
 
 
 func before_all() -> void:
@@ -38,6 +43,14 @@ func before_all() -> void:
 	_ecfg = EconomyConfig.load()
 	_scfg = SimConfig.load()
 	_bcfg = BuildConfig.load()
+	_checks = (JSON.parse_string(FileAccess.get_file_as_string(ARTIST_JSON)) as Dictionary)["checks"]
+	for row: Dictionary in _checks["promotion_shows"]:
+		var cells: Array = []
+		for sg: String in TABLE_GRADES:
+			cells.append(JsonUtil.as_int(row[sg]))
+		_promo[JsonUtil.as_int(row["popularity"])] = cells
+	_fastest_min = JsonUtil.as_int(_checks["fastest_promotion_min_shows"])
+	_slowest_max = JsonUtil.as_int(_checks["slowest_promotion_max_shows"])
 
 
 # --- 도우미 -------------------------------------------------------------------
@@ -103,8 +116,8 @@ func test_promotion_table_config_grow() -> void:
 		var a: Dictionary = _acfg.artist(id)
 		if a["grade"] != "local":
 			continue
-		assert_true(PROMOTION_SHOWS.has(a["popularity"]), "%s: 시작 인기 %d 가 손계산 표에 있다" % [id, a["popularity"]])
-		if not PROMOTION_SHOWS.has(a["popularity"]):
+		assert_true(_promo.has(a["popularity"]), "%s: 시작 인기 %d 가 checks.promotion_shows 에 있다" % [id, a["popularity"]])
+		if not _promo.has(a["popularity"]):
 			continue
 		for k: int in TABLE_GRADES.size():
 			var sg: String = TABLE_GRADES[k]
@@ -121,7 +134,7 @@ func test_promotion_table_config_grow() -> void:
 					promoted_calls.append(n)
 					break
 			var label: String = "%s(%d) %s" % [id, a["popularity"], sg]
-			assert_eq(n, PROMOTION_SHOWS[a["popularity"]][k], label + ": 승급까지 공연 수")
+			assert_eq(n, _promo[a["popularity"]][k], label + ": 승급까지 공연 수")
 			assert_eq(promoted_calls, [n], label + ": 승급은 그 공연 하나")
 			assert_eq(e["grade"], "rookie", label + ": 승급 등급")
 			assert_eq(e["shows_played"], n)
@@ -133,15 +146,109 @@ func test_promotion_table_config_grow() -> void:
 			assert_false(after["promoted"], label + ": 승급 뒤 재승급 없음")
 			assert_eq(after["grade"], "rookie")
 		checked += 1
-	assert_eq(checked, PROMOTION_SHOWS.size(), "local 8명 전원 검사")
+	assert_eq(checked, _promo.size(), "local 8명 전원 검사")
 	# T1·T2
 	var fastest: int = 999
 	var slowest: int = 0
-	for key: int in PROMOTION_SHOWS:
-		fastest = mini(fastest, PROMOTION_SHOWS[key][2])
-		slowest = maxi(slowest, PROMOTION_SHOWS[key][1])
-	assert_true(fastest >= 5, "T1 가장 빠른 승급(열광만) >= 5")
-	assert_true(slowest <= 25, "T2 가장 느린 승급(호평만) <= 25")
+	for key: int in _promo:
+		fastest = mini(fastest, _promo[key][2])
+		slowest = maxi(slowest, _promo[key][1])
+	assert_true(fastest >= _fastest_min, "T1 가장 빠른 승급(열광만) %d >= checks.fastest_promotion_min_shows %d" % [fastest, _fastest_min])
+	assert_true(slowest <= _slowest_max, "T2 가장 느린 승급(호평만) %d <= checks.slowest_promotion_max_shows %d" % [slowest, _slowest_max])
+
+
+## checks.promotion_shows 가 artist.md 표(문서)와 같다. 문서의 마크다운 표를 파싱한다(굵게 `**n**` 제거).
+func test_promotion_checks_match_doc_table() -> void:
+	var path: String = ProjectSettings.globalize_path("res://").path_join("../docs/gdd/artist.md").simplify_path()
+	assert_true(FileAccess.file_exists(path), "artist.md 를 찾을 수 있다: " + path)
+	if not FileAccess.file_exists(path):
+		return
+	var lines: PackedStringArray = FileAccess.get_file_as_string(path).split("\n")
+	var start: int = -1
+	for i: int in lines.size():
+		if lines[i].begins_with(TABLE_HEADING):
+			start = i
+			break
+	assert_ne(start, -1, "artist.md 에 '%s' 절이 있다" % TABLE_HEADING)
+	if start < 0:
+		return
+	var doc: Dictionary = {}  # slot → [popularity, ok, good, rave]
+	for i: int in range(start + 1, lines.size()):
+		var ln: String = lines[i].strip_edges()
+		if ln.begins_with("#"):
+			break
+		if not ln.begins_with("| s"):
+			continue
+		var cells: PackedStringArray = ln.replace("**", "").trim_prefix("|").trim_suffix("|").split("|")
+		assert_eq(cells.size(), 5, "문서 표 행은 5칸: " + ln)
+		if cells.size() != 5:
+			continue
+		var nums: Array = []
+		for c: int in range(1, 5):
+			assert_true(cells[c].strip_edges().is_valid_int(), "정수 칸: " + cells[c])
+			nums.append(cells[c].strip_edges().to_int())
+		doc[cells[0].strip_edges()] = nums
+	var rows: Array = _checks["promotion_shows"]
+	assert_eq(doc.size(), rows.size(), "문서 표 행 수 == checks.promotion_shows 행 수")
+	for row: Dictionary in rows:
+		var slot: String = row["slot"]
+		assert_true(doc.has(slot), "문서 표에 슬롯 %s" % slot)
+		if not doc.has(slot):
+			continue
+		var got: Array = [JsonUtil.as_int(row["popularity"])]
+		for sg: String in TABLE_GRADES:
+			got.append(JsonUtil.as_int(row[sg]))
+		assert_eq(got, doc[slot], "%s: [인기, 보통, 호평, 열광] 문서 == 데이터" % slot)
+	# 문서 본문의 T1·T2 판정 문구(5회 ≥ 하한 5, 17회 ≤ 25)도 checks 와 같은 수.
+	var body: String = "\n".join(lines.slice(start))
+	assert_true(body.contains("가장 빠른 승급(열광만) %d회 ≥ 하한 %d" % [_min_of(2), _fastest_min]), "문서 T1 문구 == 데이터")
+	assert_true(body.contains("가장 느린 승급(호평만) %d회 ≤ 티어 2 목표 %d일" % [_max_of(1), _slowest_max]), "문서 T2 문구 == 데이터")
+
+
+## checks.promotion_shows 가 규칙(GR1·GR4: n = ⌈(promote_at − 인기) ÷ Δ⌉)·roster_plan 과 같다. 재시뮬레이션 없이 정수 닫힌 식.
+func test_promotion_checks_match_rules_and_roster() -> void:
+	var from_grade: String = _checks["promotion_from"]
+	var rule: Dictionary = _acfg.grade_rule(from_grade)
+	var at: int = int(rule["promote_at_popularity"])
+	var deltas: Dictionary = rule["popularity_delta_by_show_grade"]
+	var roster: Array = (JSON.parse_string(FileAccess.get_file_as_string(ARTIST_JSON)) as Dictionary)["roster_plan"]["slots"]
+	var plan: Dictionary = {}  # slot → popularity (promotion_from 등급만)
+	for sl: Dictionary in roster:
+		if sl["grade"] == from_grade:
+			plan[sl["slot"]] = JsonUtil.as_int(sl["popularity"])
+	var rows: Array = _checks["promotion_shows"]
+	assert_eq(rows.size(), plan.size(), "checks 행 수 == roster_plan %s 슬롯 수" % from_grade)
+	var seen: Dictionary = {}
+	for row: Dictionary in rows:
+		var slot: String = row["slot"]
+		assert_false(seen.has(slot), "슬롯 중복 없음: " + slot)
+		seen[slot] = true
+		assert_true(plan.has(slot), "roster_plan 의 %s 슬롯 %s" % [from_grade, slot])
+		if not plan.has(slot):
+			continue
+		var pop: int = JsonUtil.as_int(row["popularity"])
+		assert_eq(pop, plan[slot], "%s: 인기 == roster_plan" % slot)
+		for sg: String in TABLE_GRADES:
+			var d: int = int(deltas[sg])
+			assert_true(d > 0, "%s: Δ>0" % sg)
+			@warning_ignore("integer_division")
+			var want: int = (at - pop + d - 1) / d  # 정수 올림
+			assert_eq(JsonUtil.as_int(row[sg]), want, "%s %s: ⌈(%d−%d)÷%d⌉" % [slot, sg, at, pop, d])
+	assert_eq(seen.size(), plan.size(), "local 슬롯 전부 커버")
+
+
+func _min_of(k: int) -> int:
+	var v: int = 1 << 30
+	for key: int in _promo:
+		v = mini(v, _promo[key][k])
+	return v
+
+
+func _max_of(k: int) -> int:
+	var v: int = 0
+	for key: int in _promo:
+		v = maxi(v, _promo[key][k])
+	return v
 
 
 func test_promotion_table_through_bus() -> void:
@@ -154,7 +261,7 @@ func test_promotion_table_through_bus() -> void:
 		var a: Dictionary = _acfg.artist(id)
 		for k: int in TABLE_GRADES.size():
 			var sg: String = TABLE_GRADES[k]
-			var want: int = PROMOTION_SHOWS[a["popularity"]][k]
+			var want: int = _promo[a["popularity"]][k]
 			var u: Array = _unit()
 			_set_cash(u[2], top_cost * (want + 2))
 			var rec: EventRecorder = u[3]

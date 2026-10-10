@@ -89,5 +89,20 @@
       "show_grades": ["disaster"],
       "expected": { "grade": "rookie", "popularity": 39, "skill": 31, "shows_played": 1, "promoted_on_show": null }
     }
-  ]
+  ],
+  "checks": {
+    "promotion_from": "local",
+    "promotion_shows": [
+      { "slot": "s01", "popularity": 6,  "ok": 34, "good": 17, "rave": 12 },
+      { "slot": "s02", "popularity": 15, "ok": 25, "good": 13, "rave": 9 },
+      { "slot": "s03", "popularity": 24, "ok": 16, "good": 8,  "rave": 6 },
+      { "slot": "s05", "popularity": 9,  "ok": 31, "good": 16, "rave": 11 },
+      { "slot": "s06", "popularity": 18, "ok": 22, "good": 11, "rave": 8 },
+      { "slot": "s07", "popularity": 27, "ok": 13, "good": 7,  "rave": 5 },
+      { "slot": "s09", "popularity": 12, "ok": 28, "good": 14, "rave": 10 },
+      { "slot": "s10", "popularity": 21, "ok": 19, "good": 10, "rave": 7 }
+    ],
+    "fastest_promotion_min_shows": 5,
+    "slowest_promotion_max_shows": 25
+  }
 }

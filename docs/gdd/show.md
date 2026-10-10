@@ -240,6 +240,29 @@ PRD "마감: 수익·만족도·명성 리포트, 아티스트 관계 변화, �
 - 돈은 반드시 `economy.day_settled`에서 읽는다. `show.ended.revenue_hint`는 공연 중·직후 HUD 미리 보기용이고 리포트의 티켓 매출(`ticket_revenue`)과 값이 같다.
 - 리포트에 필요한 이벤트는 전부 close 진입 틱의 `tick.advanced` 전에 끝난다(#공연-끝 이벤트 순서). 공연 없는 날은 `show.ended`·`reputation.changed`·`artist.grown`이 오지 않으므로 R3·R5·R11 을 숨기고 R9 는 "변화 없음"이다.
 
+#### 표시 순서 (SE-039 2차 확정)
+
+위에서 아래로 한 열. 묶음은 "오늘 무슨 공연이 있었나 → 돈 → 돈의 결과 → 평판 → 다음 목표" 순서다. 문구 키는 `ui_ko.json` `ui.report.r<n>`(공연 없는 날 변형 `_none`·`skip.*`).
+
+| 순서 | 행 | 묶음 | 근거 |
+|---|---|---|---|
+| 1 | R1 날짜 | 머리 | 제목(`ui.report.title`)과 같은 날 — 불러오기 직후(`show.ended` 재발행 없음)에도 항상 채워지는 행 |
+| 2 | R2 아티스트 | 공연 | 오늘의 주인공. 공연 없는 날엔 이 줄이 이유("섭외한 아티스트가 없었다"/"무대가 없었다")를 말한다 |
+| 3 | R3 공연 등급 | 공연 | 하루의 클라이맥스 결과(PRD "공연 = 하루의 클라이맥스") |
+| 4 | R4 관객 | 공연 | 등급의 규모 |
+| 5 | R5 만족 요소 | 공연 | 등급의 원인(다음 날 무엇을 고칠지) |
+| 6 | R6 수익 | 돈 | 회계 순서: 수익 → 비용 → 합 |
+| 7 | R7 비용 | 돈 | |
+| 8 | R8 순이익·현금 | 돈 | 묶음의 합계 줄 |
+| 9 | **R13 구제·파산** | 돈의 결과 | **show.md 표 순서에서 옮김.** 구제·파산은 R8 현금이 음수가 된 결과라 바로 아래에 둬야 인과가 읽힌다. 평소엔 "재정 이상 없음" 한 줄 |
+| 10 | R9 명성 | 평판 | |
+| 11 | R10 장르별 명성 | 평판 | |
+| 12 | R11 아티스트 변화 | 평판 | PRD "아티스트 관계 변화" — 명성 다음 |
+| 13 | R12 해금 진행도 | 다음 목표 | 마지막 줄 = "다음 날" 버튼 바로 위. 해금 목표를 보고 버튼을 누르게 한다 |
+
+- 배열: `R1, R2, R3, R4, R5, R6, R7, R8, R13, R9, R10, R11, R12`. 1차 초안(`ui_params.tres report_rows` = R1~R13 표 순서)과 다른 곳은 R13 위치 하나. `ui_params.tres` 는 render-engineer 소유라 game-designer 는 바꾸지 않고 SE-039 티켓 결과 절로 인계한다.
+- 숨김 규칙(R3·R5·R11)은 순서와 무관하다. 숨긴 행은 자리를 남기지 않는다.
+
 ## 수치표
 
 모든 값은 [`show.json`](../../project/data/show/show.json) (version 1). 만족 가중치는 `audience.json`(audience.md #수치표).
@@ -383,4 +406,5 @@ PY
 
 | 날짜 | 버전 | 티켓 | 내용 |
 |---|---|---|---|
+| 2026-10-10 | show.md v0.1 (데이터 변경 없음) | SE-039 2차 | 마감 리포트 표시 순서 확정(#표시-순서-se-039-2차-확정): R13 을 R8 바로 아래로. Q6(등급 표시 이름)은 (a) 유지 — `ui_ko.json` 으로 옮기려면 UI 코드가 `ui.show.grade.<id>` 를 읽어야 해 후속 티켓으로 미룬다 |
 | 2026-10-09 | show.md v0, `show.json` v1 + `show.schema.json` version 1 | SE-030 | 신규. 만족도 진실의 출처 SR1~SR3(관객 평균 → 등급, PRD 항 대응표), 입력 계약 7개 이벤트·라인업 LN1~LN3, 상태 8필드, 공연 시작 ST0~ST3(`no_lineup`·`no_stage`), 공연 끝 DS1~DS5·SE1~SE4·CL1, 이벤트 3종(`show.started`·`show.skipped`·`show.ended`), 결정성(난수 없음), 스냅샷 SS1~SS4, 로드 검사 SL1~SL4, 마감 리포트 필드 R1~R13(SE-039 인계), 등급 임계 5단계, 기준 시나리오 5개, 수용 기준 SH1~SH13·ST1~ST4. 티켓 초안에서 바꾼 것: 구독에 `audience.admissions_decided`(`expected_admissions`)·`economy.ticket_price_changed`(`revenue_hint`)·`time.day_started`(리셋) 추가, `show.skipped` 페이로드 `{day, reason}` 확정(티켓은 이름만), 무대 없는 날도 `show.skipped`(Q3) |

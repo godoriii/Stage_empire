@@ -50,9 +50,9 @@ func test_view_does_not_touch_sim_or_data() -> void:
 	# SE-038: 군중·무대 연출(view/crowd, view/stage)도 구독용으로 EventBus 를 쓴다(발행 0, test_crowd_stage_boundary_se038).
 	var emits: PackedStringArray = PackedStringArray()
 	for h: String in ViewTestUtil.grep(srcs, "EventBus|event_bus"):
-		if not _is_build_ui_file(h) and not _is_se038_file(h):
+		if not _is_build_ui_file(h) and not _is_se038_file(h) and not _is_se039_file(h):
 			emits.append(h)
-	assert_eq(emits.size(), 0, "배치 UI·군중/무대 연출 밖에서는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
+	assert_eq(emits.size(), 0, "배치 UI·군중/무대 연출·HUD 패널(SE-039) 밖에서는 이벤트 버스 사용 없음: %s" % ", ".join(emits))
 
 
 func test_view_does_not_reference_tests() -> void:
@@ -248,8 +248,12 @@ func test_build_ui_boundary_ac6() -> void:
 	assert_eq(usage.size(), 0, "EventBus 는 타입 참조만: %s" % ", ".join(usage))
 	assert_eq(news.size(), 1, "EventBus.new() 는 샌드박스 1곳: %s" % ", ".join(news))
 	# (4) 발행은 *_requested 명령만, 문자열 리터럴로(검사 가능하게).
-	var publishes: PackedStringArray = ViewTestUtil.grep(srcs, "^[^#]*\\.publish\\(")
-	assert_eq(publishes.size(), 2, "발행 지점 2곳(place·demolish): %s" % ", ".join(publishes))
+	# SE-039 부터 HUD·패널도 발행한다 — 배치 UI 파일만 세고, 전체는 아래 *_requested 검사로 본다(test_se039_boundary).
+	var publishes: PackedStringArray = PackedStringArray()
+	for h: String in ViewTestUtil.grep(srcs, "^[^#]*\\.publish\\("):
+		if _is_build_ui_file(h):
+			publishes.append(h)
+	assert_eq(publishes.size(), 2, "배치 UI 발행 지점 2곳(place·demolish): %s" % ", ".join(publishes))
 	for h: String in publishes:
 		assert_true(RegEx.create_from_string("\\.publish\\(\\s*\"[a-z_]+\\.[a-z_]+_requested\"").search(h) != null,
 			"*_requested 명령만 발행: %s" % h)
@@ -382,3 +386,156 @@ func test_se038_screenshot_exists_1080p() -> void:
 	var img: Image = Image.new()
 	assert_eq(img.load(abs_path), OK, "PNG 로드")
 	assert_eq(Vector2i(img.get_width(), img.get_height()), Vector2i(1920, 1080), "1920×1080")
+
+
+# --- SE-039 AC7·경계 ---------------------------------------------------------
+
+## SE-039 HUD·패널 파일(구독 + *_requested 발행).
+const SE039_PREFIXES: Array[String] = ["res://ui/hud/top_hud.gd", "res://ui/panels/", "res://ui/ui_"]
+const SE039_FILES: Array[String] = [
+	"res://ui/hud/top_hud.gd", "res://ui/panels/artist_panel.gd", "res://ui/panels/day_report.gd",
+	"res://ui/panels/bailout_modal.gd", "res://ui/panels/game_over.gd", "res://ui/panels/notifications.gd",
+	"res://ui/panels/main_menu.gd", "res://ui/ui_root.gd", "res://ui/ui_panel.gd", "res://ui/ui_text.gd", "res://ui/ui_data.gd",
+	"res://ui/ui_params.gd", "res://ui/ui_preset.gd", "res://ui/ui_artist_catalog.gd",
+]
+## SE-039 이전 파일의 한국어 리터럴(캡처 SE-002·SE-037 에 그대로 찍혀 있다). ui_ko.json(2차) 뒤 같은 문장으로 키 전환 —
+## 후속 티켓. 이 목록은 줄기만 한다(새 파일 추가 금지).
+const KOREAN_LEGACY_FILES: Array[String] = ["res://ui/build/build_palette.gd", "res://ui/hud/debug_hud.gd"]
+## SE-039 가 발행하는 명령 전부(events.md 명령 표 + session.* — 2차 등록).
+const SE039_COMMANDS: Array[String] = [
+	"time.speed_requested", "time.next_day_requested", "artist.book_requested", "economy.ticket_price_requested",
+	"economy.bailout_accept_requested", "session.save_requested", "session.load_requested", "session.new_game_requested",
+]
+## 읽기 전용 sim 객체에서 부를 수 있는 멤버(SE-033·SE-030 인계).
+const SE039_READ_MEMBERS: Array[String] = [
+	"artist_ids", "artist", "guarantee", "unlock_reputation", "check_book", "roster", "entry", "total",
+]
+const HANGUL_PATTERN: String = "[가-힣]"
+
+
+func _is_se039_file(hit: String) -> bool:
+	for p: String in SE039_PREFIXES:
+		if hit.begins_with(p):
+			return true
+	return false
+
+
+## 줄에서 주석(문자열 밖의 첫 #부터)을 뗀 코드 부분.
+static func _code_part(line: String) -> String:
+	var quote: String = ""
+	var i: int = 0
+	while i < line.length():
+		var c: String = line[i]
+		if quote.is_empty():
+			if c == "#":
+				return line.substr(0, i)
+			if c == "\"" or c == "'":
+				quote = c
+		elif c == "\\":
+			i += 1
+		elif c == quote:
+			quote = ""
+		i += 1
+	return line
+
+
+## 파일들에서 주석을 뺀 코드에 정규식이 걸리는 줄("경로:줄: 내용").
+static func _grep_code(paths: PackedStringArray, pattern: String) -> PackedStringArray:
+	var re: RegEx = RegEx.create_from_string(pattern)
+	var out: PackedStringArray = PackedStringArray()
+	for path: String in paths:
+		var lines: PackedStringArray = FileAccess.get_file_as_string(path).split("\n")
+		for i: int in range(lines.size()):
+			if re.search(_code_part(lines[i])) != null:
+				out.append("%s:%d: %s" % [path, i + 1, lines[i].strip_edges()])
+	return out
+
+
+func test_ui_no_korean_literals_ac7() -> void:
+	var files: PackedStringArray = ViewTestUtil.list_sources(["res://ui"], "gd")
+	for must: String in SE039_FILES:
+		assert_true(files.has(must), "검사 대상에 %s 포함" % must)
+	var hits: PackedStringArray = PackedStringArray()
+	var legacy: Dictionary = {}
+	for h: String in _grep_code(files, HANGUL_PATTERN):
+		var path: String = h.get_slice(":", 0) + ":" + h.get_slice(":", 1)
+		if KOREAN_LEGACY_FILES.has(path):
+			legacy[path] = true
+		else:
+			hits.append(h)
+	assert_eq(hits.size(), 0, "project/ui .gd 의 한국어 리터럴(주석 제외) 0건: %s" % ", ".join(hits))
+	for path: Variant in legacy:
+		assert_true(KOREAN_LEGACY_FILES.has(str(path)), "예외는 SE-039 이전 파일만: %s" % path)
+	# SE-039 파일은 주석을 빼면 한글 0, 주석에는 있다(검사가 주석을 실제로 거른다).
+	assert_eq(_grep_code(PackedStringArray(SE039_FILES), HANGUL_PATTERN).size(), 0, "SE-039 파일 한글 리터럴 0")
+	assert_gt(ViewTestUtil.grep(PackedStringArray(SE039_FILES), HANGUL_PATTERN).size(), 0, "주석의 한글은 걸리지 않는다(대조)")
+	# 역검증.
+	var fake: PackedStringArray = PackedStringArray([
+		"label.text = \"자금\"", "## 자금 라벨", "label.text = t(\"ui.hud.cash\")  # 자금", "var s: String = \"#\" + \"명성\"",
+	])
+	var n: int = 0
+	var re: RegEx = RegEx.create_from_string(HANGUL_PATTERN)
+	for line: String in fake:
+		if re.search(_code_part(line)) != null:
+			n += 1
+	assert_eq(n, 2, "대조군: 코드 리터럴 2건(주석 2건 제외)")
+
+
+func test_se039_boundary() -> void:
+	var files: PackedStringArray = PackedStringArray(SE039_FILES)
+	# (1) 발행은 정해진 *_requested 명령만, 문자열 리터럴로.
+	var pub_re: RegEx = RegEx.create_from_string("\\.publish\\(\\s*\"([a-z_]+\\.[a-z_]+_requested)\"")
+	var published: Dictionary = {}
+	for h: String in _grep_code(files, "\\.publish\\("):
+		var m: RegExMatch = pub_re.search(h)
+		assert_not_null(m, "*_requested 리터럴 발행만: %s" % h)
+		if m != null:
+			assert_true(SE039_COMMANDS.has(m.get_string(1)), "정해진 명령만: %s" % m.get_string(1))
+			published[m.get_string(1)] = true
+	for c: String in SE039_COMMANDS:
+		assert_true(published.has(c), "명령 %s 발행 지점 있음" % c)
+	# (2) 명령 큐 조작 0, _process 0(원칙 2), sim 클래스 이름 0(덕 타이핑 — test_build_ui_boundary_ac6 와 같은 수집).
+	assert_eq(_grep_code(files, "\\b(dispatch_commands|set_pending_commands|normalize_commands)\\(").size(), 0, "명령 큐 조작 0")
+	assert_eq(_grep_code(files, "^func _(physics_)?process\\(").size(), 0, "_process 없음")
+	for n: String in ["ArtistSystem", "ArtistConfig", "ReputationSystem", "Economy", "TickLoop", "GameSession"]:
+		assert_eq(_grep_code(files, "\\b%s\\b" % n).size(), 0, "%s 이름 참조 0(인계 멤버는 .call 로만)" % n)
+	# (3) 읽기 전용 객체 호출(.call("멤버"))은 인계 멤버만.
+	var call_re: RegEx = RegEx.create_from_string("\\.call\\(\\s*\"([a-z_]+)\"")
+	var called: Dictionary = {}
+	for h: String in _grep_code(files, "\\.call\\(\\s*\""):
+		for m: RegExMatch in call_re.search_all(h):
+			called[m.get_string(1)] = true
+			assert_true(SE039_READ_MEMBERS.has(m.get_string(1)), "인계 멤버만 호출: %s" % h)
+	assert_true(called.has("check_book") and called.has("roster"), "check_book·roster 호출 검사 동작")
+	# (4) 수치 리터럴: 명단 행 수·섭외 임계·티어 해금 조건·티켓 가격 범위가 코드에 없다.
+	var nums: Dictionary = {}
+	nums[str((ViewTestUtil.read_json("res://data/artists/artists.json") as Dictionary)["rows"].size())] = "artists rows"
+	for g: Dictionary in (ViewTestUtil.read_json("res://data/artist/artist.json") as Dictionary)["grades"]:
+		if int(g["unlock_reputation"]) > 0:
+			nums[str(int(g["unlock_reputation"]))] = "unlock_reputation"
+	for r: Dictionary in (ViewTestUtil.read_json("res://data/tiers/tiers.json") as Dictionary)["rows"]:
+		for k: String in ["unlock_reputation", "unlock_cash"]:
+			if int(r[k]) > 0:
+				nums[str(int(r[k]))] = "tiers " + k
+	for r: Dictionary in (ViewTestUtil.read_json("res://data/economy/economy.json") as Dictionary)["rows"]:
+		for k: String in ["ticket_price_min", "ticket_price_max", "ticket_price_default"]:
+			nums[str(int(r[k]))] = "economy " + k
+	for v: String in nums:
+		var hits: PackedStringArray = _grep_code(files, "(^|[^0-9._a-zA-Z])" + v + "($|[^0-9.])")
+		assert_eq(hits.size(), 0, "%s(%s) 리터럴 없음: %s" % [v, nums[v], ", ".join(hits)])
+
+
+const SE039_SHOTS: Array[String] = [
+	"res://tests/view/screenshots/SE-039/hud_day_yaw45_zoom2.png", "res://tests/view/screenshots/SE-039/report_close.png",
+]
+
+
+func test_se039_screenshots_exist_1080p() -> void:
+	for shot: String in SE039_SHOTS:
+		var abs_path: String = ProjectSettings.globalize_path(shot)
+		assert_true(FileAccess.file_exists(abs_path), "SE-039 캡처 존재: %s" % shot)
+		if not FileAccess.file_exists(abs_path):
+			continue
+		var img: Image = Image.new()
+		assert_eq(img.load(abs_path), OK, "PNG 로드")
+		assert_eq(Vector2i(img.get_width(), img.get_height()), Vector2i(1920, 1080), "1920×1080")
