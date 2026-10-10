@@ -167,13 +167,18 @@ func test_au1_reference_admissions_seed0() -> void:
 		assert_eq(_stream_state(u["rng"], "audience"), _state_after(sc["seed"], "audience", maxi(1, n)), "%s: 뽑기 max(1, N)" % sid)
 
 
+## 시스템 수준 시드 표본: 1, 6, 11, … 96 (20개). 시드 0~100 전체 범위 검사는 AudienceConfig 오라클 쪽
+## (`test_audience_data.gd::test_other_seeds_fall_in_declared_ranges`, 101개)이 맡는다. SE-052 C 가 100 → 20 으로 줄였다.
+const AU2_SEED_STEP: int = 5
+
+
 func test_au2_other_seeds_in_range() -> void:
 	for sid: String in _cfg.scenario_ids():
 		var sc: Dictionary = _sc(sid)
 		var rg: Array = sc["expected"]["admissions_range_other_seeds"]
 		var lo: int = 1 << 30
 		var hi: int = -1
-		for seed_value: int in range(1, 101):
+		for seed_value: int in range(1, 101, AU2_SEED_STEP):
 			var u: Dictionary = _h.unit(seed_value)
 			_h.decide(u, sc, _base)
 			var p: Dictionary = (u["rec"] as EventRecorder).of("audience.admissions_decided")[0]
@@ -766,7 +771,9 @@ func _finish(u: Dictionary, ph: String, tip: int, on_tick: Callable = Callable()
 
 ## A(연속) 와 B(스냅샷 → JSON 왕복 → 새 시스템 restore, 커버리지 이벤트 없음) 를 끝까지 돌려 틱마다 에이전트·이벤트 비교.
 ## 반환 {a_rec_tail, b_rec, b_log: [[ph, tip, before, after]], blocked}
-func _restore_compare(sc: Dictionary, cov: Dictionary, ph: String, tip: int) -> Dictionary:
+## stride > 1 이면 에이전트 레코드(target·path) 비교를 stride 틱마다 한 번만 한다(SE-052 C: 시간 절감).
+## 이벤트 열 해시 비교는 항상 모든 틱을 덮는다(agent_moved 가 틱마다 모든 에이전트 위치를 싣는다). b_log 는 stride 1 일 때만 틱마다 쌓인다.
+func _restore_compare(sc: Dictionary, cov: Dictionary, ph: String, tip: int, stride: int = 1) -> Dictionary:
 	var ua: Dictionary = _h.unit(sc["seed"])
 	_h.decide(ua, sc, cov)
 	if ph == "show":
@@ -787,10 +794,14 @@ func _restore_compare(sc: Dictionary, cov: Dictionary, ph: String, tip: int) -> 
 	var a_prev: Array = [a_aud.agents()]
 	var b_prev: Array = [b_aud.agents()]
 	_finish(ua, ph, tip, func(p: String, t: int) -> void:
+		if t % stride != 0:
+			return
 		var now: Array = a_aud.agents()
 		a_log.append(AudienceHarness.hash_of(now))
 		a_prev[0] = now)
 	_finish(ub, ph, tip, func(p: String, t: int) -> void:
+		if t % stride != 0:
+			return
 		var now: Array = b_aud.agents()
 		b_log.append([p, t, b_prev[0], now])
 		b_prev[0] = now)
@@ -800,14 +811,19 @@ func _restore_compare(sc: Dictionary, cov: Dictionary, ph: String, tip: int) -> 
 	for k: int in b_log.size():
 		if AudienceHarness.hash_of(b_log[k][3]) == a_log[k]:
 			same += 1
-	assert_eq(same, a_log.size(), "틱마다 에이전트 레코드(target·path 포함) 동일")
+	assert_gt(a_log.size(), 0, "비교한 틱이 있다")
+	assert_eq(b_log.size(), a_log.size(), "비교 틱 수 동일")
+	assert_eq(same, a_log.size(), "%s 틱마다 에이전트 레코드(target·path 포함) 동일" % ("매" if stride == 1 else "%d " % stride))
 	return {"b_log": b_log, "b_rec": ub["rec"]}
+
+
+const AU10A_RECORD_STRIDE: int = 10
 
 
 func test_au10a_snapshot_mid_evening_and_mid_show() -> void:
 	var sc: Dictionary = _sc("rookie_baseline")
-	var r1: Dictionary = _restore_compare(sc, _base, "evening", 250)
-	var r2: Dictionary = _restore_compare(sc, _base, "show", _cfg.show_ticks / 2)
+	var r1: Dictionary = _restore_compare(sc, _base, "evening", 250, AU10A_RECORD_STRIDE)
+	var r2: Dictionary = _restore_compare(sc, _base, "show", _cfg.show_ticks / 2, AU10A_RECORD_STRIDE)
 	assert_eq((r1["b_rec"] as EventRecorder).count("audience.day_summary"), 1)
 	assert_eq((r2["b_rec"] as EventRecorder).of("audience.day_summary")[0]["admissions"], sc["expected"]["admissions"])
 	# 저녁 중간 스냅샷에는 도착 대기·건너는 사람·at_bar 가 있다(전제)

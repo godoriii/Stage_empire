@@ -46,5 +46,6 @@ func test_simconfig_rejects_1e19_default_speed_as_not_integer() -> void:
 		var d: Dictionary = raw.duplicate(true)
 		(d["phases"] as Array)[0]["default_speed"] = v
 		assert_null(SimConfig.from_dict(d), "default_speed %s → null" % v)
-		# default_speed 는 부호/범위 검사가 따로 없어 가드가 유일한 방어선이다(없으면 INT64_MIN 이 그대로 통과).
+		# 가드를 지워도 null 은 그대로다: int(±1e19) 는 INT64_MIN 이 되고 C4(default_speed ∈ speeds, sim_config.gd 103행)가
+		# 거절한다. 가드의 몫은 "누가 거절했는가"(정수 아님 vs C4)이므로 아래에서 push_error 문구를 단언한다(SE-052 AC-45b).
 		assert_push_error("default_speed 는 정수여야 한다")
