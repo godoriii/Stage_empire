@@ -6,13 +6,15 @@
 (5) glb 서피스(머티리얼) 이름 집합 == furniture.json 행 `slots` 키 집합 (SE-051; 키를 바꾼 사본에서는 실패해야 한다),
 (6) preview.png 의 슬롯 색(base·accent·emissive)이 furniture.json `slots` 색과 일치 (SE-051 픽셀 표본),
 (7) 비교 도구 compare_test_furniture.py: 같은 픽셀·다른 압축의 preview.png 는 통과, 픽셀 1개 다르면 실패 (SE-059 AC1),
-(8) furniture.json 행 slots 키 ≠ 서피스이면 KeyError 가 아니라 "slots 키 ≠ 서피스: <행 id>" 오류 (SE-059 AC2).
+(8) furniture.json 행 slots 키 ≠ 서피스이면 KeyError 가 아니라 "slots 키 ≠ 서피스: <행 id>" 오류 (SE-059 AC2),
+(9) 비교 도구의 PNG 디코더가 필터 0~4·행별 혼합(RGB·RGBA)을 원본 픽셀로 복원한다 (SE-059 QA, 필터 왕복).
 표준 라이브러리만, Godot 불필요. 출력은 전부 임시 디렉터리(project/ 를 건드리지 않는다).
 """
 import importlib.util
 import json
 import io
 import math
+import random
 import shutil
 import struct
 import sys
@@ -263,6 +265,54 @@ class TestMakeTestFurniture(unittest.TestCase):
         got = dict(cmp_tool.compare_dirs(self.p, q))
         self.assertIn("바이트 다름", got["light_spot/light_spot.glb"])
         self.assertIn("없음", got["speaker_floor/META.json"])
+
+    # ------------------------------------------------------------ SE-059 QA: 디코더 필터 1~4 왕복
+
+    @staticmethod
+    def _encode_filtered(w, h, ch, pix, filters):
+        """테스트용 인코더: 행 y 를 filters[y % len(filters)] (0 None, 1 Sub, 2 Up, 3 Average, 4 Paeth) 로 필터링해 PNG 로 쓴다."""
+        stride = w * ch
+        out = bytearray()
+        prev = bytes(stride)
+        for y in range(h):
+            cur = pix[y * stride:(y + 1) * stride]
+            ft = filters[y % len(filters)]
+            out.append(ft)
+            for i in range(stride):
+                a = cur[i - ch] if i >= ch else 0
+                b = prev[i]
+                c = prev[i - ch] if i >= ch else 0
+                if ft == 0:
+                    pred = 0
+                elif ft == 1:
+                    pred = a
+                elif ft == 2:
+                    pred = b
+                elif ft == 3:
+                    pred = (a + b) // 2
+                else:
+                    pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                    pred = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+                out.append((cur[i] - pred) & 255)
+            prev = cur
+
+        def chunk(tag, data):
+            return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+        ctype = {3: 2, 4: 6}[ch]
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, ctype, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress(bytes(out), 6)) + chunk(b"IEND", b""))
+
+    def test_decode_png_roundtrip_all_filters(self):
+        """RGB·RGBA 무작위 픽셀(고정 시드)을 필터 0~4 각각과 행별 혼합으로 인코드 → 디코더가 원본과 같은 픽셀을 복원한다.
+        (커밋된 PNG 는 필터 0 만 써서 1~4 경로가 달리 검증되지 않는다 — 디코더의 Paeth 등이 고장나면 여기서 실패.)"""
+        rng = random.Random(59)
+        w, h = 9, 11
+        for ch in (3, 4):
+            pix = bytes(rng.randrange(256) for _ in range(w * h * ch))
+            for filters in ([0], [1], [2], [3], [4], [0, 1, 2, 3, 4], [4, 3, 2, 1, 0, 4, 1]):
+                png = self._encode_filtered(w, h, ch, pix, filters)
+                self.assertEqual(cmp_tool.decode_png(png), (w, h, ch, pix), f"ch={ch} filters={filters}")
 
     # ------------------------------------------------------------ SE-059 AC2: slots 키 진단
 
