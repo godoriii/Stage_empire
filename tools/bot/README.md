@@ -1,5 +1,22 @@
 # tools/bot — qa 도구
 
+## play_bot.sh — 봇 플레이 통계 (SE-042)
+
+"정책 3종 × 시드 N × 30일" 을 `GameSession` 헤드리스로 돌려 대리 지표(`docs/gdd/bot_metrics.md` M1~M12)를 낸다.
+구성: `project/tests/e2e/bot_runner.gd`(SceneTree 러너) + `bot_play.gd`(한 판·통계, `class_name BotPlay`) · `tools/bot/policies/*.json`(정책, `targets.json` = 목표 범위·보정 기대값) · `bot_table.py`(결과 JSON → 표 + 안/밖).
+
+```bash
+tools/bot/play_bot.sh --policy frugal --seeds 100 --days 30        # 시드 1..100 을 코어 수만큼 프로세스로 나눠 돌리고 합쳐 results/SE-042.json 갱신
+tools/bot/play_bot.sh --policy v0_replay --seed-start 36 --seeds 1 --days 30   # 보정(통계 표 밖). calibration.match 가 true 여야 한다
+tools/bot/play_bot.sh --merge                                      # 부분 결과(results/parts, gitignore)만 다시 합침
+python3 -I tools/bot/bot_table.py                                  # results/SE-042.json 표 출력
+```
+
+- 프로세스마다 `XDG_DATA_HOME` 을 따로 줘 `user://` 가 다른 GUT·봇 실행과 겹치지 않는다(`BOT_TMP` 아래 임시 디렉터리, 종료 시 삭제).
+- 결과 파일은 결정적이다(실행 시간 없음). 같은 입력이면 프로세스 분할이 달라도 바이트 동일(`--merge` 가 시드 순서로 합친다).
+- 실행 시간은 하루 약 1.2~2.3 초(관객 120명대, 다른 실행과 코어 경쟁 여부에 따라). 300판은 벽시계 1시간을 넘을 수 있어 SE-042 는 시드 30 으로 줄여 돌렸다(리포트 `docs/reports/SE-042.md`).
+- 단위 테스트: `tools/run_tests.sh project/tests/e2e`.
+
 ## mutate_and_test.sh — 변이 확인 (SE-023)
 
 "이 코드를 이렇게 망가뜨리면 테스트가 빨개지는가?"를 한 명령으로 확인한다.

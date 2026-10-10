@@ -1,0 +1,4353 @@
+{
+  "ticket": "SE-042",
+  "spec": "docs/gdd/bot_metrics.md",
+  "spec_version": 1,
+  "days": 30,
+  "seeds": {
+    "first": 1,
+    "count": 30
+  },
+  "policies": [
+    "frugal",
+    "aggressive",
+    "random"
+  ],
+  "by_policy": {
+    "frugal": {
+      "policy_file_sha1": "7ec144e08ff2b8d44c54ac6c16e9139448e033d0",
+      "summary": {
+        "cash_swing_d3": {
+          "n": 30,
+          "q1": 3071,
+          "median": 3181,
+          "q3": 3336,
+          "reached_bp": 10000
+        },
+        "first_profit_day": {
+          "n": 30,
+          "q1": 1,
+          "median": 1,
+          "q3": 1,
+          "reached_bp": 10000
+        },
+        "payback_day": {
+          "n": 30,
+          "q1": 3,
+          "median": 3,
+          "q3": 3,
+          "reached_bp": 10000
+        },
+        "rep500_day": {
+          "n": 30,
+          "q1": 22,
+          "median": 22,
+          "q3": 22,
+          "reached_bp": 10000
+        },
+        "tier2_day": {
+          "n": 30,
+          "q1": 22,
+          "median": 22,
+          "q3": 22,
+          "reached_bp": 10000
+        },
+        "first_prompt_day": {
+          "n": 30,
+          "q1": 7,
+          "median": 7,
+          "q3": 7,
+          "reached_bp": 10000
+        },
+        "prompts_d10": {
+          "n": 30,
+          "q1": 2,
+          "median": 2,
+          "q3": 2,
+          "reached_bp": 10000
+        },
+        "bankrupt_day": {
+          "n": 30,
+          "q1": null,
+          "median": null,
+          "q3": null,
+          "reached_bp": 0
+        },
+        "final_cash": {
+          "n": 30,
+          "q1": 43618,
+          "median": 44079,
+          "q3": 44746,
+          "reached_bp": 10000
+        },
+        "final_rep": {
+          "n": 30,
+          "q1": 707,
+          "median": 710,
+          "q3": 714,
+          "reached_bp": 10000
+        },
+        "bailouts_taken": {
+          "n": 30,
+          "q1": 0,
+          "median": 0,
+          "q3": 0,
+          "reached_bp": 10000
+        }
+      },
+      "pooled": {
+        "grade_share_bp": {
+          "disaster": 0,
+          "poor": 0,
+          "ok": 0,
+          "good": 10000,
+          "rave": 0,
+          "skipped": 0
+        },
+        "bankrupt_rate_bp": 0,
+        "tier2_rate_bp": 10000,
+        "soldout": {
+          "days": 221,
+          "sat_mean_bp": 6547,
+          "below_good_bp": 0
+        },
+        "fail_vs_skip": {
+          "fail_days": 0,
+          "skip_days": 0,
+          "net_fail_mean": null,
+          "net_skip_mean": null,
+          "rep_fail_mean": null
+        },
+        "zero_admission_shows": {
+          "count": 0,
+          "of_shows": 900
+        },
+        "rejections": {
+          "booking": {},
+          "build": {}
+        }
+      },
+      "runs": [
+        {
+          "seed": 1,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 45018,
+          "final_rep": 714,
+          "metrics": {
+            "cash_swing_d3": 3156,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 9,
+            "soldout_sat_sum": 58573,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 2,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43947,
+          "final_rep": 708,
+          "metrics": {
+            "cash_swing_d3": 3335,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 9,
+            "soldout_sat_sum": 58012,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 3,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43710,
+          "final_rep": 710,
+          "metrics": {
+            "cash_swing_d3": 3071,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 6,
+            "soldout_sat_sum": 39300,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 4,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44746,
+          "final_rep": 715,
+          "metrics": {
+            "cash_swing_d3": 3336,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 10,
+            "soldout_sat_sum": 65092,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 5,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 42377,
+          "final_rep": 703,
+          "metrics": {
+            "cash_swing_d3": 2916,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 23,
+            "tier2_day": 23,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 33358,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 6,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44744,
+          "final_rep": 709,
+          "metrics": {
+            "cash_swing_d3": 3027,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 51970,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 7,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 45002,
+          "final_rep": 714,
+          "metrics": {
+            "cash_swing_d3": 3175,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 6,
+            "soldout_sat_sum": 39749,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 8,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44432,
+          "final_rep": 711,
+          "metrics": {
+            "cash_swing_d3": 3156,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 45973,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 9,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 45166,
+          "final_rep": 716,
+          "metrics": {
+            "cash_swing_d3": 3379,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 52519,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 10,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 45049,
+          "final_rep": 715,
+          "metrics": {
+            "cash_swing_d3": 3138,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 51988,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 11,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43778,
+          "final_rep": 703,
+          "metrics": {
+            "cash_swing_d3": 2898,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 23,
+            "tier2_day": 23,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 9,
+            "soldout_sat_sum": 58410,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 12,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43563,
+          "final_rep": 710,
+          "metrics": {
+            "cash_swing_d3": 2916,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 32882,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 13,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 45060,
+          "final_rep": 714,
+          "metrics": {
+            "cash_swing_d3": 3396,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 10,
+            "soldout_sat_sum": 65142,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 14,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43703,
+          "final_rep": 713,
+          "metrics": {
+            "cash_swing_d3": 3207,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 6,
+            "soldout_sat_sum": 39865,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 15,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43370,
+          "final_rep": 709,
+          "metrics": {
+            "cash_swing_d3": 3071,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 45535,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 16,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44178,
+          "final_rep": 707,
+          "metrics": {
+            "cash_swing_d3": 3045,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 23,
+            "tier2_day": 23,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 52525,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 17,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44242,
+          "final_rep": 713,
+          "metrics": {
+            "cash_swing_d3": 3447,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 52927,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 18,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 42525,
+          "final_rep": 704,
+          "metrics": {
+            "cash_swing_d3": 3113,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 23,
+            "tier2_day": 23,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 52082,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 19,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44001,
+          "final_rep": 708,
+          "metrics": {
+            "cash_swing_d3": 3274,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 46426,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 20,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43410,
+          "final_rep": 707,
+          "metrics": {
+            "cash_swing_d3": 3429,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 9,
+            "soldout_sat_sum": 58143,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 21,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43618,
+          "final_rep": 709,
+          "metrics": {
+            "cash_swing_d3": 3447,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 6,
+            "soldout_sat_sum": 38997,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 22,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44079,
+          "final_rep": 705,
+          "metrics": {
+            "cash_swing_d3": 2873,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 23,
+            "tier2_day": 23,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 10,
+            "soldout_sat_sum": 65098,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 23,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44535,
+          "final_rep": 712,
+          "metrics": {
+            "cash_swing_d3": 3471,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 45417,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 24,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44712,
+          "final_rep": 719,
+          "metrics": {
+            "cash_swing_d3": 3181,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 45982,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 25,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 45279,
+          "final_rep": 711,
+          "metrics": {
+            "cash_swing_d3": 3292,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 6,
+            "soldout_sat_sum": 39256,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 26,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 45267,
+          "final_rep": 715,
+          "metrics": {
+            "cash_swing_d3": 3224,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 52884,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 27,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 42756,
+          "final_rep": 705,
+          "metrics": {
+            "cash_swing_d3": 3225,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 23,
+            "tier2_day": 23,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 46380,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 28,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44132,
+          "final_rep": 714,
+          "metrics": {
+            "cash_swing_d3": 3217,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 33272,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 29,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 43425,
+          "final_rep": 707,
+          "metrics": {
+            "cash_swing_d3": 2923,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 23,
+            "tier2_day": 23,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 45897,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 30,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 44007,
+          "final_rep": 715,
+          "metrics": {
+            "cash_swing_d3": 3464,
+            "first_profit_day": 1,
+            "payback_day": 3,
+            "rep500_day": 22,
+            "tier2_day": 22,
+            "first_prompt_day": 7,
+            "prompts_d10": 2
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 30,
+            "rave": 0,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 4,
+          "price_changes": 0,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 33277,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        }
+      ]
+    },
+    "aggressive": {
+      "policy_file_sha1": "c95f1c5c176fd9d0b4f3f31c1e51e101310ef8dc",
+      "summary": {
+        "cash_swing_d3": {
+          "n": 30,
+          "q1": 3840,
+          "median": 3840,
+          "q3": 3840,
+          "reached_bp": 10000
+        },
+        "first_profit_day": {
+          "n": 30,
+          "q1": 1,
+          "median": 1,
+          "q3": 1,
+          "reached_bp": 10000
+        },
+        "payback_day": {
+          "n": 30,
+          "q1": 4,
+          "median": 4,
+          "q3": 5,
+          "reached_bp": 10000
+        },
+        "rep500_day": {
+          "n": 30,
+          "q1": 15,
+          "median": 15,
+          "q3": 15,
+          "reached_bp": 10000
+        },
+        "tier2_day": {
+          "n": 30,
+          "q1": 17,
+          "median": 18,
+          "q3": 18,
+          "reached_bp": 10000
+        },
+        "first_prompt_day": {
+          "n": 30,
+          "q1": 5,
+          "median": 5,
+          "q3": 5,
+          "reached_bp": 10000
+        },
+        "prompts_d10": {
+          "n": 30,
+          "q1": 3,
+          "median": 3,
+          "q3": 3,
+          "reached_bp": 10000
+        },
+        "bankrupt_day": {
+          "n": 30,
+          "q1": null,
+          "median": null,
+          "q3": null,
+          "reached_bp": 0
+        },
+        "final_cash": {
+          "n": 30,
+          "q1": 56465,
+          "median": 56563,
+          "q3": 56952,
+          "reached_bp": 10000
+        },
+        "final_rep": {
+          "n": 30,
+          "q1": 1078,
+          "median": 1080,
+          "q3": 1083,
+          "reached_bp": 10000
+        },
+        "bailouts_taken": {
+          "n": 30,
+          "q1": 0,
+          "median": 0,
+          "q3": 0,
+          "reached_bp": 10000
+        }
+      },
+      "pooled": {
+        "grade_share_bp": {
+          "disaster": 0,
+          "poor": 0,
+          "ok": 0,
+          "good": 44,
+          "rave": 9955,
+          "skipped": 0
+        },
+        "bankrupt_rate_bp": 0,
+        "tier2_rate_bp": 10000,
+        "soldout": {
+          "days": 743,
+          "sat_mean_bp": 7920,
+          "below_good_bp": 0
+        },
+        "fail_vs_skip": {
+          "fail_days": 0,
+          "skip_days": 0,
+          "net_fail_mean": null,
+          "net_skip_mean": null,
+          "rep_fail_mean": null
+        },
+        "zero_admission_shows": {
+          "count": 0,
+          "of_shows": 900
+        },
+        "rejections": {
+          "booking": {},
+          "build": {}
+        }
+      },
+      "runs": [
+        {
+          "seed": 1,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56347,
+          "final_rep": 1077,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197965,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 2,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 57071,
+          "final_rep": 1083,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197974,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 3,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56491,
+          "final_rep": 1081,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197942,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 4,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56471,
+          "final_rep": 1078,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197956,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 5,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56959,
+          "final_rep": 1074,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 1,
+            "rave": 29,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197978,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 6,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56711,
+          "final_rep": 1082,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197979,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 7,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56866,
+          "final_rep": 1083,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197967,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 8,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56440,
+          "final_rep": 1079,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197972,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 9,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56465,
+          "final_rep": 1083,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197969,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 10,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 57052,
+          "final_rep": 1084,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197955,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 11,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56311,
+          "final_rep": 1076,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197981,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 12,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56391,
+          "final_rep": 1075,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 24,
+            "soldout_sat_sum": 190275,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 13,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56483,
+          "final_rep": 1082,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197972,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 14,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 57028,
+          "final_rep": 1077,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 1,
+            "rave": 29,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197977,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 15,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56410,
+          "final_rep": 1079,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 24,
+            "soldout_sat_sum": 190272,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 16,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56020,
+          "final_rep": 1080,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 24,
+            "soldout_sat_sum": 190270,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 17,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56563,
+          "final_rep": 1081,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 24,
+            "soldout_sat_sum": 190301,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 18,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56465,
+          "final_rep": 1079,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197961,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 19,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56823,
+          "final_rep": 1075,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 1,
+            "rave": 29,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197974,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 20,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 57149,
+          "final_rep": 1086,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197971,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 21,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56644,
+          "final_rep": 1082,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 24,
+            "soldout_sat_sum": 190262,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 22,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56497,
+          "final_rep": 1079,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197989,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 23,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56952,
+          "final_rep": 1084,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197970,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 24,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 57160,
+          "final_rep": 1078,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 1,
+            "rave": 29,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 24,
+            "soldout_sat_sum": 190284,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 25,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56884,
+          "final_rep": 1083,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197962,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 26,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56490,
+          "final_rep": 1079,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197966,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 27,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56645,
+          "final_rep": 1083,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 24,
+            "soldout_sat_sum": 190271,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 28,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56576,
+          "final_rep": 1081,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197976,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 29,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 56422,
+          "final_rep": 1076,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": 15,
+            "tier2_day": 18,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197951,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 30,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 57003,
+          "final_rep": 1085,
+          "metrics": {
+            "cash_swing_d3": 3840,
+            "first_profit_day": 1,
+            "payback_day": 4,
+            "rep500_day": 15,
+            "tier2_day": 17,
+            "first_prompt_day": 5,
+            "prompts_d10": 3
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 0,
+            "good": 0,
+            "rave": 30,
+            "skipped": 0
+          },
+          "rejections": {
+            "booking": {},
+            "build": {}
+          },
+          "shows": 30,
+          "distinct_artists": 2,
+          "price_changes": 3,
+          "pool": {
+            "soldout_days": 25,
+            "soldout_sat_sum": 197967,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 0,
+            "net_fail_sum": 0,
+            "net_skip_sum": 0,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        }
+      ]
+    },
+    "random": {
+      "policy_file_sha1": "1a5c712c204bbb90f627b377a6a90aa105208dda",
+      "summary": {
+        "cash_swing_d3": {
+          "n": 30,
+          "q1": 2540,
+          "median": 2951,
+          "q3": 3241,
+          "reached_bp": 10000
+        },
+        "first_profit_day": {
+          "n": 30,
+          "q1": 1,
+          "median": 2,
+          "q3": 3,
+          "reached_bp": 10000
+        },
+        "payback_day": {
+          "n": 30,
+          "q1": 16,
+          "median": 17,
+          "q3": 21,
+          "reached_bp": 10000
+        },
+        "rep500_day": {
+          "n": 30,
+          "q1": 28,
+          "median": 29,
+          "q3": null,
+          "reached_bp": 6333
+        },
+        "tier2_day": {
+          "n": 30,
+          "q1": null,
+          "median": null,
+          "q3": null,
+          "reached_bp": 0
+        },
+        "first_prompt_day": {
+          "n": 30,
+          "q1": 11,
+          "median": 13,
+          "q3": 15,
+          "reached_bp": 10000
+        },
+        "prompts_d10": {
+          "n": 30,
+          "q1": 0,
+          "median": 0,
+          "q3": 0,
+          "reached_bp": 10000
+        },
+        "bankrupt_day": {
+          "n": 30,
+          "q1": null,
+          "median": null,
+          "q3": null,
+          "reached_bp": 0
+        },
+        "final_cash": {
+          "n": 30,
+          "q1": 10941,
+          "median": 13629,
+          "q3": 14936,
+          "reached_bp": 10000
+        },
+        "final_rep": {
+          "n": 30,
+          "q1": 460,
+          "median": 518,
+          "q3": 563,
+          "reached_bp": 10000
+        },
+        "bailouts_taken": {
+          "n": 30,
+          "q1": 0,
+          "median": 0,
+          "q3": 0,
+          "reached_bp": 10000
+        }
+      },
+      "pooled": {
+        "grade_share_bp": {
+          "disaster": 0,
+          "poor": 0,
+          "ok": 1788,
+          "good": 4455,
+          "rave": 2255,
+          "skipped": 1500
+        },
+        "bankrupt_rate_bp": 0,
+        "tier2_rate_bp": 0,
+        "soldout": {
+          "days": 180,
+          "sat_mean_bp": 7461,
+          "below_good_bp": 0
+        },
+        "fail_vs_skip": {
+          "fail_days": 0,
+          "skip_days": 135,
+          "net_fail_mean": null,
+          "net_skip_mean": -431,
+          "rep_fail_mean": null
+        },
+        "zero_admission_shows": {
+          "count": 0,
+          "of_shows": 765
+        },
+        "rejections": {
+          "booking": {
+            "grade_locked": 132,
+            "insufficient_cash": 3
+          },
+          "build": {
+            "bad_rotation": 19,
+            "blocked_tile": 36,
+            "insufficient_cash": 1,
+            "limit_reached": 5,
+            "out_of_bounds": 10,
+            "overlap": 15,
+            "wall_required": 59
+          }
+        }
+      },
+      "runs": [
+        {
+          "seed": 1,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 9018,
+          "final_rep": 458,
+          "metrics": {
+            "cash_swing_d3": 3451,
+            "first_profit_day": 4,
+            "payback_day": 23,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 18,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 4,
+            "good": 13,
+            "rave": 6,
+            "skipped": 7
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 7
+            },
+            "build": {
+              "overlap": 1,
+              "wall_required": 3
+            }
+          },
+          "shows": 23,
+          "distinct_artists": 8,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 37584,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 7,
+            "net_fail_sum": 0,
+            "net_skip_sum": -3063,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 2,
+          "bankrupt_day": null,
+          "bailouts_taken": 2,
+          "final_cash": 5734,
+          "final_rep": 401,
+          "metrics": {
+            "cash_swing_d3": 3150,
+            "first_profit_day": 3,
+            "payback_day": 30,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 11,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 4,
+            "good": 9,
+            "rave": 7,
+            "skipped": 10
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 8,
+              "insufficient_cash": 2
+            },
+            "build": {
+              "blocked_tile": 2,
+              "limit_reached": 1,
+              "wall_required": 1
+            }
+          },
+          "shows": 20,
+          "distinct_artists": 10,
+          "price_changes": 27,
+          "pool": {
+            "soldout_days": 6,
+            "soldout_sat_sum": 46205,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 10,
+            "net_fail_sum": 0,
+            "net_skip_sum": -4403,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 3,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 11418,
+          "final_rep": 508,
+          "metrics": {
+            "cash_swing_d3": 3039,
+            "first_profit_day": 2,
+            "payback_day": 19,
+            "rep500_day": 29,
+            "tier2_day": null,
+            "first_prompt_day": 14,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 6,
+            "good": 15,
+            "rave": 6,
+            "skipped": 3
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 3
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 3,
+              "out_of_bounds": 1,
+              "overlap": 1,
+              "wall_required": 2
+            }
+          },
+          "shows": 27,
+          "distinct_artists": 12,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 40158,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 3,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1285,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 4,
+          "bankrupt_day": null,
+          "bailouts_taken": 2,
+          "final_cash": 5399,
+          "final_rep": 407,
+          "metrics": {
+            "cash_swing_d3": 3570,
+            "first_profit_day": 4,
+            "payback_day": 29,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 10,
+            "prompts_d10": 1
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 4,
+            "good": 9,
+            "rave": 7,
+            "skipped": 10
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 9,
+              "insufficient_cash": 1
+            },
+            "build": {
+              "limit_reached": 1,
+              "out_of_bounds": 1,
+              "wall_required": 1
+            }
+          },
+          "shows": 20,
+          "distinct_artists": 8,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 3,
+            "soldout_sat_sum": 22550,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 10,
+            "net_fail_sum": 0,
+            "net_skip_sum": -4462,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 5,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 14955,
+          "final_rep": 638,
+          "metrics": {
+            "cash_swing_d3": 2951,
+            "first_profit_day": 2,
+            "payback_day": 14,
+            "rep500_day": 24,
+            "tier2_day": null,
+            "first_prompt_day": 11,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 4,
+            "good": 13,
+            "rave": 10,
+            "skipped": 3
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 3
+            },
+            "build": {
+              "out_of_bounds": 1,
+              "wall_required": 2
+            }
+          },
+          "shows": 27,
+          "distinct_artists": 11,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 10,
+            "soldout_sat_sum": 75493,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 3,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1320,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 6,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 13977,
+          "final_rep": 569,
+          "metrics": {
+            "cash_swing_d3": 2979,
+            "first_profit_day": 2,
+            "payback_day": 22,
+            "rep500_day": 28,
+            "tier2_day": null,
+            "first_prompt_day": 14,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 12,
+            "rave": 8,
+            "skipped": 5
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 5
+            },
+            "build": {
+              "blocked_tile": 2,
+              "wall_required": 1
+            }
+          },
+          "shows": 25,
+          "distinct_artists": 10,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 10,
+            "soldout_sat_sum": 76330,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 5,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2099,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 7,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 16996,
+          "final_rep": 542,
+          "metrics": {
+            "cash_swing_d3": 3027,
+            "first_profit_day": 2,
+            "payback_day": 15,
+            "rep500_day": 28,
+            "tier2_day": null,
+            "first_prompt_day": 12,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 17,
+            "rave": 5,
+            "skipped": 3
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 3
+            },
+            "build": {
+              "blocked_tile": 1,
+              "out_of_bounds": 2,
+              "overlap": 1,
+              "wall_required": 2
+            }
+          },
+          "shows": 27,
+          "distinct_artists": 12,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 58572,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 3,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1373,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 8,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 14542,
+          "final_rep": 489,
+          "metrics": {
+            "cash_swing_d3": 2952,
+            "first_profit_day": 2,
+            "payback_day": 17,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 6,
+            "prompts_d10": 1
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 7,
+            "good": 14,
+            "rave": 5,
+            "skipped": 4
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 4
+            },
+            "build": {
+              "bad_rotation": 2,
+              "blocked_tile": 1,
+              "overlap": 1,
+              "wall_required": 2
+            }
+          },
+          "shows": 26,
+          "distinct_artists": 12,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 9,
+            "soldout_sat_sum": 65396,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 4,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1525,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 9,
+          "bankrupt_day": null,
+          "bailouts_taken": 1,
+          "final_cash": 10810,
+          "final_rep": 565,
+          "metrics": {
+            "cash_swing_d3": 3250,
+            "first_profit_day": 4,
+            "payback_day": 18,
+            "rep500_day": 28,
+            "tier2_day": null,
+            "first_prompt_day": 5,
+            "prompts_d10": 1
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 6,
+            "good": 7,
+            "rave": 11,
+            "skipped": 6
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 6
+            },
+            "build": {
+              "blocked_tile": 2,
+              "insufficient_cash": 1,
+              "overlap": 1,
+              "wall_required": 3
+            }
+          },
+          "shows": 24,
+          "distinct_artists": 12,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 54427,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 6,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2383,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 10,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 15649,
+          "final_rep": 529,
+          "metrics": {
+            "cash_swing_d3": 3065,
+            "first_profit_day": 2,
+            "payback_day": 17,
+            "rep500_day": 29,
+            "tier2_day": null,
+            "first_prompt_day": 13,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 6,
+            "good": 14,
+            "rave": 7,
+            "skipped": 3
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 3
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 1,
+              "wall_required": 2
+            }
+          },
+          "shows": 27,
+          "distinct_artists": 12,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 37609,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 3,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1613,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 11,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 10941,
+          "final_rep": 542,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 23,
+            "rep500_day": 29,
+            "tier2_day": null,
+            "first_prompt_day": 16,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 3,
+            "good": 11,
+            "rave": 9,
+            "skipped": 7
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 7
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 2,
+              "limit_reached": 1,
+              "out_of_bounds": 1,
+              "wall_required": 3
+            }
+          },
+          "shows": 23,
+          "distinct_artists": 9,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 37187,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 7,
+            "net_fail_sum": 0,
+            "net_skip_sum": -3112,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 12,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 17883,
+          "final_rep": 460,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 16,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 14,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 6,
+            "good": 16,
+            "rave": 4,
+            "skipped": 4
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 4
+            },
+            "build": {
+              "bad_rotation": 1,
+              "out_of_bounds": 1,
+              "wall_required": 3
+            }
+          },
+          "shows": 26,
+          "distinct_artists": 12,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 2,
+            "soldout_sat_sum": 13530,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 4,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1489,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 13,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 14930,
+          "final_rep": 533,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 17,
+            "rep500_day": 29,
+            "tier2_day": null,
+            "first_prompt_day": 15,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 4,
+            "good": 11,
+            "rave": 9,
+            "skipped": 6
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 6
+            },
+            "build": {
+              "blocked_tile": 3,
+              "limit_reached": 1,
+              "wall_required": 3
+            }
+          },
+          "shows": 24,
+          "distinct_artists": 11,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 51344,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 6,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2298,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 14,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 13629,
+          "final_rep": 551,
+          "metrics": {
+            "cash_swing_d3": 3574,
+            "first_profit_day": 3,
+            "payback_day": 15,
+            "rep500_day": 28,
+            "tier2_day": null,
+            "first_prompt_day": 12,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 8,
+            "good": 14,
+            "rave": 6,
+            "skipped": 2
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 2
+            },
+            "build": {
+              "wall_required": 2
+            }
+          },
+          "shows": 28,
+          "distinct_artists": 11,
+          "price_changes": 28,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 59323,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 2,
+            "net_fail_sum": 0,
+            "net_skip_sum": -803,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 15,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 16526,
+          "final_rep": 563,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 17,
+            "rep500_day": 27,
+            "tier2_day": null,
+            "first_prompt_day": 12,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 8,
+            "good": 11,
+            "rave": 7,
+            "skipped": 4
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 4
+            },
+            "build": {
+              "wall_required": 1
+            }
+          },
+          "shows": 26,
+          "distinct_artists": 10,
+          "price_changes": 28,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 58620,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 4,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1693,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 16,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 13895,
+          "final_rep": 518,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 16,
+            "rep500_day": 29,
+            "tier2_day": null,
+            "first_prompt_day": 13,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 13,
+            "rave": 8,
+            "skipped": 4
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 4
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 1,
+              "overlap": 1,
+              "wall_required": 1
+            }
+          },
+          "shows": 26,
+          "distinct_artists": 9,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 52738,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 4,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1663,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 17,
+          "bankrupt_day": null,
+          "bailouts_taken": 1,
+          "final_cash": 5386,
+          "final_rep": 426,
+          "metrics": {
+            "cash_swing_d3": 3241,
+            "first_profit_day": 3,
+            "payback_day": 29,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 15,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 13,
+            "rave": 6,
+            "skipped": 6
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 6
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 1,
+              "out_of_bounds": 1,
+              "wall_required": 3
+            }
+          },
+          "shows": 24,
+          "distinct_artists": 9,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 3,
+            "soldout_sat_sum": 22998,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 6,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2659,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 18,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 11239,
+          "final_rep": 470,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 5,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 15,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 17,
+            "rave": 4,
+            "skipped": 4
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 4
+            },
+            "build": {
+              "bad_rotation": 3,
+              "wall_required": 1
+            }
+          },
+          "shows": 26,
+          "distinct_artists": 10,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 3,
+            "soldout_sat_sum": 21807,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 4,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1513,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 19,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 13240,
+          "final_rep": 575,
+          "metrics": {
+            "cash_swing_d3": 2620,
+            "first_profit_day": 1,
+            "payback_day": 18,
+            "rep500_day": 26,
+            "tier2_day": null,
+            "first_prompt_day": 15,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 11,
+            "rave": 9,
+            "skipped": 5
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 5
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 4,
+              "overlap": 1,
+              "wall_required": 2
+            }
+          },
+          "shows": 25,
+          "distinct_artists": 10,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 53880,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 5,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2102,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 20,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 10988,
+          "final_rep": 367,
+          "metrics": {
+            "cash_swing_d3": 2593,
+            "first_profit_day": 2,
+            "payback_day": 22,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 20,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 9,
+            "good": 11,
+            "rave": 3,
+            "skipped": 7
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 7
+            },
+            "build": {
+              "bad_rotation": 2,
+              "blocked_tile": 2,
+              "limit_reached": 1,
+              "wall_required": 1
+            }
+          },
+          "shows": 23,
+          "distinct_artists": 9,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 3,
+            "soldout_sat_sum": 22197,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 7,
+            "net_fail_sum": 0,
+            "net_skip_sum": -3164,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 21,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 12555,
+          "final_rep": 515,
+          "metrics": {
+            "cash_swing_d3": 3440,
+            "first_profit_day": 1,
+            "payback_day": 17,
+            "rep500_day": 30,
+            "tier2_day": null,
+            "first_prompt_day": 13,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 4,
+            "good": 22,
+            "rave": 2,
+            "skipped": 2
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 2
+            },
+            "build": {
+              "out_of_bounds": 1,
+              "overlap": 2
+            }
+          },
+          "shows": 28,
+          "distinct_artists": 11,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 57373,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 2,
+            "net_fail_sum": 0,
+            "net_skip_sum": -860,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 22,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 10168,
+          "final_rep": 552,
+          "metrics": {
+            "cash_swing_d3": 3564,
+            "first_profit_day": 3,
+            "payback_day": 21,
+            "rep500_day": 28,
+            "tier2_day": null,
+            "first_prompt_day": 12,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 6,
+            "good": 16,
+            "rave": 7,
+            "skipped": 1
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 1
+            },
+            "build": {
+              "overlap": 3
+            }
+          },
+          "shows": 29,
+          "distinct_artists": 9,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 60741,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 1,
+            "net_fail_sum": 0,
+            "net_skip_sum": -472,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 23,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 10373,
+          "final_rep": 474,
+          "metrics": {
+            "cash_swing_d3": 2932,
+            "first_profit_day": 1,
+            "payback_day": 17,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 4,
+            "prompts_d10": 1
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 6,
+            "good": 12,
+            "rave": 7,
+            "skipped": 5
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 5
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 2,
+              "wall_required": 1
+            }
+          },
+          "shows": 25,
+          "distinct_artists": 10,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 38563,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 5,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2184,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 24,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 14501,
+          "final_rep": 535,
+          "metrics": {
+            "cash_swing_d3": 2943,
+            "first_profit_day": 2,
+            "payback_day": 14,
+            "rep500_day": 29,
+            "tier2_day": null,
+            "first_prompt_day": 13,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 3,
+            "good": 17,
+            "rave": 6,
+            "skipped": 4
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 4
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 2,
+              "wall_required": 3
+            }
+          },
+          "shows": 26,
+          "distinct_artists": 11,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 6,
+            "soldout_sat_sum": 44125,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 4,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1716,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 25,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 22759,
+          "final_rep": 673,
+          "metrics": {
+            "cash_swing_d3": 2996,
+            "first_profit_day": 2,
+            "payback_day": 7,
+            "rep500_day": 24,
+            "tier2_day": null,
+            "first_prompt_day": 10,
+            "prompts_d10": 1
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 2,
+            "good": 15,
+            "rave": 11,
+            "skipped": 2
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 2
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 1,
+              "out_of_bounds": 1,
+              "wall_required": 2
+            }
+          },
+          "shows": 28,
+          "distinct_artists": 11,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 5,
+            "soldout_sat_sum": 38145,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 2,
+            "net_fail_sum": 0,
+            "net_skip_sum": -811,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 26,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 14279,
+          "final_rep": 518,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 17,
+            "rep500_day": 30,
+            "tier2_day": null,
+            "first_prompt_day": 12,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 14,
+            "rave": 7,
+            "skipped": 4
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 4
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 1,
+              "wall_required": 1
+            }
+          },
+          "shows": 26,
+          "distinct_artists": 10,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 7,
+            "soldout_sat_sum": 49007,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 4,
+            "net_fail_sum": 0,
+            "net_skip_sum": -1739,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 27,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 17563,
+          "final_rep": 568,
+          "metrics": {
+            "cash_swing_d3": 2540,
+            "first_profit_day": 1,
+            "payback_day": 11,
+            "rep500_day": 29,
+            "tier2_day": null,
+            "first_prompt_day": 11,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 5,
+            "good": 16,
+            "rave": 8,
+            "skipped": 1
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 1
+            },
+            "build": {
+              "blocked_tile": 1,
+              "wall_required": 5
+            }
+          },
+          "shows": 29,
+          "distinct_artists": 12,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 8,
+            "soldout_sat_sum": 61447,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 1,
+            "net_fail_sum": 0,
+            "net_skip_sum": -486,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 28,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 14936,
+          "final_rep": 408,
+          "metrics": {
+            "cash_swing_d3": 3496,
+            "first_profit_day": 3,
+            "payback_day": 18,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 16,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 6,
+            "good": 14,
+            "rave": 4,
+            "skipped": 6
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 6
+            },
+            "build": {
+              "blocked_tile": 1,
+              "overlap": 1,
+              "wall_required": 5
+            }
+          },
+          "shows": 24,
+          "distinct_artists": 10,
+          "price_changes": 30,
+          "pool": {
+            "soldout_days": 4,
+            "soldout_sat_sum": 26954,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 6,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2868,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 29,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 13649,
+          "final_rep": 569,
+          "metrics": {
+            "cash_swing_d3": 2628,
+            "first_profit_day": 1,
+            "payback_day": 16,
+            "rep500_day": 26,
+            "tier2_day": null,
+            "first_prompt_day": 10,
+            "prompts_d10": 1
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 8,
+            "good": 11,
+            "rave": 9,
+            "skipped": 2
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 2
+            },
+            "build": {
+              "blocked_tile": 1,
+              "overlap": 1
+            }
+          },
+          "shows": 28,
+          "distinct_artists": 10,
+          "price_changes": 28,
+          "pool": {
+            "soldout_days": 4,
+            "soldout_sat_sum": 29804,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 2,
+            "net_fail_sum": 0,
+            "net_skip_sum": -819,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        },
+        {
+          "seed": 30,
+          "bankrupt_day": null,
+          "bailouts_taken": 0,
+          "final_cash": 12148,
+          "final_rep": 450,
+          "metrics": {
+            "cash_swing_d3": 2860,
+            "first_profit_day": 1,
+            "payback_day": 20,
+            "rep500_day": null,
+            "tier2_day": null,
+            "first_prompt_day": 17,
+            "prompts_d10": 0
+          },
+          "grade_days": {
+            "disaster": 0,
+            "poor": 0,
+            "ok": 7,
+            "good": 13,
+            "rave": 5,
+            "skipped": 5
+          },
+          "rejections": {
+            "booking": {
+              "grade_locked": 5
+            },
+            "build": {
+              "bad_rotation": 1,
+              "blocked_tile": 2,
+              "overlap": 1,
+              "wall_required": 3
+            }
+          },
+          "shows": 25,
+          "distinct_artists": 11,
+          "price_changes": 29,
+          "pool": {
+            "soldout_days": 4,
+            "soldout_sat_sum": 28873,
+            "soldout_below_good": 0,
+            "fail_days": 0,
+            "skip_days": 5,
+            "net_fail_sum": 0,
+            "net_skip_sum": -2178,
+            "rep_fail_sum": 0,
+            "zero_admission_shows": 0
+          }
+        }
+      ]
+    }
+  },
+  "cross_policy": {
+    "spread_rep500_days": 7,
+    "spread_final_cash": 30450,
+    "bankrupt_rate_bp_pooled": 0
+  },
+  "calibration": {
+    "v0_replay": {
+      "seed": 36,
+      "tier2_day": 22,
+      "rep500_day": 21,
+      "final_cash": 41294,
+      "final_rep": 756,
+      "match": true
+    }
+  }
+}
