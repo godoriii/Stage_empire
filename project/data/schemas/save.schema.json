@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "schema version 1 (SE-057). 변경 이력: docs/gdd/tick.md#변경-이력. 스키마 구조를 바꾸면 version enum 을 올리고 tick.md 변경 이력에 적는다.",
+  "title": "save",
+  "description": "세이브 설정(슬롯 수·오토세이브 보관 수). 규칙: docs/gdd/tick.md#세이브-설정-savejson (SV1~SV5), 슬롯 이름 규칙: docs/gdd/events.md#session-명령-규칙 SN1. 세이브 파일 형식(JSON→gzip)·스냅샷 버전은 이 테이블이 아니라 sim.json snapshot_schema_version 과 SaveFile 이 정한다.",
+  "type": "object",
+  "required": ["version", "manual_slots", "autosave_keep"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "description": { "type": "string" },
+    "manual_slots": {
+      "description": "수동 저장 슬롯 수. 슬롯 이름은 \"1\" … str(manual_slots)(SN1 형식). 메뉴(SE-039/SE-040)가 이 수만큼 슬롯을 보여 준다. sim 은 이 값으로 저장·불러오기를 막지 않는다(SV2). 상한 9 는 메뉴 한 화면 기준(tick.md SV1).",
+      "type": "integer", "minimum": 1, "maximum": 9
+    },
+    "autosave_keep": {
+      "description": "보관할 오토세이브(autosave_day<N>) 파일 수. 0 = 무제한. 새 오토세이브를 쓴 직후 일차가 작은 것부터 초과분을 지운다. 수동 슬롯은 세지도 지우지도 않는다(tick.md SV3).",
+      "type": "integer", "minimum": 0, "maximum": 99
+    }
+  }
+}

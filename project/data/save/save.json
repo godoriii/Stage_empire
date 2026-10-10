@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "description": "세이브 설정. manual_slots = 메뉴의 수동 저장 슬롯 수(이름 \"1\"…\"N\"), autosave_keep = 보관할 오토세이브 수(0 = 무제한). 규칙 docs/gdd/tick.md#세이브-설정-savejson (SE-057).",
+  "manual_slots": 3,
+  "autosave_keep": 3
+}
