@@ -67,7 +67,7 @@ boundary hook 이 qa/reviewer 의 `project/sim|core|world` 쓰기를 막는 것�
 SE-023 AC1~AC5 를 그대로 돌린다. 합격 기준:
 
 1. 빈 패치 → exit 0, 요약이 `tools/run_tests.sh project/tests/sim` 과 같다.
-2. 예시 패치 2개 → exit ≠ 0, 실패 테스트가 각각 위 표의 1건뿐.
+2. 예시 패치 2개 → exit ≠ 0, 실패 테스트가 위 표의 건수와 같다(se016 2건, se015 1건).
 3. 실행 전후 `git status --short` 동일, `ls /tmp | grep se_mutate`(또는 `$SE_MUTATE_DIR`/`$TMPDIR`) 비어 있음, 경고 출력 없음. `--keep` 이면 경로가 출력되고 남는다.
 4. 적용 불가 패치 → exit 3 + `patch` 출력, 사본 삭제. `GODOT_BIN=/nonexistent` → exit 4.
 5. `tests/view` 인자 → 사본에서 view 테스트가 돌고 exit 0.
