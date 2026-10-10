@@ -48,9 +48,20 @@ shadow_atlas_size = 2048
 crowd_shadows = false
 note = "관문 구성 (B 와 같고 군중 그림자 off, 셰도우 아틀라스 ≤ 2048)"
 
+[sub_resource type="Resource" id="Resource_f038"]
+script = ExtResource("1_nowse")
+id = "F"
+instances = 150
+lights = 4
+shadow_atlas_size = 2048
+crowd_shadows = false
+prop_count = 20
+spots_only = true
+note = "대표 장면 (SE-038: 가구 20 + 군중 150 + 스포트 4, 군중 그림자 off)"
+
 [resource]
 script = ExtResource("2_55jm0")
-configs = Array[ExtResource("1_nowse")]([SubResource("Resource_khmpg"), SubResource("Resource_rmjwt"), SubResource("Resource_g7pps"), SubResource("Resource_3mfmq"), SubResource("Resource_e013c")])
+configs = Array[ExtResource("1_nowse")]([SubResource("Resource_khmpg"), SubResource("Resource_rmjwt"), SubResource("Resource_g7pps"), SubResource("Resource_3mfmq"), SubResource("Resource_e013c"), SubResource("Resource_f038")])
 default_config_id = "E"
 gate_config_id = "E"
 gate_min_avg_fps = 60.0
