@@ -1,0 +1,11 @@
+{
+  "asset_id": "bar_fridge",
+  "category": "bar",
+  "footprint": [
+    1,
+    1
+  ],
+  "height_m": 1.9,
+  "poly_budget": "furniture_small",
+  "ticket": "SE-041"
+}

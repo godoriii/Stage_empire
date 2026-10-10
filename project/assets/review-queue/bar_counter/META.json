@@ -1,0 +1,11 @@
+{
+  "asset_id": "bar_counter",
+  "category": "bar",
+  "footprint": [
+    3,
+    1
+  ],
+  "height_m": 1.1,
+  "poly_budget": "equipment_large",
+  "ticket": "SE-041"
+}
