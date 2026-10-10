@@ -5,9 +5,9 @@
   "admission": {
     "price_ref": 20,
     "reputation_cap": 2000,
-    "noise_bp": 1000,
+    "noise_bp": 3000,
     "price_factor_min_bp": 0,
-    "price_factor_max_bp": 20000
+    "price_factor_max_bp": 11000
   },
   "flow": {
     "arrival_window_ticks": 400,
@@ -38,7 +38,7 @@
       "popularity_centi": 0,
       "reputation_centi": 2,
       "genre_fit_bp": { "rock": 10000, "indie": 8000, "electronic": 6000 },
-      "price_sensitivity_bp": 200,
+      "price_sensitivity_bp": 300,
       "bar_visit_bp": 7000,
       "patience_ticks": 400,
       "spot_weights_bp": { "sound": 5000, "sight": 5000, "bar": 2000 }
@@ -52,7 +52,7 @@
       "popularity_centi": 160,
       "reputation_centi": 0,
       "genre_fit_bp": { "rock": 10000, "indie": 10000, "electronic": 10000 },
-      "price_sensitivity_bp": 300,
+      "price_sensitivity_bp": 500,
       "bar_visit_bp": 4000,
       "patience_ticks": 300,
       "spot_weights_bp": { "sound": 6000, "sight": 4000, "bar": 0 }
@@ -66,14 +66,14 @@
       "popularity_centi": 30,
       "reputation_centi": 6,
       "genre_fit_bp": { "rock": 7000, "indie": 8000, "electronic": 10000 },
-      "price_sensitivity_bp": 500,
+      "price_sensitivity_bp": 800,
       "bar_visit_bp": 7500,
       "patience_ticks": 150,
       "spot_weights_bp": { "sound": 4000, "sight": 3000, "bar": 3000 }
     }
   ],
   "checks": {
-    "reference_reputation": 150,
+    "reference_reputation": 70,
     "rookie_over_local_top_min": 17,
     "rookie_over_local_top_target": [25, 40],
     "local_top_slots": ["s03", "s07", "s10"],
@@ -93,13 +93,13 @@
         "e_centi": { "regular": 1200, "genre_fan": 0, "walk_in": 0 },
         "expected_centi": 1200,
         "first_draw": 3230427448,
-        "noise_bp": 42,
-        "raw": 12,
-        "admissions": 12,
+        "noise_bp": 2134,
+        "raw": 14,
+        "admissions": 14,
         "capped_by": "none",
-        "by_type": { "regular": 12, "genre_fan": 0, "walk_in": 0 },
-        "admissions_range_other_seeds": [10, 13],
-        "audience": 12,
+        "by_type": { "regular": 14, "genre_fan": 0, "walk_in": 0 },
+        "admissions_range_other_seeds": [8, 15],
+        "audience": 14,
         "left_early": 0,
         "crowd_bp": 0,
         "avg_satisfaction_bp_hand": 4600,
@@ -119,22 +119,22 @@
         "e_centi": { "regular": 960, "genre_fan": 4320, "walk_in": 3048 },
         "expected_centi": 8328,
         "first_draw": 3230427448,
-        "noise_bp": 42,
-        "raw": 83,
-        "admissions": 83,
+        "noise_bp": 2134,
+        "raw": 101,
+        "admissions": 101,
         "capped_by": "none",
-        "by_type": { "regular": 10, "genre_fan": 43, "walk_in": 30 },
-        "admissions_range_other_seeds": [74, 91],
-        "audience": 83,
+        "by_type": { "regular": 12, "genre_fan": 52, "walk_in": 37 },
+        "admissions_range_other_seeds": [58, 108],
+        "audience": 101,
         "left_early": 0,
-        "crowd_bp": 0,
-        "avg_satisfaction_bp_hand": 6732,
-        "avg_satisfaction_bp_range": [6432, 6732]
+        "crowd_bp": 1390,
+        "avg_satisfaction_bp_hand": 6557,
+        "avg_satisfaction_bp_range": [6257, 6557]
       }
     },
     {
       "id": "rookie_baseline",
-      "description": "신인(roster_plan s08: indie, 인기 42, 실력 60). 기준 배치, 명성 150(신인 해금 임계), 티켓 20, 시드 0, 1일차",
+      "description": "신인(roster_plan s08: indie, 인기 42, 실력 60). 기준 배치, 명성 150(SE-065 전 신인 해금 임계 — 해금은 70 으로 내렸고 이 입력은 둘째 주 수준으로 유지), 티켓 20, 시드 0, 1일차",
       "layout": "baseline_show",
       "seed": 0,
       "day": 1,
@@ -145,17 +145,17 @@
         "e_centi": { "regular": 1200, "genre_fan": 6720, "walk_in": 4128 },
         "expected_centi": 12048,
         "first_draw": 3230427448,
-        "noise_bp": 42,
-        "raw": 120,
-        "admissions": 120,
-        "capped_by": "none",
-        "by_type": { "regular": 12, "genre_fan": 67, "walk_in": 41 },
-        "admissions_range_other_seeds": [108, 122],
-        "audience": 120,
+        "noise_bp": 2134,
+        "raw": 146,
+        "admissions": 122,
+        "capped_by": "capacity",
+        "by_type": { "regular": 12, "genre_fan": 68, "walk_in": 42 },
+        "admissions_range_other_seeds": [84, 122],
+        "audience": 122,
         "left_early": 0,
-        "crowd_bp": 9180,
-        "avg_satisfaction_bp_hand": 6733,
-        "avg_satisfaction_bp_range": [6433, 6733]
+        "crowd_bp": 10000,
+        "avg_satisfaction_bp_hand": 6672,
+        "avg_satisfaction_bp_range": [6372, 6672]
       }
     },
     {
@@ -168,20 +168,20 @@
       "ticket_price": 30,
       "lineup": { "slot": "s07", "genre": "indie", "grade": "local", "popularity": 27, "skill": 18 },
       "expected": {
-        "e_centi": { "regular": 768, "genre_fan": 3024, "walk_in": 1524 },
-        "expected_centi": 5316,
+        "e_centi": { "regular": 672, "genre_fan": 2160, "walk_in": 609 },
+        "expected_centi": 3441,
         "first_draw": 3230427448,
-        "noise_bp": 42,
-        "raw": 53,
-        "admissions": 53,
+        "noise_bp": 2134,
+        "raw": 41,
+        "admissions": 41,
         "capped_by": "none",
-        "by_type": { "regular": 8, "genre_fan": 30, "walk_in": 15 },
-        "admissions_range_other_seeds": [47, 58],
-        "audience": 53,
+        "by_type": { "regular": 8, "genre_fan": 26, "walk_in": 7 },
+        "admissions_range_other_seeds": [24, 44],
+        "audience": 41,
         "left_early": 0,
         "crowd_bp": 0,
-        "avg_satisfaction_bp_hand": 5730,
-        "avg_satisfaction_bp_range": [5430, 5730]
+        "avg_satisfaction_bp_hand": 5404,
+        "avg_satisfaction_bp_range": [5104, 5404]
       }
     }
   ]

@@ -12,14 +12,14 @@
   "tier_unlock": {"max_tier": 2},
   "checks": {
     "tier2_reputation_day_range": [20, 30],
-    "rookie_unlock_day_range": [6, 12],
+    "rookie_unlock_day_range": [3, 5],
     "tier2_reputation_cash_gap_max_days": 3,
     "main_scenario": "local_daily_good_30"
   },
   "reference_scenarios": [
     {
       "id": "local_daily_good_30",
-      "description": "30일 기준 시나리오(AC2). 기준 배치 + 로컬 상위 indie(s07)를 매일 공연. 공연 입력은 audience local_top_baseline(입장 83, 평균 만족 6,732 → 호평)을 30일 고정, 정산 현금은 economy tier1_baseline 일자 검증(1일차 건설 뒤 2,000 + 매일 net 1,142)을 그대로 이어 붙인 합성 시나리오. 연동(명성 → 입장 증가, 아티스트 성장)은 reputation.md 부록 C",
+      "description": "30일 기준 시나리오(AC2). 기준 배치 + 로컬 상위 indie(s07)를 매일 공연. 공연 입력은 audience local_top_baseline 의 노이즈 0 기대 입장 83 과 그 입장의 손계산 평균 만족 6,732(호평)를 30일 고정(SE-065 에서 시드 0 노이즈가 바뀌어 시나리오의 시드 0 값은 101 / 6,557 이지만 이 합성 입력은 노이즈 0 값으로 둔다), 정산 현금은 economy tier1_baseline 일자 검증(1일차 건설 뒤 2,000 + 매일 net 1,142)을 그대로 이어 붙인 합성 시나리오. 연동(명성 → 입장 증가, 아티스트 성장)은 reputation.md 부록 C",
       "days": 30,
       "show_cycle": [
         {"genre": "indie", "satisfaction_bp": 6732, "admissions": 83}
@@ -35,7 +35,7 @@
         "total": [18, 36, 54, 75, 96, 117, 138, 159, 180, 201, 222, 243, 264, 285, 306, 327, 348, 369, 390, 411, 432, 453, 474, 495, 516, 537, 558, 579, 600, 621],
         "by_genre_final": {"rock": 0, "indie": 621, "electronic": 0},
         "tier_unlocked_days": [25],
-        "day_reach_rookie_unlock": 8,
+        "day_reach_rookie_unlock": 4,
         "day_reach_tier2_reputation": 25,
         "day_reach_tier2_cash": 25
       }
@@ -60,7 +60,7 @@
         "total": [18, 36, 54, 75, 96, 117, 138, 159, 180, 201, 222, 243, 264, 285, 306, 327, 348, 369, 390, 411, 432, 453, 474, 495, 516, 537, 558, 579, 600, 621],
         "by_genre_final": {"rock": 207, "indie": 207, "electronic": 207},
         "tier_unlocked_days": [25],
-        "day_reach_rookie_unlock": 8,
+        "day_reach_rookie_unlock": 4,
         "day_reach_tier2_reputation": 25,
         "day_reach_tier2_cash": 25
       }
@@ -74,7 +74,7 @@
         {"genre": "indie", "satisfaction_bp": 2000, "admissions": 83},
         null,
         {"genre": "indie", "satisfaction_bp": 4000, "admissions": 40},
-        {"genre": "indie", "satisfaction_bp": 5500, "admissions": 83},
+        {"genre": "indie", "satisfaction_bp": 5900, "admissions": 83},
         {"genre": "indie", "satisfaction_bp": 7600, "admissions": 122}
       ],
       "cash": {"start": 2000, "per_day": 0},
@@ -109,7 +109,7 @@
         "total": [18, 36, 54, 75, 96, 117, 138, 159, 180, 201, 222, 243, 264, 285, 306, 327, 348, 369, 390, 411, 432, 453, 474, 495, 516, 537, 558, 579, 600, 621, 642, 663, 684, 705, 726, 747, 768, 789, 810, 831],
         "by_genre_final": {"rock": 0, "indie": 831, "electronic": 0},
         "tier_unlocked_days": [35],
-        "day_reach_rookie_unlock": 8,
+        "day_reach_rookie_unlock": 4,
         "day_reach_tier2_reputation": 25,
         "day_reach_tier2_cash": 35
       }

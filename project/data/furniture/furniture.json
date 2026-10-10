@@ -4,7 +4,7 @@
     "allowed_phases": ["day"],
     "allowed_rotations": [0, 90, 180, 270],
     "category_max_count": { "stage": 1 },
-    "satisfaction_bonus_cap_bp": 1500
+    "satisfaction_bonus_cap_bp": 700
   },
   "reference_sets": [
     {

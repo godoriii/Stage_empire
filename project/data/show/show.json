@@ -3,10 +3,10 @@
   "satisfaction_source": "audience.day_summary.avg_satisfaction_bp",
   "grades": [
     { "id": "disaster", "name": "참사", "min_bp": 0 },
-    { "id": "poor",     "name": "부진", "min_bp": 3000 },
-    { "id": "ok",       "name": "보통", "min_bp": 5000 },
+    { "id": "poor",     "name": "부진", "min_bp": 4000 },
+    { "id": "ok",       "name": "보통", "min_bp": 5800 },
     { "id": "good",     "name": "호평", "min_bp": 6000 },
-    { "id": "rave",     "name": "열광", "min_bp": 7500 }
+    { "id": "rave",     "name": "열광", "min_bp": 7200 }
   ],
   "reference_scenarios": [
     {
@@ -18,32 +18,32 @@
     },
     {
       "id": "local_top_baseline",
-      "description": "audience local_top_baseline(s07 indie local, 명성 0, 티켓 20, 시드 0). 손계산 평균 만족 6,732 → 호평",
+      "description": "audience local_top_baseline(s07 indie local, 명성 0, 티켓 20, 시드 0, 입장 101). 손계산 평균 만족 6,557 → 호평",
       "audience_scenario": "local_top_baseline",
       "has_stage": true,
       "expected": {
-        "event": "show.ended", "expected_admissions": 83, "satisfaction_bp": 6732, "grade": "good",
-        "grade_over_range": "good", "admissions": 83, "audience": 83, "revenue_hint": 1660
+        "event": "show.ended", "expected_admissions": 101, "satisfaction_bp": 6557, "grade": "good",
+        "grade_over_range": "good", "admissions": 101, "audience": 101, "revenue_hint": 2020
       }
     },
     {
       "id": "rookie_baseline",
-      "description": "audience rookie_baseline(s08 indie rookie, 명성 150, 티켓 20, 시드 0). 손계산 6,733 → 호평",
+      "description": "audience rookie_baseline(s08 indie rookie, 명성 150, 티켓 20, 시드 0, 입장 122 만석). 손계산 6,672 → 호평",
       "audience_scenario": "rookie_baseline",
       "has_stage": true,
       "expected": {
-        "event": "show.ended", "expected_admissions": 120, "satisfaction_bp": 6733, "grade": "good",
-        "grade_over_range": "good", "admissions": 120, "audience": 120, "revenue_hint": 2400
+        "event": "show.ended", "expected_admissions": 122, "satisfaction_bp": 6672, "grade": "good",
+        "grade_over_range": "good", "admissions": 122, "audience": 122, "revenue_hint": 2440
       }
     },
     {
       "id": "local_top_price30",
-      "description": "audience local_top_price30(s07, 티켓 30). 손계산 5,730 → 보통",
+      "description": "audience local_top_price30(s07, 티켓 30, 입장 41). 손계산 5,404 → 부진(SE-065: 가격 반응·등급 임계 조정 뒤 두 단계 아래)",
       "audience_scenario": "local_top_price30",
       "has_stage": true,
       "expected": {
-        "event": "show.ended", "expected_admissions": 53, "satisfaction_bp": 5730, "grade": "ok",
-        "grade_over_range": "ok", "admissions": 53, "audience": 53, "revenue_hint": 1590
+        "event": "show.ended", "expected_admissions": 41, "satisfaction_bp": 5404, "grade": "poor",
+        "grade_over_range": "poor", "admissions": 41, "audience": 41, "revenue_hint": 1230
       }
     },
     {

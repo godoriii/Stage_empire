@@ -18,7 +18,7 @@
     },
     {
       "id": "rookie",
-      "unlock_reputation": 150,
+      "unlock_reputation": 70,
       "promote_to": null,
       "promote_at_popularity": null,
       "popularity_delta_by_show_grade": { "disaster": -2, "poor": 0, "ok": 1, "good": 2, "rave": 3 },
