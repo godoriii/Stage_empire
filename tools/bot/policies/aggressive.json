@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "id": "aggressive",
+  "spec": "docs/gdd/bot_metrics.md#정책-2--공격형-aggressive",
+  "opening_layout": "baseline_show",
+  "artist_pick": "max_popularity",
+  "artist_id": null,
+  "book_reserve": 0,
+  "price_mode": "demand_step",
+  "price_fixed": null,
+  "price_min": 20,
+  "price_max": 26,
+  "price_step": 2,
+  "price_low_fill_bp": 8500,
+  "build_queue": [
+    {
+      "furniture_id": "speaker_floor",
+      "cell": [
+        5,
+        10
+      ],
+      "rotation": 0
+    },
+    {
+      "furniture_id": "speaker_floor",
+      "cell": [
+        18,
+        10
+      ],
+      "rotation": 0
+    },
+    {
+      "furniture_id": "toilet_booth",
+      "cell": [
+        21,
+        17
+      ],
+      "rotation": 90
+    },
+    {
+      "furniture_id": "toilet_booth",
+      "cell": [
+        21,
+        19
+      ],
+      "rotation": 90
+    },
+    {
+      "furniture_id": "neon_sign",
+      "cell": [
+        3,
+        1
+      ],
+      "rotation": 180
+    },
+    {
+      "furniture_id": "neon_sign",
+      "cell": [
+        8,
+        1
+      ],
+      "rotation": 180
+    },
+    {
+      "furniture_id": "neon_sign",
+      "cell": [
+        16,
+        1
+      ],
+      "rotation": 180
+    },
+    {
+      "furniture_id": "bench",
+      "cell": [
+        1,
+        16
+      ],
+      "rotation": 270
+    },
+    {
+      "furniture_id": "bench",
+      "cell": [
+        1,
+        4
+      ],
+      "rotation": 270
+    }
+  ],
+  "build_min_cash_after": 1000,
+  "build_max_per_day": 9,
+  "random_build_bp": null,
+  "random_accept_bp": null,
+  "rng_salt": null,
+  "bailout_accept": "always"
+}

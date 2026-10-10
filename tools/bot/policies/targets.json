@@ -1,0 +1,247 @@
+{
+  "version": 1,
+  "spec": "docs/gdd/bot_metrics.md#목표-범위",
+  "calibration": {
+    "seed": 36,
+    "days": 30,
+    "tier2_day": 22,
+    "rep500_day": 21,
+    "final_cash": 41294,
+    "final_rep": 756
+  },
+  "targets": [
+    {
+      "metric": "cash_swing_d3",
+      "stat": "median",
+      "policy": "frugal",
+      "min": 2000,
+      "max": 5000
+    },
+    {
+      "metric": "cash_swing_d3",
+      "stat": "median",
+      "policy": "aggressive",
+      "min": 2000,
+      "max": 5000
+    },
+    {
+      "metric": "first_profit_day",
+      "stat": "q3",
+      "policy": "frugal",
+      "min": null,
+      "max": 2
+    },
+    {
+      "metric": "first_profit_day",
+      "stat": "q3",
+      "policy": "aggressive",
+      "min": null,
+      "max": 3
+    },
+    {
+      "metric": "payback_day",
+      "stat": "median",
+      "policy": "frugal",
+      "min": 3,
+      "max": 8
+    },
+    {
+      "metric": "payback_day",
+      "stat": "median",
+      "policy": "aggressive",
+      "min": 4,
+      "max": 10
+    },
+    {
+      "metric": "grade_good_rave_bp",
+      "stat": "pooled",
+      "policy": "frugal",
+      "min": 7000,
+      "max": null
+    },
+    {
+      "metric": "grade_disaster_poor_bp",
+      "stat": "pooled",
+      "policy": "frugal",
+      "min": null,
+      "max": 1000
+    },
+    {
+      "metric": "grade_rave_bp",
+      "stat": "pooled",
+      "policy": "aggressive",
+      "min": 1000,
+      "max": null
+    },
+    {
+      "metric": "grade_disaster_poor_bp",
+      "stat": "pooled",
+      "policy": "aggressive",
+      "min": null,
+      "max": 1000
+    },
+    {
+      "metric": "grade_disaster_poor_skipped_bp",
+      "stat": "pooled",
+      "policy": "random",
+      "min": 3000,
+      "max": null
+    },
+    {
+      "metric": "rep500_day",
+      "stat": "median",
+      "policy": "frugal",
+      "min": 20,
+      "max": 30
+    },
+    {
+      "metric": "rep500_day",
+      "stat": "median",
+      "policy": "aggressive",
+      "min": 15,
+      "max": 26
+    },
+    {
+      "metric": "rep500_day",
+      "stat": "median",
+      "policy": "random",
+      "min": null,
+      "max": null,
+      "unreached": true
+    },
+    {
+      "metric": "tier2_rate_bp",
+      "stat": "pooled",
+      "policy": "frugal",
+      "min": 8000,
+      "max": null
+    },
+    {
+      "metric": "tier2_rate_bp",
+      "stat": "pooled",
+      "policy": "aggressive",
+      "min": 8000,
+      "max": null
+    },
+    {
+      "metric": "tier2_rate_bp",
+      "stat": "pooled",
+      "policy": "random",
+      "min": null,
+      "max": 3000
+    },
+    {
+      "metric": "tier2_day",
+      "stat": "median",
+      "policy": "frugal",
+      "min": 20,
+      "max": 30
+    },
+    {
+      "metric": "tier2_day",
+      "stat": "median",
+      "policy": "aggressive",
+      "min": 15,
+      "max": 28
+    },
+    {
+      "metric": "bankrupt_rate_bp",
+      "stat": "pooled",
+      "policy": "frugal",
+      "min": null,
+      "max": 500
+    },
+    {
+      "metric": "bankrupt_rate_bp",
+      "stat": "pooled",
+      "policy": "aggressive",
+      "min": null,
+      "max": 1500
+    },
+    {
+      "metric": "bankrupt_rate_bp",
+      "stat": "pooled",
+      "policy": "random",
+      "min": 3000,
+      "max": 9000
+    },
+    {
+      "metric": "bankrupt_rate_bp_pooled",
+      "stat": "cross",
+      "policy": null,
+      "min": 1000,
+      "max": 2500,
+      "reference": true
+    },
+    {
+      "metric": "first_prompt_day",
+      "stat": "median",
+      "policy": "frugal",
+      "min": null,
+      "max": 4
+    },
+    {
+      "metric": "prompts_d10",
+      "stat": "median",
+      "policy": "frugal",
+      "min": 2,
+      "max": null
+    },
+    {
+      "metric": "first_prompt_day",
+      "stat": "median",
+      "policy": "aggressive",
+      "min": null,
+      "max": 4
+    },
+    {
+      "metric": "prompts_d10",
+      "stat": "median",
+      "policy": "aggressive",
+      "min": 2,
+      "max": null
+    },
+    {
+      "metric": "spread_rep500_days",
+      "stat": "cross",
+      "policy": null,
+      "min": 2,
+      "max": null
+    },
+    {
+      "metric": "spread_final_cash",
+      "stat": "cross",
+      "policy": null,
+      "min": 5000,
+      "max": null
+    },
+    {
+      "metric": "soldout_below_good_bp",
+      "stat": "pooled",
+      "policy": "frugal",
+      "min": null,
+      "max": 2000
+    },
+    {
+      "metric": "soldout_below_good_bp",
+      "stat": "pooled",
+      "policy": "aggressive",
+      "min": null,
+      "max": 2000
+    },
+    {
+      "metric": "soldout_sat_mean_bp",
+      "stat": "pooled",
+      "policy": "frugal",
+      "min": 6200,
+      "max": null
+    },
+    {
+      "metric": "net_fail_minus_skip",
+      "stat": "pooled",
+      "policy": "random",
+      "min": 300,
+      "max": null
+    }
+  ]
+}
