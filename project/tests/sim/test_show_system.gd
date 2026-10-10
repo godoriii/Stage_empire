@@ -342,7 +342,7 @@ func test_event_order_tickloop() -> void:
 	assert_eq(seq.count("show.ended"), 1, "show.ended 정확히 1회")
 	assert_eq(seq.count("show.skipped"), 0)
 	var to_show_ticks: int = _scfg.phase_ticks("day") + _scfg.phase_ticks("evening") - 1
-	assert_eq(ticks_before["show.started"], to_show_ticks, "show.started 는 공연 첫 틱 경계(단계 4)")
+	assert_eq(ticks_before["show.started"], to_show_ticks, "show.started 는 저녁 마지막 틱(2,400) 단계 4 에서 전환")
 	assert_eq(ticks_before["show.ended"], h.day_ticks() - 1, "show.ended 는 공연 마지막 틱(단계 2)")
 	var order: Array = ["audience.day_summary", "show.ended", "artist.grown", "reputation.changed", "economy.sales_reported",
 		"phase:close", "economy.day_settled"]
