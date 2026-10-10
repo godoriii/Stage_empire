@@ -16,7 +16,7 @@ const ARG: String = "--se-build-preset="
 const NONE: String = ""
 const EMPTY: String = "empty"
 const BASELINE: String = "baseline"
-const IDS: PackedStringArray = ["empty", "baseline"]
+const IDS: PackedStringArray = [EMPTY, BASELINE]
 ## baseline 프리셋이 쓰는 맵 reference_layouts id.
 const BASELINE_LAYOUT_ID: String = "baseline_show"
 ## baseline 프리셋의 시작 오버레이 모드(CoverageOverlay.MODES).

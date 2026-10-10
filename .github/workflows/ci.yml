@@ -41,16 +41,11 @@ jobs:
           SE_REQUIRE_GODOT: "1"
           GODOT_BIN: godot
         run: tools/run_tests.sh
-      - name: 테스트용 가구 커밋본 = 생성기 재생성 바이트 비교 (SE-051, LFS 필요)
-        # 생성기가 만든 <id>/ 폴더만 비교한다(큐에 다른 에셋이 올라와도 깨지지 않게 — SE-051 리뷰 발견).
+      - name: 테스트용 가구 커밋본 = 생성기 재생성 비교 (.glb·META·lint 바이트, preview.png 픽셀 — SE-051·SE-059, LFS 필요)
         run: |
           set -eu
           python3 -I tools/assets/make_test_furniture.py --out "$RUNNER_TEMP/tf" --lint --preview
-          for d in "$RUNNER_TEMP"/tf/*/; do
-            id="$(basename "$d")"
-            echo "== $id"
-            diff -r "$d" "project/assets/review-queue/$id"
-          done
+          python3 -I tools/assets/compare_test_furniture.py "$RUNNER_TEMP/tf" project/assets/review-queue
 
   replay-30day:
     name: 30일 리플레이 (SE036_LONG=1, 티어 해금 회귀)
@@ -96,7 +91,7 @@ jobs:
           include-templates: false
       - name: 프로젝트 임포트
         run: godot --headless --path project --import
-      - name: 9장 재캡처 (opengl3 = gl_compatibility, 셰이더 컴파일 오류가 있으면 여기서 실패)
+      - name: 11장 재캡처 (opengl3 = gl_compatibility, 셰이더 컴파일 오류가 있으면 여기서 실패)
         env:
           GODOT_BIN: godot
         run: project/tests/view/screenshots/recapture.sh "$RUNNER_TEMP/shots"
@@ -108,7 +103,7 @@ jobs:
           set -u +e
           base=project/tests/view/screenshots
           rc_all=0
-          for pair in SE-002/grid_yaw45_zoom2 SE-004/a_yaw45_zoom2 SE-004/b_yaw45_zoom2 SE-004/c_yaw45_zoom2 SE-004/b_yaw45_zoom0 SE-037/build_baseline_yaw45_zoom2 SE-038/crowd150_show_yaw45_zoom2 SE-039/hud_day_yaw45_zoom2 SE-039/report_close; do
+          for pair in SE-002/grid_yaw45_zoom2 SE-004/a_yaw45_zoom2 SE-004/b_yaw45_zoom2 SE-004/c_yaw45_zoom2 SE-004/b_yaw45_zoom0 SE-037/build_baseline_yaw45_zoom2 SE-038/crowd150_show_yaw45_zoom2 SE-039/hud_day_yaw45_zoom2 SE-039/report_close SE-040/main_day1_evening SE-040/main_show; do
             name="${pair#*/}"
             echo "== $name"
             # shellcheck disable=SC2086

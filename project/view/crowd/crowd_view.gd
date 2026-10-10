@@ -8,12 +8,15 @@ extends Node3D
 ##     gone 은 숨긴다(그 틱 이후 원소가 오지 않는다). 그 밖의 상태는 전부 보이고 색은 유형 색뿐(반투명 금지).
 ##   audience.admissions_decided — "오늘 N 명" 값만 보관(HUD SE-039 가 읽는다). 표시에는 쓰지 않는다.
 ##   build.placed / build.demolished — 무대(category stage)의 초점 셀 g 만 추적(watching 방향).
-##   session.loaded — 전부 비운다. 다음 agent_moved 1틱으로 전체를 다시 만든다(모두 새 id 라 보간 없이 스냅, AC5).
+##   session.loaded {speed} — 전부 비운다. 다음 agent_moved 1틱으로 전체를 다시 만든다(모두 새 id 라 보간 없이 스냅, AC5).
+##     보간 배속 = payload.speed(SE-049).
+##   time.speed_changed {speed} — 보간 배속(SE-040 AC-38a). 초기값 = sim.json phases[0].default_speed(새 게임).
 ##
 ## 표시:
 ##   MultiMesh instance_count = audience.json max_agents(고정), visible_instance_count = 이번 틱 활성(≠ gone) 수.
 ##   슬롯 = 이번 틱 payload 순서(id 오름차순)에서 gone 을 뺀 순번 — 앞 N 칸만 그려지므로 매 틱 다시 채운다(id → 슬롯).
-##   위치 = 직전 틱 → 이번 틱 선형 보간, t = acc ÷ tick_len(tick_len = 1 ÷ sim.json ticks_per_second).
+##   위치 = 직전 틱 → 이번 틱 선형 보간, t = clamp(acc × speed ÷ tick_len, 0, 1)(tick_len = 1 ÷ sim.json ticks_per_second,
+##   audience.md view 계약 "위치"). speed 0 이면 t 를 진행하지 않는다(정지).
 ##   새 id(직전 틱에 없던 것)는 보간 없이 놓는다. _process 는 표시 버퍼만 다시 쓴다(게임 상태 변경 없음).
 ##   방향(모델 정면 −z): watching = 에이전트 → 무대 초점 셀(모르면 +z), 움직였으면 진행 방향, 아니면 직전 방향 유지.
 ##   색 = audience.json types[].color, 알파 1.0(materials.md M3). 군중 cast_shadow = OFF(style-guide 2026-10-09).
@@ -24,6 +27,7 @@ const EV_ADMISSIONS: String = "audience.admissions_decided"
 const EV_PLACED: String = "build.placed"
 const EV_DEMOLISHED: String = "build.demolished"
 const EV_SESSION_LOADED: String = "session.loaded"
+const EV_SPEED_CHANGED: String = "time.speed_changed"
 const DEFAULT_PARAMS_PATH: String = "res://view/crowd/crowd_view_params.tres"
 const MULTIMESH_NAME: StringName = &"Crowd"
 
@@ -56,7 +60,6 @@ var _buffer: PackedFloat32Array = PackedFloat32Array()
 ## 직전에 받은 틱의 에이전트 표시 상태: id → {pos: Vector3, yaw: float}.
 var _last: Dictionary = {}
 ## 슬롯별(앞 _active 칸만 의미 있음).
-var _slot_ids: PackedInt64Array = PackedInt64Array()
 var _from_pos: PackedVector3Array = PackedVector3Array()
 var _to_pos: PackedVector3Array = PackedVector3Array()
 var _from_yaw: PackedFloat32Array = PackedFloat32Array()
@@ -65,6 +68,8 @@ var _slot_of: Dictionary = {}
 var _active: int = 0
 var _acc: float = 0.0
 var _alpha: float = 1.0
+## 보간 배속(time.speed_changed·session.loaded 의 speed). bind 때 data.default_speed.
+var _speed: int = CrowdData.SPEED_REALTIME
 var _last_tick: int = -1
 var _admissions: int = -1
 ## 무대 위치(StageGeometry.from_placed). 비어 있으면 무대 모름.
@@ -85,6 +90,7 @@ func bind(bus: EventBus, catalog: BuildCatalog, data: CrowdData = null) -> bool:
 		push_error("CrowdView: 데이터(audience.json·sim.json)를 읽지 못해 군중을 그리지 않는다")
 		return false
 	_build_multimesh()
+	_speed = _data.default_speed
 	_bus = bus
 	if _bus != null:
 		_bus.subscribe(EV_AGENT_MOVED, on_agent_moved)
@@ -92,6 +98,7 @@ func bind(bus: EventBus, catalog: BuildCatalog, data: CrowdData = null) -> bool:
 		_bus.subscribe(EV_PLACED, on_placed)
 		_bus.subscribe(EV_DEMOLISHED, on_demolished)
 		_bus.subscribe(EV_SESSION_LOADED, on_session_loaded)
+		_bus.subscribe(EV_SPEED_CHANGED, on_speed_changed)
 	return true
 
 
@@ -107,6 +114,7 @@ func _unsubscribe() -> void:
 	_bus.unsubscribe(EV_PLACED, on_placed)
 	_bus.unsubscribe(EV_DEMOLISHED, on_demolished)
 	_bus.unsubscribe(EV_SESSION_LOADED, on_session_loaded)
+	_bus.unsubscribe(EV_SPEED_CHANGED, on_speed_changed)
 	_bus = null
 
 
@@ -130,12 +138,13 @@ func _process(delta: float) -> void:
 	advance_display(delta)
 
 
-## 보간 진행: acc += delta, t = clamp(acc ÷ tick_len, 0, 1) 로 버퍼를 다시 쓴다. 이미 t = 1 이면 아무것도 안 한다.
+## 보간 진행: acc += delta, t = clamp(acc × speed ÷ tick_len, 0, 1) 로 버퍼를 다시 쓴다.
+## 이미 t = 1 이거나 speed ≤ 0(일시정지·마감)이면 아무것도 안 한다.
 func advance_display(delta: float) -> void:
-	if _data == null or _active == 0 or _alpha >= 1.0:
+	if _data == null or _active == 0 or _alpha >= 1.0 or _speed <= 0:
 		return
 	_acc += delta
-	_write(clampf(_acc / _data.tick_len_sec, 0.0, 1.0))
+	_write(clampf(_acc * float(_speed) / _data.tick_len_sec, 0.0, 1.0))
 
 
 # --- 구독 핸들러 --------------------------------------------------------------
@@ -169,7 +178,6 @@ func on_agent_moved(payload: Dictionary) -> void:
 		var prev: Dictionary = _last.get(id, {}) as Dictionary
 		var from: Vector3 = prev.get("pos", to) as Vector3
 		var yaw: float = _yaw_for(state, from, to, prev)
-		_slot_ids[n] = id
 		_from_pos[n] = from
 		_to_pos[n] = to
 		_from_yaw[n] = float(prev.get("yaw", yaw))
@@ -211,8 +219,15 @@ func on_demolished(payload: Dictionary) -> void:
 		_stage = {}
 
 
+## time.speed_changed: 보간 배속. 0 이면 보간 정지(현재 표시 위치 유지).
+func on_speed_changed(payload: Dictionary) -> void:
+	_speed = int(payload.get("speed", _speed))
+
+
 ## session.loaded: 군중·무대·보간 기준을 전부 비운다(다음 agent_moved 가 전원을 스냅으로 다시 놓는다).
-func on_session_loaded(_payload: Dictionary) -> void:
+## 보간 배속 = payload.speed(SE-049, 없으면 그대로).
+func on_session_loaded(payload: Dictionary) -> void:
+	_speed = int(payload.get("speed", _speed))
 	_last.clear()
 	_slot_of.clear()
 	_stage = {}
@@ -262,6 +277,11 @@ func get_alpha() -> float:
 	return _alpha
 
 
+## 보간 배속(time.speed_changed·session.loaded 로 받은 값).
+func get_speed() -> int:
+	return _speed
+
+
 func get_tick_len_sec() -> float:
 	return _data.tick_len_sec if _data != null else 0.0
 
@@ -306,7 +326,6 @@ func _build_multimesh() -> void:
 	_mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_buffer.resize(cap * FLOATS_PER_INSTANCE)
 	_buffer.fill(0.0)
-	_slot_ids.resize(cap)
 	_from_pos.resize(cap)
 	_to_pos.resize(cap)
 	_from_yaw.resize(cap)

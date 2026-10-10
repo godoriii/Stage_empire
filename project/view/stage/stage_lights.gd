@@ -6,6 +6,9 @@ extends Node3D
 ## 구독:
 ##   build.placed / build.demolished — 설치 가구의 effects.light_grade(furniture.json, build.md C6) 를 entity 별로 누적,
 ##     무대(category stage) 위치 추적. session.loaded — 전부 비우고 끈다(로드 뒤 build.placed 재발행으로 복구, SE-036).
+##     session.loaded.show_active 가 true 면(공연 중 저장을 불러옴, SE-049 — show.started 는 재발행되지 않는다) 재발행 끝 표시인
+##     build.coverage_changed {cause:"sync"}(GameSession 재발행 순서 loaded → placed… → coverage_changed) 에서 show.started 와
+##     같이 켠다(SE-040 AC-38b).
 ##   show.started — 스포트 N = min(max_spots, Σ light_grade) 개를 켠다(색 = show_colors). 무대를 모르면 켜지 않는다.
 ##   show.ended {grade} — 끝 연출: 켜진 스포트를 grade 색(stage_light_params.tres grade_colors)으로 바꾸고
 ##     finale_sec 뒤 끈다(0 이면 즉시). show.skipped — 변화 없음.
@@ -19,6 +22,7 @@ const EV_SESSION_LOADED: String = "session.loaded"
 const EV_SHOW_STARTED: String = "show.started"
 const EV_SHOW_ENDED: String = "show.ended"
 const EV_SHOW_SKIPPED: String = "show.skipped"
+const EV_COVERAGE_CHANGED: String = "build.coverage_changed"
 const DEFAULT_PARAMS_PATH: String = "res://view/stage/stage_light_params.tres"
 ## furniture.json effects 의 연출 등급 필드(build.md C6).
 const LIGHT_GRADE_FIELD: String = "light_grade"
@@ -41,13 +45,18 @@ var _mode: String = MODE_OFF
 var _on_count: int = 0
 var _finale_left: float = 0.0
 var _finale_color: Color = Color.WHITE
+## session.loaded.show_active — 재발행이 끝나면(coverage_changed) 공연 스포트를 다시 켠다.
+var _resume_show: bool = false
 
 
 ## 버스 구독을 시작하고 스포트 노드 max_spots 개(꺼짐)를 만든다. tile_m = sim.json tile_size_m.
-func bind(bus: EventBus, catalog: BuildCatalog, tile_m: float) -> void:
+## .tres 설정 오류(StageLightParams.get_errors)가 있으면 push_error 후 false — 구독은 그대로 하고, show_colors 가 비면
+## grade_fallback_color 로 켠다(0 나눗셈 방지, SE-040 AC-38e). 오류가 없으면 true.
+func bind(bus: EventBus, catalog: BuildCatalog, tile_m: float) -> bool:
 	if params == null:
 		params = load(DEFAULT_PARAMS_PATH) as StageLightParams
-	for err: String in params.get_errors():
+	var errs: PackedStringArray = params.get_errors()
+	for err: String in errs:
 		push_error("StageLights: 설정 오류: %s" % err)
 	_unsubscribe()
 	_catalog = catalog
@@ -61,6 +70,8 @@ func bind(bus: EventBus, catalog: BuildCatalog, tile_m: float) -> void:
 		_bus.subscribe(EV_SHOW_STARTED, on_show_started)
 		_bus.subscribe(EV_SHOW_ENDED, on_show_ended)
 		_bus.subscribe(EV_SHOW_SKIPPED, on_show_skipped)
+		_bus.subscribe(EV_COVERAGE_CHANGED, on_coverage_changed)
+	return errs.is_empty()
 
 
 func _exit_tree() -> void:
@@ -76,6 +87,7 @@ func _unsubscribe() -> void:
 	_bus.unsubscribe(EV_SHOW_STARTED, on_show_started)
 	_bus.unsubscribe(EV_SHOW_ENDED, on_show_ended)
 	_bus.unsubscribe(EV_SHOW_SKIPPED, on_show_skipped)
+	_bus.unsubscribe(EV_COVERAGE_CHANGED, on_coverage_changed)
 	_bus = null
 
 
@@ -119,10 +131,19 @@ func on_demolished(payload: Dictionary) -> void:
 		_stage = {}
 
 
-func on_session_loaded(_payload: Dictionary) -> void:
+func on_session_loaded(payload: Dictionary) -> void:
 	_grade_by_entity.clear()
 	_stage = {}
 	_turn_off()
+	_resume_show = bool(payload.get("show_active", false))
+
+
+## build.coverage_changed: 로드 재발행 끝(공연 중 로드면 스포트 복구). 그 밖에는 무시.
+func on_coverage_changed(_payload: Dictionary) -> void:
+	if not _resume_show:
+		return
+	_resume_show = false
+	on_show_started({})
 
 
 ## show.started: N = min(max_spots, Σ light_grade) 개를 공연 색으로 켠다.
@@ -139,7 +160,7 @@ func on_show_started(_payload: Dictionary) -> void:
 	_place_spots(n)
 	for i: int in range(n):
 		var spot: SpotLight3D = _spots[i]
-		spot.light_color = params.show_colors[i % params.show_colors.size()]
+		spot.light_color = show_color(i)
 		spot.visible = true
 	_on_count = n
 	_mode = MODE_SHOW
@@ -164,6 +185,13 @@ func on_show_skipped(_payload: Dictionary) -> void:
 
 
 # --- 조회 (읽기 전용) ---------------------------------------------------------
+
+## 공연 중 스포트 i 의 색(show_colors[i % 크기]). show_colors 가 비어 있으면 grade_fallback_color.
+func show_color(i: int) -> Color:
+	if params.show_colors.is_empty():
+		return params.grade_fallback_color
+	return params.show_colors[i % params.show_colors.size()]
+
 
 func get_spot_nodes() -> Array[SpotLight3D]:
 	return _spots.duplicate()

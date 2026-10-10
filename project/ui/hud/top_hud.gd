@@ -7,7 +7,8 @@ extends UiPanel
 ## 발행: time.speed_requested {speed: int}(버튼), economy.ticket_price_requested {price: int}(스피너).
 ## 배속 버튼 = sim.json 모든 구간 speeds 의 합집합, 현재 구간 speeds 에 없는 값은 비활성(tick.md #배속).
 ## 스피너 범위 = economy.json 현재 티어 행 ticket_price_min..max, 낮 구간만 편집(economy.md 티켓 가격).
-## 현금 초기값 = economy.json starting_cash(새 게임). 불러오기 뒤 현금은 열린 질문(결과 절).
+## 현금 초기값 = economy.json starting_cash(새 게임). 불러오기·새 게임 뒤 현금·가격은 apply_session_state(SE-040 AC-39a —
+##   메인 씬이 session.loaded 뒤 GameSession.hud_state() 사전을 넘긴다. economy 는 재발행되지 않는다).
 
 signal artist_panel_requested
 signal menu_requested
@@ -93,6 +94,10 @@ func _on_setup() -> void:
 
 # --- 조회 -------------------------------------------------------------------
 
+func get_cash() -> int:
+	return _cash
+
+
 func get_cash_text() -> String:
 	return (get_node(CASH_PATH) as Label).text
 
@@ -176,6 +181,20 @@ func on_session_loaded(p: Dictionary) -> void:
 	_phase = str(p.get("phase", _phase))
 	_speed = int(p.get("speed", _speed))
 	_reputation = read_reputation_total(_reputation_reader, _reputation)
+	_refresh_labels()
+
+
+## SE-040 AC-39a: sim 읽기 전용 상태 사전(GameSession.hud_state 키: day·phase·speed·cash·ticket_price·reputation_total)으로
+## 전체를 다시 채운다. 없는 키는 그대로 둔다. 발행 없음.
+func apply_session_state(state: Dictionary) -> void:
+	_day = int(state.get("day", _day))
+	_phase = str(state.get("phase", _phase))
+	_speed = int(state.get("speed", _speed))
+	_cash = int(state.get("cash", _cash))
+	_reputation = int(state.get("reputation_total", _reputation))
+	if state.has("ticket_price"):
+		_price = int(state["ticket_price"])
+		get_price_spin().set_value_no_signal(_price)
 	_refresh_labels()
 
 
