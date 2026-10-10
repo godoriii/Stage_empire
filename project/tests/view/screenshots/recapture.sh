@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# SE-020: SE-002(1장) + SE-004(4장) + SE-037(1장) 스크린샷을 Xvfb(llvmpipe, gl_compatibility=opengl3)로 재캡처한다.
-# 명령 5개는 SE-018 결과 절(AC9 / 테스트 방법)의 재캡처 명령과 인자 순서까지 같고, 6번째(SE-037)는 SE-037 결과 절의 명령과 같다.
+# SE-020: SE-002(1장) + SE-004(4장) + SE-037(1장) + SE-038(1장) 스크린샷을 Xvfb(llvmpipe, gl_compatibility=opengl3)로 재캡처한다.
+# 명령 5개는 SE-018 결과 절(AC9 / 테스트 방법)의 재캡처 명령과 인자 순서까지 같고, 6번째(SE-037)는 SE-037 결과 절의 명령과, 7번째(SE-038)는 SE-038 결과 절의 명령과 같다.
 # 셰이더 컴파일 검증 겸용: 헤드리스 GUT 는 더미 RenderingServer 라 .gdshader 를 컴파일하지 않으므로,
 # 이 캡처가 toon/outline 셰이더가 gl_compatibility 에서 오류 없이 도는지 확인하는 유일한 자동 경로다.
 #
 #   project/tests/view/screenshots/recapture.sh [out_dir]
 #
-#   out_dir  PNG 6장 + 로그 6개(<name>.log)를 쓸 디렉터리. 생략하면 mktemp -d (경로를 마지막 줄에 출력).
+#   out_dir  PNG 7장 + 로그 7개(<name>.log)를 쓸 디렉터리. 생략하면 mktemp -d (경로를 마지막 줄에 출력).
 #            상대 경로는 **호출자의 cwd** 기준이다(리포지토리 루트 기준 아님). 없으면 만든다.
 #            리포지토리 안(특히 커밋된 기준 PNG 폴더)을 가리키면 디렉터리를 만들기 **전에** 거부한다 — 기준 PNG 는 SE-018 에서만 바꾼다.
-# 종료 코드: 0 = 6장 모두 생성·1920x1080·셰이더 오류 없음, 1 = 캡처 실패/오류 패턴/크기 이상, 2 = 환경(Godot·xvfb-run 없음, 인자 오류).
+# 종료 코드: 0 = 7장 모두 생성·1920x1080·셰이더 오류 없음, 1 = 캡처 실패/오류 패턴/크기 이상, 2 = 환경(Godot·xvfb-run 없음, 인자 오류).
 set -uo pipefail
 CALLER_PWD="$PWD"   # out_dir 상대 경로의 기준(아래 cd 로 cwd 가 바뀌기 전에 잡는다)
 cd "$(dirname "$0")/../../../.." || { echo "FAIL: 리포지토리 루트로 이동할 수 없다 ($0 기준 4단계 위)"; exit 2; }   # project/tests/view/screenshots 의 4단계 위
@@ -92,13 +92,15 @@ for m in a b c; do capture "${m}_yaw45_zoom2.png" --material=$m --se-screenshot=
 capture b_yaw45_zoom0.png --material=b --se-zoom=0 --se-screenshot="$OUT/b_yaw45_zoom0.png"
 # SE-037 (배치 UI: 기준 배치 6 + 음향 오버레이 + 팔레트)
 capture build_baseline_yaw45_zoom2.png --se-build-preset=baseline --se-screenshot="$OUT/build_baseline_yaw45_zoom2.png"
+# SE-038 (관객 150 watching + 무대 스포트 4 on, 기준 배치 + 조명 가구)
+capture crowd150_show_yaw45_zoom2.png --se-crowd-preset=150 --se-screenshot="$OUT/crowd150_show_yaw45_zoom2.png"
 
-# 6장 전부 존재·1920x1080 (compare_png.gd --size-only)
-for f in grid_yaw45_zoom2 a_yaw45_zoom2 b_yaw45_zoom2 c_yaw45_zoom2 b_yaw45_zoom0 build_baseline_yaw45_zoom2; do
+# 7장 전부 존재·1920x1080 (compare_png.gd --size-only)
+for f in grid_yaw45_zoom2 a_yaw45_zoom2 b_yaw45_zoom2 c_yaw45_zoom2 b_yaw45_zoom0 build_baseline_yaw45_zoom2 crowd150_show_yaw45_zoom2; do
   line="$("$GODOT" --headless --path project -s res://tests/view/screenshots/compare_png.gd -- "$OUT/$f.png" --size-only 2>&1 | tail -n 1)"
   echo "$f.png: $line"
   if [ "$line" != "size_ok=true size=1920x1080" ]; then echo "FAIL: $f.png 크기 이상"; exit 1; fi
 done
 
-echo "OK: 6장 캡처 완료, 셰이더 오류 패턴 없음"
+echo "OK: 7장 캡처 완료, 셰이더 오류 패턴 없음"
 echo "$OUT"
