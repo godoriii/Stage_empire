@@ -24,6 +24,7 @@ extends RefCounted
 ## build.placed(설치 인스턴스 순서대로 전부) → build.coverage_changed {cause:"sync"} → reputation.changed {delta:0}.
 ## economy 는 재발행하지 않는다(cash()·ticket_price()·hud_state() 접근자로 읽는다). show.started·time.phase_changed·
 ## artist.lineup_set 은 재발행하지 않는다(구독 시스템이 다시 반응해 상태·난수가 바뀐다, SE-049).
+## 새 세계 생성 직후에도 build.coverage_changed {cause:"sync"} 1회를 낸다(SE-058) — 그래서 재발행 sync 는 상태를 바꾸지 않는다.
 ## 오토세이브 보관 수(SE-057, tick.md SV1~SV5): <data_root>/save/save.json 의 autosave_keep. 없으면 무제한.
 
 const CMD_SAVE: String = "session.save_requested"
@@ -164,6 +165,9 @@ func new_game(seed_value: int, data_root: String = DEFAULT_DATA_ROOT) -> bool:
 
 ## 이미 읽은 설정으로 새 게임(테스트가 설정을 한 번만 읽고 재사용한다). configs 키 = CONFIG_KEYS(필수) + KEY_AUTOSAVE_KEEP(선택).
 ## 생성·구독·register_system 순서 = sim.json system_order(build → artist → audience → show → economy → reputation).
+## 끝(모든 구독·등록 뒤)에 build.coverage_changed {cause:"sync"} 1회를 새 세계 자신의 버스에 낸다(SE-058, events.md
+## build.coverage_changed "새 세계 생성 직후"): AudienceSystem.coverage 가 BuildSystem.coverage() 와 같은 값으로 시작한다.
+## 틱·RNG·명령 큐는 건드리지 않는다. 생성 뒤 붙인 리스너는 이 이벤트를 받지 않는다.
 func new_game_from_configs(seed_value: int, configs: Dictionary) -> bool:
 	if _loop != null:
 		push_error("[GameSession] new_game: 이미 시작한 세션이다(새 GameSession 을 만든다)")
@@ -217,6 +221,7 @@ func new_game_from_configs(seed_value: int, configs: Dictionary) -> bool:
 	_loop.bus.subscribe(CMD_LOAD, _on_load_requested)
 	_loop.bus.subscribe(CMD_NEW_GAME, _on_new_game_requested)
 	_loop.bus.subscribe(EV_PHASE_CHANGED, _on_phase_changed)
+	_publish_coverage_sync()                           # SE-058: 생성 직후 coverage 를 시스템끼리 맞춘다
 	return true
 
 
@@ -455,23 +460,17 @@ func _load_now(path: String) -> String:
 	return ""
 
 
-## SN5: new_game(seed) 와 같은 1일차 세계를 만들어 그 스냅샷을 지금 TickLoop 에 restore 한다(버스·시스템·구독 유지).
-## 재발행(session.loaded → build.placed → build.coverage_changed{sync} → reputation.changed) 뒤 같은 스냅샷을 한 번 더
-## restore 한다: 새 세계의 AudienceSystem.coverage 는 첫 coverage_changed 전이라 비어 있는데(capacity 0) 재발행 sync 가
-## 그것을 채워 상태 해시가 new_game(seed) 와 달라지기 때문이다(SN5 "같은 seed → 같은 1일차 상태 해시").
-## 실패하면 push_error, false, 상태 불변.
+## SN5: new_game(seed) 와 같은 1일차 세계를 만들어 그 스냅샷을 지금 TickLoop 에 restore 하고 재발행한다
+## (버스·시스템·구독 유지). 실패하면 push_error, false, 상태 불변.
 func _new_world(seed_value: int) -> bool:
 	var fresh: GameSession = GameSession.new()
 	if not fresh.new_game_from_configs(seed_value, _configs):
 		push_error("[GameSession] 새 게임 실패: 세계를 만들지 못했다(seed %d)" % seed_value)
 		return false
-	var snap: Dictionary = fresh.snapshot()
-	if not _loop.restore(snap):
+	if not _loop.restore(fresh.snapshot()):
 		return false
 	_autosave_day = NO_DAY
 	_publish_loaded()
-	if not _loop.restore(snap):
-		push_error("[GameSession] 새 게임: 재발행 뒤 재적용 실패(seed %d)" % seed_value)
 	return true
 
 
@@ -488,12 +487,18 @@ func _publish_loaded() -> void:
 			"entity_id": inst["entity_id"], "furniture_id": fid, "cell": cell.duplicate(), "rotation": rot,
 			"cells": BuildConfig.cells_of(cfg.furniture(fid)["footprint"], cell, rot), "cost": inst["paid"],
 		})
+	_publish_coverage_sync()
+	b.publish(EV_REPUTATION, {"day": _loop.day, "delta": 0, "total": _reputation.total, "by_genre": _reputation.by_genre()})
+
+
+## build.coverage_changed {cause:"sync", …BuildSystem.coverage()} 1회. 새 세계 생성 직후(세계 안 시스템 상태를 맞춤)와
+## 로드·새 게임 재발행(같은 값을 바깥 구독자에게 알림, 상태 불변)이 같은 페이로드를 쓴다(events.md, build.md #커버리지).
+func _publish_coverage_sync() -> void:
 	var cov: Dictionary = _build.coverage()
 	var payload: Dictionary = {"cause": COVERAGE_CAUSE_RELOAD}
 	for k: String in Coverage.KEYS:
 		payload[k] = cov[k]
-	b.publish(EV_COVERAGE, payload)
-	b.publish(EV_REPUTATION, {"day": _loop.day, "delta": 0, "total": _reputation.total, "by_genre": _reputation.by_genre()})
+	_loop.bus.publish(EV_COVERAGE, payload)
 
 
 ## 보관 수를 넘는 오래된 오토세이브(일차가 작은 것부터)를 지운다. KEEP_UNLIMITED 면 아무것도 지우지 않는다.

@@ -98,7 +98,7 @@
 
 - 다음 날 전환은 틱을 소비하지 않는다(`tick` 불변). 그래서 I1 이 유지된다.
 - close 이외의 구간에서 받은 `time.next_day_requested`는 **무시**한다(상태 불변, 이벤트 없음).
-- 새 게임은 `phases[0]`(day)·`tick_in_phase 0`·`speed = phases[0].default_speed`로 시작하며 이벤트를 내지 않는다. `time.day_started`는 2일차부터 난다.
+- 새 게임은 `phases[0]`(day)·`tick_in_phase 0`·`speed = phases[0].default_speed`로 시작하며 이벤트를 내지 않는다. `time.day_started`는 2일차부터 난다. (`TickLoop` 의 시간 이벤트 이야기다. `GameSession` 은 새 세계 생성 직후 `build.coverage_changed {cause:"sync"}` 1회를 낸다 — events.md 해당 행, SE-058. 시간 카운터·RNG 는 바꾸지 않는다.)
 - **티어 5~6 원칙:** "하루 = 3일짜리 페스티벌의 하루"가 되어도 같은 4구간·같은 카운터를 쓴다. 다중 무대는 `show` 구간 안의 시스템 문제이며 이 문서의 시간 규칙은 바뀌지 않는다. 상세는 티어 4+ 티켓.
 
 ### 배속
@@ -581,3 +581,4 @@ SE-001 의 이름을 바꾼 것은 없다. 이벤트 이름도 SE-001 이 쓴 �
 | 2026-10-09 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-022 (docs/reviews/SE-017.md 발견 1·후속 E) | #스냅샷 "`push_error` 횟수 (SE-017)" 표 2행의 "고정하는 테스트" 열을 바로잡았다. 기존 `test_restore_rejects_bad_snapshot`은 5단계 ①②③만 때리므로 그 범위를 `(5단계 ①②③)`로 적고, 5단계 ④(훅 시스템 객체 해제로 `Callable.is_valid()`가 아님)를 고정하는 `test_restore_rejects_invalid_hook`(SE-022 1차 sim-engineer 추가)을 덧붙였다. 이 케이스는 `snapshot()`이 같은 무효 훅 때문에 `{}`를 돌려주므로 상태 해시 대신 `TickLoop` 필드 비교로 불변을 단언하고, ④ 분기를 변이에서 구별하는 것은 메시지 단언 "더 이상 유효하지 않다"다(분기를 지우면 6단계 사전 스냅샷이 같은 횟수로 실패한다). 표의 (i)(ii)(iii)·합계 열(1·0·0·1)과 다른 행은 변경 없음. 규칙·수치·이벤트·스냅샷 키 변경 0, 코드·데이터 변경 0 |
 | 2026-10-10 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-052 A (docs/reviews/SE-034.md 후속 2·3, SE-034-bug) | #스냅샷 restore 8(b) 문구를 SE-034-bug 수정(`78de35a`, `rng.assign`)에 맞췄다: "4단계에서 만든 `SeededRng`으로 `rng` 교체" → "4단계에서 검증한 시드·상태를 기존 `rng` 객체에 적용(객체 유지)", 근거 링크. 같은 행 (a) 의 "교체"도 "바꿔 넣기"로 고쳐 8단계 행에 "교체" 0건. 4(b) 끝에 "새 `SeededRng`의 스트림 목록이 현재 `rng`와 다르면 실패"(TickLoop 1회)를 더해 8(b) 가 실패할 수 없음을 사전 검사로 보장하고, `push_error` 횟수 표에 그 경로 1행(합계 1)을 더했다. 구현·테스트는 SE-052 B(sim-engineer). 수치·이벤트·스냅샷 키 변경 0, 데이터 변경 0 |
 | 2026-10-10 | `save.json` v1 + `save.schema.json` version 1 (신규), tick.md v0 (후속 수정) | SE-057 (docs/reviews/SE-036.md 후속 제안, docs/tickets/SE-036.md 결과 절 "game-designer 요청 필드") | #스냅샷 아래 "세이브 설정 (save.json)" 절(SV1~SV5)을 새로 썼다. 필드 `manual_slots` 3(1~9), `autosave_keep` 3(0~99, 0 = 무제한). SE-036 결과 절 제안 이름 `save_slot_count` 는 SE-057 티켓의 `manual_slots` 로 바꿨다(SE-040 AC-39d 가 이미 이 이름을 참조). `sim.json` 에 넣지 않고 새 테이블로 둔 이유: 세이브 설정은 시뮬레이션 상수가 아니고 상태 해시에 영향이 없으며, `sim.json` 은 버전을 올리면 리플레이 기준값 검토가 따라온다. `sim.json`·스냅샷 키·이벤트 변경 0 |
+| 2026-10-10 | tick.md v0 (후속 수정), `sim.json` 변경 없음 | SE-058 | #세션-구간 "새 게임은 … 이벤트를 내지 않는다" 뒤에 "`TickLoop` 시간 이벤트 이야기이고, `GameSession` 은 새 세계 생성 직후 `build.coverage_changed {cause:"sync"}` 1회를 낸다(시간·RNG 불변)"를 덧붙였다(events.md 해당 행과 모순 제거). 규칙·수치·스냅샷 키 변경 0 |

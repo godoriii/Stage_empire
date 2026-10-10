@@ -262,7 +262,7 @@ func line(a: [x0, z0], b: [x1, z1]) -> Array:   # a 와 b 를 포함한 셀 목�
 |---|---|
 | `"placed"` | H2, `economy.upkeep_reported` 뒤 |
 | `"demolished"` | D4, `economy.upkeep_reported` 뒤 |
-| `"sync"` | `time.phase_changed {to: "evening"}` 수신 시 1회(설치 목록이 그대로여도). 새 게임·복원 직후에는 이벤트가 없으므로(스냅샷 훅은 이벤트를 내지 않는다, SH4) 관객·공연 시스템은 매일 저녁 개장 직전에 이 값으로 동기화한다 |
+| `"sync"` | (a) `time.phase_changed {to: "evening"}` 수신 시 1회(설치 목록이 그대로여도) — 관객·공연 시스템은 매일 저녁 개장 직전에 이 값으로 동기화한다. (b) **새 세계 생성 직후 1회(SE-058)** — `GameSession` 이 시스템 생성·구독 등록을 마친 뒤 첫 틱 전에 낸다(난수 소비 0). 설치 0 이어도 빈 맵 값(티어 1 `capacity` 119 등)을 싣는다. 그래서 첫 저녁·첫 설치 전에도 audience·show 의 coverage 가 이 시스템과 같다. (c) 불러오기·새 게임의 `session.loaded` 뒤 재발행 1회(SE-036 AC6, events.md `build.coverage_changed` 행) — 상태를 바꾸지 않는다. 스냅샷 훅 자체(`restore`)는 이벤트를 내지 않는다(SH4) |
 
 `blocked_cells`(SE-044): 모든 `cause`의 페이로드에 점유 셀 전체(C0, G6 순서, 증분 아님)를 싣는다 — 복원 뒤 첫 저녁 `"sync"`에도 실리므로 이 이벤트 하나로 점유 상태가 완전히 재구성된다. 소비자는 SE-034 관객 경로(자기 `TilePath`를 받을 때마다 이 목록으로 맞춘다, `BuildSystem`을 직접 부르지 않는다). SE-037 오버레이는 이 키를 쓰지 않는다(무시).
 
@@ -504,6 +504,7 @@ FC2 여유(`⌊비×0.3⌋ − 유지비`)의 최솟값은 `poster_board` 11. �
 | 2026-10-09 | build.md, `tier1_club.json`(파일 `version` 1 유지, 항목 추가만), events.md `build.*` | SE-044 | SE-032 리뷰 후속 A·B. `reference_layouts`에 `baseline_plus_two_speakers` 추가(BC21 기대값을 데이터로, `build_oracle.py --layouts` 18키 일치). `build.coverage_changed`·`coverage()`에 `blocked_cells`(C0 점유 셀 전체, G6, 증분 아님, 마지막 키) 추가. 공개 API 표 `Build` → `BuildSystem`, `find_path`·`path_from_entrance` 행 추가(UI·테스트용, sim 시스템은 부르지 않음). `build.rejected` 필드 타입 문장(any / `reason != invalid`이면 좁혀짐). 스키마 변경 없음 |
 | 2026-10-09 | build.md, 데이터·스키마 변경 없음 | SE-044 A2 (SE-044 C 인계 1) | #상태 `phase` 행에 "`to`가 `sim.json` `phases[].id`가 아니면 `push_error` 1회 후 무시(`phase` 불변, `sync` 없음)" 한 줄 — SE-044 C `build_system.gd` `_on_phase_changed`·`test_build_system.gd::test_ac5_unknown_phase_ignored` 와 같은 규칙. 관객이 `blocked_cells`를 스냅샷에 저장하는 쪽 정정은 audience.md(SE-044 A2) |
 | 2026-10-10 | build.md, `furniture.json`(파일 `version` 1 유지, 값·선택 필드만), `furniture.schema.json` `model` description 문구만(구조·`version` 불변) | SE-041 | (1) `model` 5행 등록: `stage_medium`·`bar_counter`·`speaker_floor`·`bar_fridge`·`light_spot` → `res://assets/models/<id>.glb`(FC4). 검수 통과 후 사람이 `.glb` 를 옮기기 전까지는 리소스가 없어 FurnitureView 가 프록시로 그린다(`ResourceLoader.exists` false → 경고 없이 Proxy). (2) 슬롯 구성을 테스트용 에셋(art-pipeline 서피스)에 맞춤: `speaker_floor` base+accent → base+**emissive**(`#FFB347`, 앰프 전원 LED 호박색), `bar_fridge` base+accent+glass → base+**emissive**+glass(`#E6F4FF`, 냉장고 내부 조명 냉백색). 근거: 런타임이 쓰는 슬롯 색은 아직 `slots.base` 뿐(프록시 정점색, SE-037)이고 accent 색(`#5A6270`·`#C8423A`)은 어느 코드도 읽지 않는다. materials.md 슬롯 표가 emissive 예로 '앰프 표시등, 냉장고 조명'을 든다. 요약 문단 `emissive` 6 → 8. 수치(비용·유지비·효과·footprint·height_m·poly_budget·category) 변경 없음 |
+| 2026-10-10 | build.md(문구), 데이터 변경 없음 | SE-058 | #커버리지 "발행" 표 `"sync"` 행을 (a) 저녁 진입 (b) 새 세계 생성 직후 1회(신규, producer 결정 추천안 1) (c) 불러오기·새 게임 재발행으로 나눠 적었다. 옛 문구 "새 게임·복원 직후에는 이벤트가 없으므로"는 SE-036 재발행 이후 이미 사실과 달라 지웠다. enum·페이로드·공식 변경 0 |
 
 ## 부록 A. 기준 배치 손계산
 
