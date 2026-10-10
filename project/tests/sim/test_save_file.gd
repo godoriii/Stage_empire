@@ -186,6 +186,26 @@ func test_corrupt_load_leaves_session_unchanged() -> void:
 	assert_push_error_count(1, "SaveFile 1회")
 
 
+## SE-056: inspect() 는 형식만 보고 push_error 를 내지 않는다(SN4 ③ 판정용). save_version 지원 여부는 호출자 몫.
+func test_inspect_no_push_error() -> void:
+	var s: GameSession = _session()
+	var snap: Dictionary = s.snapshot()
+	var ok: Dictionary = SaveFile.inspect(SaveFile.encode(snap))
+	assert_eq(ok[SaveFile.R_ERROR], "", "정상 파일")
+	assert_eq(ok[SaveFile.R_SAVE_VERSION], SaveFile.SAVE_VERSION)
+	assert_eq(_hash(ok[SaveFile.R_SNAPSHOT]), _hash(snap), "스냅샷 정수 정규화 후 동일")
+	var v2: Dictionary = SaveFile.inspect(_doc_bytes({
+		"header": {"save_version": 2, "snapshot_schema_version": snap["schema_version"], "written_day": 1}, "snapshot": snap,
+	}))
+	assert_eq([v2[SaveFile.R_ERROR], v2[SaveFile.R_SAVE_VERSION]], ["", 2], "save_version 2 는 형식 오류가 아니다")
+	for bad: PackedByteArray in [
+		"garbage".to_utf8_buffer(), _doc_bytes([1]), _doc_bytes({"header": {"save_version": 1}}),
+		_doc_bytes({"header": {"save_version": 1, "snapshot_schema_version": 99}, "snapshot": snap}),
+	]:
+		assert_ne(SaveFile.inspect(bad)[SaveFile.R_ERROR], "", "손상")
+	assert_push_error_count(0, "inspect 는 push_error 0")
+
+
 # --- 시간(AC4) ----------------------------------------------------------------------
 
 func test_150_agents_write_read_time() -> void:

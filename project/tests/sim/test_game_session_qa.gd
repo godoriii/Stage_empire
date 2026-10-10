@@ -1,7 +1,8 @@
 extends GutTest
 ## SE-036 qa 보강(독립 확인). sim-engineer 테스트가 덮지 않은 곳:
-## - session.load_requested 의 reason "corrupt"·"restore_failed", session.save_requested 의 reason "write_failed"
-##   (기존은 not_found·bad_slot 만 명령 경로로 확인), 오토세이브 쓰기 실패가 진행을 막지 않는 것.
+## - session.load_requested 의 reason "corrupt"·"restore_failed", session.save_requested 쓰기 실패
+##   (기존은 missing·invalid 만 명령 경로로 확인), 오토세이브 쓰기 실패가 진행을 막지 않는 것.
+## - SE-056: 계약 SN3·SN4 에 맞춰 단언을 고쳤다 — 저장 실패는 이벤트 없음(push_error 만), 불러오기 ③ corrupt 는 push_error 0.
 ## - 세이브 파일 헤더(save_version·snapshot_schema_version·written_day)를 SaveFile 을 거치지 않고 gzip→JSON 으로 직접 읽어 확인.
 ## docs/tickets/SE-036.md AC4·AC5·AC6.
 
@@ -97,7 +98,7 @@ func test_load_requested_corrupt_reason() -> void:
 	assert_eq(rec.of("session.load_failed"), [{"slot": "bad", "reason": "corrupt"}])
 	assert_eq(rec.count("session.loaded"), 0)
 	assert_eq(_hash(s.snapshot()), before, "손상 파일 로드는 상태 불변")
-	assert_push_error_count(1, "SaveFile push_error 1")
+	assert_push_error_count(0, "SN4 ③ corrupt 는 push_error 0 (SE-056)")
 
 
 func test_load_requested_restore_failed_reason() -> void:
@@ -124,8 +125,7 @@ func test_save_requested_write_failed_reason() -> void:
 	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.saved", "session.save_failed"])
 	s.bus.publish("session.save_requested", {"slot": "x"})
 	s.advance(0)
-	assert_eq(rec.of("session.save_failed"), [{"slot": "x", "reason": "write_failed"}])
-	assert_eq(rec.count("session.saved"), 0)
+	assert_eq(rec.events, [], "SN3: 쓰기 실패는 이벤트 없음(session.saved·save_failed 0, SE-056)")
 	assert_eq(_hash(s.snapshot()), before, "저장 실패는 상태 불변")
 	assert_gte(get_errors().size(), 1, "push_error 기록")
 	for e: Variant in get_errors():
@@ -142,8 +142,7 @@ func test_autosave_write_failure_does_not_block_day() -> void:
 	s.advance(_day_ticks())
 	ref.advance(_day_ticks())
 	assert_eq(s.loop.phase, "close", "오토세이브가 실패해도 하루는 close 까지 간다")
-	assert_eq(rec.of("session.save_failed"), [{"slot": "autosave_day1", "reason": "write_failed"}])
-	assert_eq(rec.count("session.saved"), 0)
+	assert_eq(rec.events, [], "SN3: 오토세이브 쓰기 실패도 이벤트 없음(SE-056)")
 	assert_eq(_hash(s.snapshot()), _hash(ref.snapshot()), "오토세이브 실패는 게임 상태에 영향 없음")
 	for e: Variant in get_errors():
 		e.handled = true
