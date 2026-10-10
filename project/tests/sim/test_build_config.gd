@@ -8,10 +8,10 @@ var _e: Dictionary
 
 
 func before_all() -> void:
-	_f = MapConfig.read_json(FurnitureConfig.DEFAULT_PATH)
-	_m = MapConfig.read_json(MapConfig.DEFAULT_PATH)
-	_t = MapConfig.read_json(MapConfig.TIERS_PATH)
-	_e = MapConfig.read_json(BuildConfig.ECONOMY_PATH)
+	_f = JsonUtil.read_json(FurnitureConfig.DEFAULT_PATH)
+	_m = JsonUtil.read_json(MapConfig.DEFAULT_PATH)
+	_t = JsonUtil.read_json(MapConfig.TIERS_PATH)
+	_e = JsonUtil.read_json(BuildConfig.ECONOMY_PATH)
 
 
 func test_load_ok() -> void:

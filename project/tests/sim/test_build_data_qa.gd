@@ -23,6 +23,11 @@ func _ints(v: Variant) -> Variant:
 		for e: Variant in v:
 			out.append(_ints(e))
 		return out
+	if v is Dictionary:
+		var dout: Dictionary = {}
+		for k: Variant in v:
+			dout[k] = _ints(v[k])
+		return dout
 	if v is float:
 		return int(v)
 	return v
@@ -405,7 +410,13 @@ func test_reference_layouts_expected_values_recomputed() -> void:
 		var exp: Dictionary = lay["expected"]
 		for key: String in exp:
 			assert_eq(_ints(got[key]), _ints(exp[key]), "%s.%s" % [lay["id"], key])
-	assert_eq(seen_ids, ["empty_room", "baseline_show"], "기준 배치 2개")
+	# id 목록은 리터럴로 고정하지 않는다(SE-044: 레이아웃이 추가돼도 깨지지 않게). 유일성 + 기준 배치 3종(BC21 레이아웃 포함) 포함만 단언.
+	var unique: Dictionary = {}
+	for lid: String in seen_ids:
+		unique[lid] = true
+	assert_eq(unique.size(), seen_ids.size(), "레이아웃 id 유일")
+	for lid: String in ["empty_room", "baseline_show", "baseline_plus_two_speakers"]:
+		assert_true(seen_ids.has(lid), "기준 배치 %s 포함" % lid)
 
 
 func test_baseline_literals_match_ticket_and_doc() -> void:
@@ -427,15 +438,23 @@ func test_baseline_literals_match_ticket_and_doc() -> void:
 
 
 func test_bc21_two_more_speakers_reach_dt6() -> void:
-	var lay: Dictionary = {}
+	# SE-044: BC21 기대값(관람·음향·음향 bp)은 리터럴이 아니라 baseline_plus_two_speakers.expected 에서 읽는다.
+	# 배치는 baseline_show + 스피커 2(build.md BC21 좌표)로 이 테스트가 직접 조립해, 데이터 레이아웃과 같은지도 대조한다.
+	var base: Dictionary = {}
+	var plus: Dictionary = {}
 	for l: Dictionary in _map["reference_layouts"]:
 		if l["id"] == "baseline_show":
-			lay = l
-	var pl: Array = (lay["placements"] as Array).duplicate(true)
+			base = l
+		elif l["id"] == "baseline_plus_two_speakers":
+			plus = l
+	assert_false(plus.is_empty(), "baseline_plus_two_speakers 레이아웃이 있다")
+	var pl: Array = (base["placements"] as Array).duplicate(true)
 	pl.append({"furniture_id": "speaker_floor", "cell": [5, 10], "rotation": 0})
 	pl.append({"furniture_id": "speaker_floor", "cell": [18, 10], "rotation": 0})
+	assert_eq(_ints(plus["placements"]), _ints(pl), "데이터 레이아웃 = baseline_show + 스피커 2")
+	var want: Dictionary = plus["expected"]
 	var got: Dictionary = _coverage(pl)
-	assert_eq([got["viewing_count"], got["sound_count"], got["sound_bp"]], [403, 313, 7766], "BC21")
+	assert_eq(_ints([got["viewing_count"], got["sound_count"], got["sound_bp"]]), _ints([want["viewing_count"], want["sound_count"], want["sound_bp"]]), "BC21 (데이터 expected)")
 	assert_gte(int(got["sound_bp"]), 6000, "DT6: 스피커 2 추가 시 ≥ 6,000")
 
 

@@ -4,7 +4,8 @@
 #   tools/bot/mutate_and_test.sh <patch.diff> [tests_subdir] [--keep]
 #
 # 실제 project/ 는 읽기만 한다. 리포지토리 안에는 어떤 파일도 만들지 않는다.
-# 사본은 리포지토리 밖($SE_MUTATE_DIR 아래 또는 mktemp -d)에 <사본>/project/... 구조로 만든다.
+# 사본은 리포지토리 밖($SE_MUTATE_DIR, 없으면 $TMPDIR, 없으면 /tmp 아래 mktemp -d)에 <사본>/project/... 구조로 만든다.
+# 그 상위 디렉터리가 리포지토리 안이면 사본을 만들기 전에 exit 2.
 # 이 스크립트는 boundary hook 의 우회가 아니라 "사본" 검증이다. 자세한 규칙은 tools/bot/README.md.
 #
 # 종료 코드: 0 = GUT 통과(변이를 못 잡음 / 패치 없음 확인),  GUT 가 돌려준 코드(!=0) = 변이가 잡힘,
@@ -58,28 +59,38 @@ fi
 
 # --- 사본 디렉터리 (리포지토리 밖) -------------------------------------------------
 BASE="${SE_MUTATE_DIR:-${TMPDIR:-/tmp}}"
+# 리포지토리 안(또는 그 자체)이면 디렉터리를 만들기 전에 거부한다: 삭제 가드가 리포지토리 안 사본을 지우지 않으므로
+# untracked 잔여가 남는다. 아직 없는 경로도 판정하도록, 존재하는 가장 가까운 상위를 실경로로 풀고 나머지를 붙인다.
+resolve_no_create() {
+  local p="$1" rest=""
+  case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
+  while [ ! -d "$p" ]; do
+    rest="/$(basename "$p")$rest"
+    p="$(dirname "$p")"
+  done
+  case "$rest" in */..|*/../*) return 1 ;; esac
+  echo "$(cd "$p" && pwd -P)$rest"
+}
+BASE_PRE="$(resolve_no_create "$BASE")" || { echo "사본 상위 디렉터리에 '..' 를 쓸 수 없다 (SE_MUTATE_DIR/TMPDIR): $BASE" >&2; exit 2; }
+case "$BASE_PRE" in
+  "$ROOT"|"$ROOT"/*)
+    echo "사본 상위 디렉터리는 리포지토리 밖이어야 한다 (SE_MUTATE_DIR/TMPDIR): $BASE_PRE" >&2
+    exit 2 ;;
+esac
 mkdir -p "$BASE" || exit 5
 BASE="$(cd "$BASE" && pwd -P)"
 WORK="$(mktemp -d -p "$BASE" se_mutate.XXXXXX)" || exit 5
 
-# rm -rf 는 mktemp 가 만든 사본 디렉터리에만 쓴다: 비어 있지 않음 + 절대 경로 + 이름 접두어 + /tmp 또는
-# SE_MUTATE_DIR 아래 + 리포지토리 바깥 일 때만.
+# rm -rf 는 mktemp 가 만든 사본 디렉터리에만 쓴다: 비어 있지 않음 + 디렉터리 + 실경로가 "$BASE"/se_mutate.?* 일 때만
+# ($BASE 는 위에서 실경로로 만들었고 리포지토리 밖임을 확인했다. 이름 조건도 이 패턴에 포함된다).
 safe_remove_work() {
   local w="${WORK:-}"
   [ -n "$w" ] || return 0
   [ -d "$w" ] || return 0
   w="$(cd "$w" && pwd -P)" || return 0
-  case "$w" in
-    "$ROOT"|"$ROOT"/*) echo "경고: 사본이 리포지토리 안이라 삭제하지 않는다: $w" >&2; return 0 ;;
-  esac
-  case "$(basename "$w")" in se_mutate.?*) ;; *) echo "경고: 예상 밖 이름이라 삭제하지 않는다: $w" >&2; return 0 ;; esac
   local ok=0
-  case "$w" in /tmp/?*) ok=1 ;; esac
-  if [ -n "${SE_MUTATE_DIR:-}" ]; then
-    local sb; sb="$(cd "$SE_MUTATE_DIR" 2>/dev/null && pwd -P)" || sb=""
-    if [ -n "$sb" ]; then case "$w" in "$sb"/?*) ok=1 ;; esac; fi
-  fi
-  if [ $ok -ne 1 ]; then echo "경고: /tmp 또는 SE_MUTATE_DIR 밖이라 삭제하지 않는다: $w" >&2; return 0; fi
+  case "$w" in "$BASE"/se_mutate.?*) ok=1 ;; esac
+  if [ $ok -ne 1 ]; then echo "경고: 예상 밖 경로라 삭제하지 않는다: $w (기대: $BASE/se_mutate.*)" >&2; return 0; fi
   rm -rf -- "$w"
 }
 

@@ -1,8 +1,8 @@
 extends GutTest
 ## SE-032 — BuildSystem. docs/gdd/build.md#수용-기준 BC1~BC19, BC21~BC23, BC27~BC31 과 SE-028 리뷰 후속 A(BC32)를 1:1 로 옮겼다.
-## 기대 수치는 furniture.json 행·tier1_club.json reference_layouts[].expected·economy.json 에서 읽는다(BC21 만 문서 리터럴,
-## 데이터에 그 배치의 expected 가 없다). 공통 전제(build.md): 새 게임, BuildSystem 과 Economy 를 system_order 순으로 같은 버스에
-## 구독, 명령은 publish 후 dispatch_commands()(또는 TickLoop.advance(0)).
+## 기대 수치는 furniture.json 행·tier1_club.json reference_layouts[].expected·economy.json 에서 읽는다(BC21 포함 — SE-044 에서
+## baseline_plus_two_speakers 레이아웃으로 데이터화). 공통 전제(build.md): 새 게임, BuildSystem 과 Economy 를 system_order 순으로
+## 같은 버스에 구독, 명령은 publish 후 dispatch_commands()(또는 TickLoop.advance(0)). SE-044 AC3(blocked_cells)·AC5(phase 검증) 포함.
 
 const RECORDED: Array[String] = [
 	"economy.charge_proposed", "economy.cash_changed", "economy.charge_resolved", "economy.refund_proposed",
@@ -12,10 +12,6 @@ const HANDSHAKE_OK: Array[String] = [
 	"economy.charge_proposed", "economy.cash_changed", "economy.charge_resolved", "build.placed",
 	"economy.upkeep_reported", "build.coverage_changed",
 ]
-## BC21 기대값(build.md BC21 리터럴. tier1_club.json 에 이 배치의 expected 가 없다 — 결과 절 질문 1).
-const BC21_VIEWING: int = 403
-const BC21_SOUND_COUNT: int = 313
-const BC21_SOUND_BP: int = 7766
 
 var _bcfg: BuildConfig
 var _ecfg: EconomyConfig
@@ -256,11 +252,17 @@ func test_bug_64bit_cells_restore_rs4() -> void:
 		assert_push_error("RS4", "RS4 %s: 의도한 검사" % [cell])
 		assert_push_error_count(errs, "RS4 %s: push_error 1회" % [cell])
 		assert_eq(_bhash(build), before, "RS4 %s: 상태 불변" % [cell])
-		if absi(int(cell[0])) < p53 and absi(int(cell[1])) < p53:
-			assert_false(build.restore(_rt(s)), "RS4 %s JSON 왕복 → false" % [cell])
-			errs += 1
-			assert_push_error("RS4", "RS4 %s JSON 왕복" % [cell])
-			assert_push_error_count(errs)
+		# JSON 왕복: |좌표| < 2^53 은 float 로 정확해 RS4 로 거절된다. ±2^63 근처는 float 가 ±2^63 이 되어
+		# JsonUtil.as_int 의 2^63 가드(SE-044)로 RS1 타입 오류가 된다(이전에는 플랫폼 정의 캐스트 뒤 RS4).
+		# (범위 비교는 absi 를 쓰지 않는다: absi(INT64_MIN) 은 음수로 넘친다.)
+		var exact: bool = true
+		for v: int in cell:
+			exact = exact and v > -p53 and v < p53
+		assert_false(build.restore(_rt(s)), "%s JSON 왕복 → false" % [cell])
+		errs += 1
+		assert_push_error("RS4" if exact else "RS1", "%s JSON 왕복: %s" % [cell, "RS4" if exact else "RS1 (2^63 가드)"])
+		assert_push_error_count(errs)
+		assert_eq(_bhash(build), before, "%s JSON 왕복: 상태 불변" % [cell])
 	assert_eq(rec.events.size(), 0, "이벤트 0")
 
 
@@ -476,17 +478,19 @@ func test_h2_h4_charge_resolved_matching() -> void:
 
 # --- 기준 배치 ------------------------------------------------------------------
 
+## BC21: reference_layouts[baseline_plus_two_speakers] 8개를 명령으로 배치 → expected 전 키(SE-044, 리터럴 없음).
 func test_bc21_two_more_speakers() -> void:
 	var u: Array = _unit()
-	_place_layout(u[0], "baseline_show")
-	var before: Dictionary = (u[1] as BuildSystem).coverage()
-	_place(u[0], "speaker_floor", [5, 10], 0)
-	_place(u[0], "speaker_floor", [18, 10], 0)
-	var cov: Dictionary = (u[1] as BuildSystem).coverage()
-	assert_eq(cov["viewing_count"], BC21_VIEWING)
-	assert_eq((cov["sound_tiles"] as Array).size(), BC21_SOUND_COUNT)
-	assert_eq(cov["sound_bp"], BC21_SOUND_BP)
-	assert_gt(cov["sound_bp"], before["sound_bp"], "스피커가 음향을 올린다")
+	var rec: EventRecorder = u[3]
+	var placements: Array = _place_layout(u[0], "baseline_plus_two_speakers")
+	assert_eq(rec.count("build.placed"), placements.size(), "8개 모두 placed")
+	assert_eq(rec.count("build.rejected"), 0)
+	var expected: Dictionary = _bcfg.layout("baseline_plus_two_speakers")["expected"]
+	var last: Dictionary = _last(rec, "build.coverage_changed")
+	last.erase("cause")
+	assert_eq(last, (u[1] as BuildSystem).coverage(), "마지막 coverage_changed == coverage()")
+	_assert_expected(last, u[1], (u[2] as Economy).cash, expected, "baseline_plus_two_speakers")
+	assert_gt(expected["sound_bp"], _bcfg.layout("baseline_show")["expected"]["sound_bp"], "스피커가 음향을 올린다")
 
 
 func test_bc22_empty_room() -> void:
@@ -655,6 +659,109 @@ func test_bc30_evening_sync() -> void:
 	var l: Array = _looped(5)
 	(l[0] as TickLoop).advance(_scfg.day_ticks)
 	assert_eq((l[3] as EventRecorder).count("build.coverage_changed"), 1, "하루에 sync 1회")
+
+
+# --- SE-044 AC3: build.coverage_changed.blocked_cells ------------------------------
+
+## placements(또는 인스턴스)의 G3 점유 셀 합집합, G6(z → x) 순서. 맵을 훑어 만든다(구현의 정렬과 독립).
+func _union_cells(placements: Array) -> Array:
+	var seen: Dictionary = {}
+	for p: Dictionary in placements:
+		for c: Array in GridOccupancy.cells_of(_row(p["furniture_id"])["footprint"], p["cell"], int(p["rotation"])):
+			seen[Vector2i(c[0], c[1])] = true
+	var out: Array = []
+	for z: int in _bcfg.map.depth:
+		for x: int in _bcfg.map.width:
+			if seen.has(Vector2i(x, z)):
+				out.append([x, z])
+	return out
+
+
+## 기준 배치 2종(baseline_show 21칸, baseline_plus_two_speakers 23칸 — 수는 데이터 placements 에서 계산)에서
+## 모든 coverage_changed 의 마지막 키가 blocked_cells 이고 그 시점 설치 목록의 점유 셀 전체(G6)와 같다. 철거 뒤 줄어든다.
+func test_ac3_blocked_cells_layouts_and_demolish() -> void:
+	var sizes: Dictionary = {}
+	for lid: String in ["baseline_show", "baseline_plus_two_speakers"]:
+		var u: Array = _unit()
+		var build: BuildSystem = u[1]
+		var rec: EventRecorder = u[3]
+		assert_eq(build.coverage()["blocked_cells"], [], "%s: 새 게임(빈 방) []" % lid)
+		var placements: Array = _place_layout(u[0], lid)
+		var events: Array = rec.of("build.coverage_changed")
+		assert_eq(events.size(), placements.size(), "%s: 배치마다 1회" % lid)
+		for i: int in events.size():
+			var ev: Dictionary = events[i]
+			assert_eq(ev["cause"], "placed")
+			assert_eq(ev.keys().back(), "blocked_cells", "%s #%d: 마지막 키" % [lid, i])
+			assert_eq(ev["blocked_cells"], _union_cells(placements.slice(0, i + 1)), "%s #%d: 점유 셀 전체(증분 아님)" % [lid, i])
+		var full: Array = _union_cells(placements)
+		assert_eq(build.coverage()["blocked_cells"], full, "%s: coverage() 에도 같은 키" % lid)
+		sizes[lid] = full.size()
+		# 철거: f2 를 빼면 그 점유 칸만큼 줄어든다.
+		var removed: Dictionary = placements[1]
+		rec.clear()
+		_demolish(u[0], "f2")
+		var dem: Dictionary = _last(rec, "build.coverage_changed")
+		assert_eq(dem["cause"], "demolished")
+		var rest: Array = placements.duplicate()
+		rest.remove_at(1)
+		assert_eq(dem["blocked_cells"], _union_cells(rest), "%s: 철거 뒤 남은 점유 셀" % lid)
+		var gone: int = GridOccupancy.cells_of(_row(removed["furniture_id"])["footprint"], removed["cell"], int(removed["rotation"])).size()
+		assert_eq((dem["blocked_cells"] as Array).size(), full.size() - gone, "%s: 철거한 칸 수만큼 감소" % lid)
+		assert_lt((dem["blocked_cells"] as Array).size(), full.size())
+	var extra: int = 0
+	var more: Array = _bcfg.layout("baseline_plus_two_speakers")["placements"]
+	for p: Dictionary in more.slice((_bcfg.layout("baseline_show")["placements"] as Array).size()):
+		extra += GridOccupancy.cells_of(_row(p["furniture_id"])["footprint"], p["cell"], int(p["rotation"])).size()
+	assert_eq(sizes["baseline_plus_two_speakers"], sizes["baseline_show"] + extra, "스피커 2개 칸만큼 많다")
+
+
+## 스냅샷(JSON 왕복) 복원 직후는 이벤트가 없고, 다음 저녁 sync 페이로드에 복원 전과 같은 blocked_cells 가 실린다.
+func test_ac3_blocked_cells_after_restore_sync() -> void:
+	var a: Array = _looped(13)
+	var loop_a: TickLoop = a[0]
+	var placements: Array = _place_layout(loop_a.bus, "baseline_plus_two_speakers", loop_a)
+	var want: Array = _union_cells(placements)
+	assert_eq((a[1] as BuildSystem).coverage()["blocked_cells"], want, "전제: 복원 전")
+	var snap: Variant = _rt(loop_a.snapshot())
+	var b: Array = _looped(13)
+	var loop_b: TickLoop = b[0]
+	var rec_b: EventRecorder = b[3]
+	assert_true(loop_b.restore(snap), "restore true")
+	assert_eq(rec_b.events.size(), 0, "복원은 이벤트 0")
+	assert_eq((b[1] as BuildSystem).coverage()["blocked_cells"], want, "복원 뒤 coverage() 재계산")
+	loop_b.advance(_scfg.day_ticks)
+	var syncs: Array = []
+	for ev: Dictionary in rec_b.of("build.coverage_changed"):
+		if ev["cause"] == "sync":
+			syncs.append(ev)
+	assert_eq(syncs.size(), 1, "다음 저녁 sync 1회")
+	assert_eq(syncs[0]["blocked_cells"], want, "sync 페이로드에 점유 셀 전체")
+	var cov: Dictionary = (syncs[0] as Dictionary).duplicate(true)
+	cov.erase("cause")
+	assert_eq(cov, (b[1] as BuildSystem).coverage(), "sync 페이로드 == coverage()")
+
+
+# --- SE-044 AC5: time.phase_changed 의 모르는 구간 id ---------------------------------
+
+func test_ac5_unknown_phase_ignored() -> void:
+	var u: Array = _unit(false)   # Economy 없이 build 만(Economy 쪽은 test_economy.gd 에서 따로)
+	var build: BuildSystem = u[1]
+	var rec: EventRecorder = u[3]
+	var stage: Dictionary = {"entity_id": "f1", "furniture_id": "stage_small", "cell": [10, 20], "rotation": 0, "paid": _row("stage_small")["build_cost"]}
+	assert_true(build.restore({"instances": [stage], "next_entity": 2, "phase": "day"}), "전제: 무대 1개 상태")
+	var before: String = _bhash(build)
+	rec.clear()
+	u[0].publish("time.phase_changed", {"from": "day", "to": "nope", "day": 1, "tick": 0})
+	assert_push_error_count(1, "모르는 to → push_error 1회")
+	assert_eq(build.phase, "day", "phase 불변")
+	assert_eq(_bhash(build), before, "상태 불변")
+	assert_eq(rec.events.size(), 0, "이벤트 0(sync 없음)")
+	assert_true(build.restore(_rt(build.snapshot())), "자기 스냅샷 왕복 true(SH3)")
+	assert_eq(_bhash(build), before)
+	_phase(u[0], "day", "evening")
+	assert_eq(build.phase, "evening", "그 뒤 정상 구간은 따라간다")
+	assert_eq(rec.count("build.coverage_changed"), 1, "evening sync")
 
 
 func test_bc31_charge_unresolved() -> void:
