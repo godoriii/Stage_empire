@@ -1,0 +1,11 @@
+{
+  "asset_id": "stage_medium",
+  "category": "stage",
+  "footprint": [
+    6,
+    4
+  ],
+  "height_m": 0.8,
+  "poly_budget": "equipment_large",
+  "ticket": "SE-041"
+}

@@ -90,7 +90,7 @@ func test_bc25_fc2_upkeep_rule() -> void:
 func test_fc_violations() -> void:
 	var cases: Array = []
 	var d: Dictionary
-	d = _raw.duplicate(true); d["rows"][1]["id"] = d["rows"][0]["id"]; cases.append(["FC1 id 중복", d, "FC1"])
+	d = _raw.duplicate(true); d["rows"][1]["id"] = d["rows"][0]["id"]; d["rows"][1].erase("model"); cases.append(["FC1 id 중복", d, "FC1"])
 	d = _raw.duplicate(true); d["build_rules"]["allowed_rotations"] = [90, 180]; cases.append(["FC3 0 없음", d, "FC3"])
 	d = _raw.duplicate(true); d["build_rules"]["allowed_rotations"] = [0, 45]; cases.append(["FC3 방향표 밖 회전", d, "FC3"])
 	d = _raw.duplicate(true); d["rows"][0]["model"] = "res://assets/models/other.glb"; cases.append(["FC4 model 경로", d, "FC4"])
