@@ -39,17 +39,17 @@ static func load(path: String = DEFAULT_PATH) -> SimConfig:
 static func from_dict(d: Dictionary) -> SimConfig:
 	var cfg: SimConfig = SimConfig.new()
 
-	var tps: Variant = _as_int(d.get("ticks_per_second"))
+	var tps: Variant = JsonUtil.as_int(d.get("ticks_per_second"))
 	if tps == null or tps <= 0:
 		return _fail("ticks_per_second 는 양의 정수여야 한다")
 	cfg.ticks_per_second = tps
 
-	var mtps: Variant = _as_int(d.get("max_ticks_per_step"))
+	var mtps: Variant = JsonUtil.as_int(d.get("max_ticks_per_step"))
 	if mtps == null or mtps < 1:
 		return _fail("max_ticks_per_step 는 1 이상 정수여야 한다")
 	cfg.max_ticks_per_step = mtps
 
-	var ssv: Variant = _as_int(d.get("snapshot_schema_version"))
+	var ssv: Variant = JsonUtil.as_int(d.get("snapshot_schema_version"))
 	if ssv == null or ssv < 1:
 		return _fail("snapshot_schema_version 은 1 이상 정수여야 한다")
 	cfg.snapshot_schema_version = ssv
@@ -159,7 +159,7 @@ static func _parse_phase(raw: Variant) -> Variant:
 	var id: Variant = raw.get("id")
 	if not (id is String) or (id as String).is_empty():
 		return _fail("phases[].id 는 문자열이어야 한다")
-	var t: Variant = _as_int(raw.get("ticks"))
+	var t: Variant = JsonUtil.as_int(raw.get("ticks"))
 	if t == null or t < 0:
 		return _fail("구간 '%s' 의 ticks 는 0 이상 정수여야 한다" % id)
 	var pausable: Variant = raw.get("pausable")
@@ -170,11 +170,11 @@ static func _parse_phase(raw: Variant) -> Variant:
 		return _fail("구간 '%s' 의 speeds 는 비어 있지 않은 배열이어야 한다" % id)
 	var speeds: Array = []
 	for v: Variant in raw_speeds:
-		var s: Variant = _as_int(v)
+		var s: Variant = JsonUtil.as_int(v)
 		if s == null or s < 0:
 			return _fail("구간 '%s' 의 speeds 원소는 0 이상 정수여야 한다" % id)
 		speeds.append(s)
-	var ds: Variant = _as_int(raw.get("default_speed"))
+	var ds: Variant = JsonUtil.as_int(raw.get("default_speed"))
 	if ds == null:
 		return _fail("구간 '%s' 의 default_speed 는 정수여야 한다" % id)
 	var mode: Variant = raw.get("enter_speed_mode")
@@ -188,15 +188,6 @@ static func _parse_phase(raw: Variant) -> Variant:
 		"default_speed": ds,
 		"enter_speed_mode": mode,
 	}
-
-
-## int, 또는 정수값인 유한 float 만 int 로. 그 밖은 null.
-static func _as_int(v: Variant) -> Variant:
-	if v is int:
-		return v
-	if v is float and is_finite(v) and v == floorf(v):
-		return int(v)
-	return null
 
 
 static func _string_list(v: Variant) -> Variant:

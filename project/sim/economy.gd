@@ -457,8 +457,8 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 	if out["day"] < NEW_GAME_DAY or out["upkeep_per_day"] < 0 or out["last_settled_day"] < 0 or out["bailouts_left"] < 0 or out["ticket_price"] < 0:
 		return "범위 밖 값(day ≥ 1, upkeep_per_day·last_settled_day·bailouts_left·ticket_price ≥ 0)"
 	var ph: Variant = d["phase"]
-	if not (ph is String or ph is StringName) or String(ph).is_empty():
-		return "phase 가 문자열이 아니다"
+	if not (ph is String or ph is StringName) or not SimConfig.PHASE_IDS.has(String(ph)):   # SE-045: build RS1 과 같은 조건
+		return "phase 가 구간 id %s 가 아니다: %s" % [SimConfig.PHASE_IDS, ph]
 	out["phase"] = String(ph)
 	if not (d["bankrupt"] is bool):
 		return "bankrupt 가 bool 이 아니다"
