@@ -3,6 +3,7 @@ extends GutTest
 ## AC-35a/b(실제 audience 포함 하루 이벤트 순서·라인업 없는 날), AC5(오토세이브·경계), AC6(session 명령·재발행 규칙),
 ## SE-049(session.loaded 4필드, 공연 중 로드 → 연속 진행과 동일). docs/tickets/SE-036.md, docs/gdd/tick.md#스냅샷.
 ## SE-056 AC1~AC5(session.* 계약 SN1~SN5, docs/gdd/events.md #session-명령-규칙)는 파일 끝 절.
+## SE-058(새 세계 생성 직후 coverage sync, 이중 restore 제거, AC-56b·AC-56d)는 그 뒤 절.
 
 const DIR: String = "user://test_se036_session"
 ## SE-057 데이터 루트 사본(res://data 복사, save/ 만 바꾼다).
@@ -762,3 +763,153 @@ func test_se057_sv3_no_prune_on_autosave_write_failure() -> void:
 	_to_close(s)
 	assert_eq(s.list_autosave_days(), [4], "다음 성공 경계에서 보관 수 적용")
 	assert_true(FileAccess.file_exists(s.slot_path(MANUAL_SLOT)), "수동 슬롯은 남는다")
+
+
+# --- SE-058 새 세계 생성 직후 coverage sync · 이중 restore 제거 (docs/tickets/SE-058.md) -------------------
+
+const SEED_058: int = 58
+const SLOT_058: String = "p"
+
+
+## d 에서 keys 만 남긴 사본(AudienceSystem.coverage 가 보관하는 키로 비교한다).
+static func _pick(d: Dictionary, keys: Array) -> Dictionary:
+	var out: Dictionary = {}
+	for k: Variant in keys:
+		out[k] = d[k]
+	return out
+
+
+## 재발행 중(session.loaded 수신) 명령 하나를 내는 구독자(AC-56b i).
+func _publish_speed_on_loaded(_p: Dictionary, b: EventBus) -> void:
+	b.publish("time.speed_requested", {"speed": 3})
+
+
+## AC1·AC4(재현 A 행): 새 게임 직후(설치 0) 저장 → 다른 seed 세션 load_from → 상태 해시 == 저장 시점 해시.
+func test_se058_ac1_fresh_save_load_from_matches() -> void:
+	var a: GameSession = _session(false, SEED_058)
+	a.autosave_enabled = false
+	a.bus.publish("session.save_requested", {"slot": SLOT_058})
+	a.advance(0)
+	var before: String = _hash(a.snapshot())
+	assert_eq(_hash(SaveFile.read(a.slot_path(SLOT_058))), before, "저장 = 경계 상태")
+	var b: GameSession = _session(false, 777)
+	assert_true(b.load_from(b.slot_path(SLOT_058)))
+	assert_eq(_hash(b.snapshot()), before, "새 게임 직후 저장도 재발행 뒤 해시 == 저장 시점 해시(SE-036 AC6)")
+	assert_eq(int(b.audience.coverage["capacity"]), int(b.build.coverage()["capacity"]), "audience capacity = build capacity")
+	assert_push_error_count(0)
+
+
+## AC1·AC4: 같은 세션 session.load_requested 경로도 같다(낮 구간에서 움직인 뒤 불러온다).
+func test_se058_ac1_fresh_save_load_requested_matches() -> void:
+	var s: GameSession = _session(false, SEED_058)
+	s.autosave_enabled = false
+	s.bus.publish("session.save_requested", {"slot": SLOT_058})
+	s.advance(0)
+	var before: String = _hash(s.snapshot())
+	s.advance(5)
+	assert_ne(_hash(s.snapshot()), before, "전제: 움직였다")
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["session.loaded", "session.load_failed"])
+	s.bus.publish("session.load_requested", {"slot": SLOT_058})
+	s.advance(0)
+	assert_eq(rec.names(), ["session.loaded"])
+	assert_eq(_hash(s.snapshot()), before, "load_requested 경로도 해시 == 저장 시점 해시")
+
+
+## AC2(회귀, 표 B·C): 설치 뒤 첫 저녁 전 저장, 설치 + 섭외 + 저녁 진행 중 저장도 load_from·load_requested 둘 다 일치.
+func test_se058_ac2_placed_and_evening_saves_still_match() -> void:
+	var c: SimConfig = _cfgs["sim"]
+	var s: GameSession = _session(true, SEED_058)
+	s.autosave_enabled = false
+	s.bus.publish("session.save_requested", {"slot": "b"})
+	s.advance(0)
+	var hash_b: String = _hash(s.snapshot())
+	_book(s)
+	s.advance(c.phase_ticks("day") + c.phase_ticks("evening") / 2)
+	assert_eq(s.loop.phase, "evening", "전제: 저녁 진행 중")
+	s.bus.publish("session.save_requested", {"slot": "c"})
+	s.advance(0)
+	var hash_c: String = _hash(s.snapshot())
+	for slot_hash: Array in [["b", hash_b], ["c", hash_c]]:
+		var o: GameSession = _session(false, 777)
+		assert_true(o.load_from(o.slot_path(slot_hash[0])))
+		assert_eq(_hash(o.snapshot()), slot_hash[1], "load_from %s" % slot_hash[0])
+		s.advance(7)
+		s.bus.publish("session.load_requested", {"slot": slot_hash[0]})
+		s.advance(0)
+		assert_eq(_hash(s.snapshot()), slot_hash[1], "load_requested %s" % slot_hash[0])
+
+
+## 인계 1: 새 세계(new_game_from_configs 직후)의 AudienceSystem.coverage == BuildSystem.coverage()(빈 맵 capacity 포함).
+## 생성 직후 sync 는 새 세계 자신의 버스에서 나므로 생성 뒤 붙인 리스너는 받지 않는다(인계 6).
+func test_se058_new_world_coverage_synced_at_creation() -> void:
+	var s: GameSession = _session(false, SEED_058)
+	assert_eq(_hash(s.audience.coverage), _hash(_pick(s.build.coverage(), s.audience.coverage.keys())), "생성 직후 audience.coverage = build.coverage()")
+	assert_gt(int(s.audience.coverage["capacity"]), 0, "빈 맵 capacity(바닥 면적) > 0")
+	assert_eq(s.loop.tick, 0, "틱 불변")
+	assert_eq(s.bus.get_pending_commands(), [], "명령 큐 불변")
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["build.coverage_changed"])
+	s.advance(1)
+	assert_eq(rec.events, [], "생성 뒤 붙인 리스너에게는 낮 구간 coverage 이벤트 0")
+
+
+## AC-56b (ii): new_game_requested 뒤 AudienceSystem.coverage == 마지막으로 받은 build.coverage_changed{sync} 페이로드.
+func test_se058_ac56b_new_game_audience_coverage_equals_last_sync() -> void:
+	var mv: Array = _moved_session()
+	var s: GameSession = mv[0]
+	var rec: EventRecorder = EventRecorder.new(s.bus, ["build.coverage_changed"])
+	s.bus.publish("session.new_game_requested", {"seed": 7})
+	s.advance(0)
+	var syncs: Array = rec.of("build.coverage_changed")
+	assert_eq(syncs.size(), 1)
+	var last: Dictionary = syncs[-1]
+	assert_eq(last["cause"], "sync")
+	assert_eq(_hash(s.audience.coverage), _hash(_pick(last, s.audience.coverage.keys())), "audience.coverage == 마지막 sync 페이로드(cause 제외)")
+
+
+## AC-56b (i): 재발행 중 구독자가 낸 명령을 새 게임 경로와 불러오기 경로가 같게 처리한다.
+## 두 경로 모두 seed 7 의 1일차 세계에 도착하고, session.loaded 구독자가 낸 speed 명령이 큐에 남아 같은 경계에서 적용된다.
+func test_se058_ac56b_command_during_republish_same_on_both_paths() -> void:
+	var ref: GameSession = _session(false, 7)
+	ref.bus.publish("session.save_requested", {"slot": "fresh7"})
+	ref.advance(0)
+	var fresh7: String = _hash(ref.snapshot())
+	var out: Array = []
+	for cmd: Array in [["session.new_game_requested", {"seed": 7}], ["session.load_requested", {"slot": "fresh7"}]]:
+		var x: GameSession = _moved_session()[0]
+		var rec: EventRecorder = EventRecorder.new(x.bus, ["session.loaded", "time.speed_changed"])
+		x.bus.subscribe("session.loaded", _publish_speed_on_loaded.bind(x.bus))
+		x.bus.publish(cmd[0], cmd[1])
+		x.advance(0)
+		assert_eq(rec.names(), ["session.loaded", "time.speed_changed"], "%s: 재발행 중 낸 명령이 적용된다" % cmd[0])
+		assert_eq(x.loop.speed, 3, "%s: 배속 3" % cmd[0])
+		assert_eq(x.bus.get_pending_commands(), [], "%s: 큐 비움" % cmd[0])
+		x.bus.publish("time.speed_requested", {"speed": 1})
+		x.advance(0)
+		assert_eq(_hash(x.snapshot()), fresh7, "%s: 배속을 되돌리면 seed 7 의 1일차 상태" % cmd[0])
+		out.append(_hash(x.snapshot()))
+	assert_eq(out[0], out[1], "두 경로 결과 상태 해시 동일")
+	assert_push_error_count(0)
+
+
+## AC-56d(회귀 방지): {seed:-1} 새 게임 명령 → push_error 정확히 1(SeededRng), 상태 해시 == 독립 new_game(-1) 해시
+## (= posmod 로 접은 seed 의 해시), 두 번 실행해 같다.
+func test_se058_ac56d_negative_seed_new_game_requested() -> void:
+	var hashes: Array[String] = []
+	for i: int in range(2):
+		var s: GameSession = _session(false)
+		s.advance(50)
+		var rec: EventRecorder = EventRecorder.new(s.bus, SESSION_EVENTS)
+		s.bus.publish("session.new_game_requested", {"seed": -1})
+		s.advance(0)
+		assert_push_error("SeededRng")
+		assert_push_error_count(i + 1, "실행 %d: push_error 정확히 1(SeededRng)" % (i + 1))
+		assert_eq(rec.names(), ["session.loaded"], "새 게임 성공")
+		hashes.append(_hash(s.snapshot()))
+	assert_eq(hashes[0], hashes[1], "결정적")
+	var ref: GameSession = GameSession.new()
+	assert_true(ref.new_game_from_configs(-1, _cfgs))
+	assert_push_error_count(3, "독립 new_game(-1) 도 push_error 1")
+	assert_eq(hashes[0], _hash(ref.snapshot()), "== 독립 new_game_from_configs(-1)")
+	var folded: GameSession = GameSession.new()
+	assert_true(folded.new_game_from_configs(posmod(-1, SeededRng.MASTER_SEED_MAX + 1), _cfgs))
+	assert_eq(hashes[0], _hash(folded.snapshot()), "== posmod 로 접은 seed 의 new_game")
