@@ -78,6 +78,31 @@
         "upkeep_per_day": 123, "build_cost": 2140, "cash_after": 2860,
         "sight_blocked_cells": [[4, 1], [18, 1], [19, 1], [4, 2], [5, 2], [18, 2], [5, 3], [17, 3], [18, 3], [5, 4], [17, 4], [18, 4], [6, 5], [17, 5], [6, 6], [17, 6], [22, 6], [7, 7], [16, 7], [22, 7], [1, 8], [21, 8], [22, 8], [1, 9], [2, 9], [20, 9], [21, 9], [2, 10], [20, 10], [21, 10], [3, 11], [19, 11], [20, 11], [4, 12], [18, 12], [19, 12], [5, 13], [17, 13], [18, 13], [6, 14], [17, 14]]
       }
+    },
+    {
+      "id": "baseline_plus_two_speakers",
+      "description": "기준 배치 + 바닥 스피커 2(왼쪽 [5,10]·오른쪽 [18,10], 회전 0). 순서대로 배치하면 entity f1~f8. 스피커 2 → 4 로 음향 23.70% → 77.66%. build.md BC21·DT6",
+      "placements": [
+        { "furniture_id": "stage_small", "cell": [10, 20], "rotation": 0 },
+        { "furniture_id": "speaker_floor", "cell": [9, 20], "rotation": 0 },
+        { "furniture_id": "speaker_floor", "cell": [14, 20], "rotation": 0 },
+        { "furniture_id": "bar_counter", "cell": [20, 4], "rotation": 90 },
+        { "furniture_id": "bench", "cell": [1, 10], "rotation": 270 },
+        { "furniture_id": "bench", "cell": [1, 13], "rotation": 270 },
+        { "furniture_id": "speaker_floor", "cell": [5, 10], "rotation": 0 },
+        { "furniture_id": "speaker_floor", "cell": [18, 10], "rotation": 0 }
+      ],
+      "expected": {
+        "has_stage": true,
+        "floor_free": 455, "viewing_count": 403,
+        "sound_count": 313, "sound_bp": 7766,
+        "sight_count": 362, "sight_bp": 8982,
+        "bar_count": 121, "bar_bp": 3002,
+        "capacity": 121, "evac_capacity": 80, "evac_shortfall": 41,
+        "light_grade": 0, "satisfaction_bonus_bp": 100,
+        "upkeep_per_day": 153, "build_cost": 2540, "cash_after": 2460,
+        "sight_blocked_cells": [[4, 1], [18, 1], [19, 1], [4, 2], [5, 2], [18, 2], [5, 3], [17, 3], [18, 3], [5, 4], [17, 4], [18, 4], [6, 5], [17, 5], [6, 6], [17, 6], [22, 6], [7, 7], [16, 7], [22, 7], [1, 8], [21, 8], [22, 8], [1, 9], [2, 9], [20, 9], [21, 9], [2, 10], [20, 10], [21, 10], [3, 11], [19, 11], [20, 11], [4, 12], [18, 12], [19, 12], [5, 13], [17, 13], [18, 13], [6, 14], [17, 14]]
+      }
     }
   ]
 }

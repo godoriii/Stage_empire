@@ -6,8 +6,8 @@ var _tiers: Dictionary
 
 
 func before_all() -> void:
-	_raw = MapConfig.read_json(MapConfig.DEFAULT_PATH)
-	_tiers = MapConfig.read_json(MapConfig.TIERS_PATH)
+	_raw = JsonUtil.read_json(MapConfig.DEFAULT_PATH)
+	_tiers = JsonUtil.read_json(MapConfig.TIERS_PATH)
 
 
 func _copy() -> Dictionary:
@@ -67,7 +67,12 @@ func test_reachable_respects_blocked() -> void:
 
 func test_layouts_parsed_as_int() -> void:
 	var m: MapConfig = MapConfig.load()
-	assert_eq(m.layout_ids(), ["empty_room", "baseline_show"])
+	# 레이아웃 id 목록은 원본 JSON 에서 읽는다(레이아웃이 추가돼도 깨지지 않게, SE-044).
+	var raw_ids: Array = []
+	for rl: Dictionary in _raw["reference_layouts"]:
+		raw_ids.append(rl["id"])
+	assert_gt(raw_ids.size(), 0, "전제: reference_layouts 가 비어 있지 않다")
+	assert_eq(m.layout_ids(), raw_ids, "모든 레이아웃을 파일 순서대로")
 	var l: Dictionary = m.layout("baseline_show")
 	assert_eq(l["placements"][0], {"furniture_id": "stage_small", "cell": [10, 20], "rotation": 0})
 	assert_eq(typeof(l["expected"]["floor_free"]), TYPE_INT, "float → int 접기")
