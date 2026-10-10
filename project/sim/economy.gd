@@ -210,7 +210,7 @@ static func split_installments(total: int, n: int) -> Array:
 func _on_charge_proposed(p: Dictionary) -> void:
 	var rid: String = _str_or_empty(p.get("request_id"))
 	var reason: String = _str_or_empty(p.get("reason"))
-	var amount: Variant = EconomyConfig.as_int(p.get("amount"))
+	var amount: Variant = JsonUtil.as_int(p.get("amount"))
 	var amount_out: int = amount if amount != null else 0
 	if bankrupt:                                                                               # C1
 		_resolve_charge(rid, reason, amount_out, DECLINE_BANKRUPT)
@@ -244,7 +244,7 @@ func _resolve_charge(rid: String, reason: String, amount: int, decline: String) 
 func _on_refund_proposed(p: Dictionary) -> void:
 	if bankrupt:                                                                               # F1
 		return
-	var base: Variant = EconomyConfig.as_int(p.get("base_amount"))
+	var base: Variant = JsonUtil.as_int(p.get("base_amount"))
 	if p.get("reason") != REFUND_REASON_DEMOLISH or base == null or base < 0:                # F2
 		push_warning("[Economy] refund_proposed 무시: reason=%s base_amount=%s" % [p.get("reason"), p.get("base_amount")])
 		return
@@ -258,8 +258,8 @@ func _on_refund_proposed(p: Dictionary) -> void:
 func _on_sales_reported(p: Dictionary) -> void:
 	if bankrupt:
 		return
-	var adm: Variant = EconomyConfig.as_int(p.get("admissions"))
-	var aud: Variant = EconomyConfig.as_int(p.get("audience"))
+	var adm: Variant = JsonUtil.as_int(p.get("admissions"))
+	var aud: Variant = JsonUtil.as_int(p.get("audience"))
 	if adm == null or aud == null or adm < 0 or aud < 0:
 		push_warning("[Economy] sales_reported 무시: %s" % [p])
 		return
@@ -271,7 +271,7 @@ func _on_sales_reported(p: Dictionary) -> void:
 func _on_upkeep_reported(p: Dictionary) -> void:
 	if bankrupt:
 		return
-	var total: Variant = EconomyConfig.as_int(p.get("total"))
+	var total: Variant = JsonUtil.as_int(p.get("total"))
 	if total == null or total < 0:
 		push_warning("[Economy] upkeep_reported 무시: %s" % [p])
 		return
@@ -312,11 +312,15 @@ func _on_bailout_accept_requested(_p: Dictionary) -> void:
 
 ## phase·day 추적. close 진입이면 정산(1회성). 1회성 검사를 통과했는데 제안 중인 구제가 남아 있으면
 ## (time.day_started 없이 다음 close 가 옴 = 시간 이벤트 계약 위반) S0: push_warning 1회 후 auto 수락, 그다음 정산.
+## `to` 가 SimConfig.PHASE_IDS(sim.json phases) 밖이면 push_error 1회 후 전체 무시(파산 뒤에도 같음).
 func _on_phase_changed(p: Dictionary) -> void:
 	var to: Variant = p.get("to")
-	var d: Variant = EconomyConfig.as_int(p.get("day"))
+	var d: Variant = JsonUtil.as_int(p.get("day"))
 	if not (to is String) or d == null:
 		push_warning("[Economy] time.phase_changed 페이로드 무시: %s" % [p])
+		return
+	if not SimConfig.PHASE_IDS.has(to):   # SE-044: 모르는 구간 id 는 계약 위반 — day·phase 를 바꾸지 않는다
+		push_error("[Economy] time.phase_changed 의 to '%s' 가 구간 id %s 가 아니다(무시)" % [to, SimConfig.PHASE_IDS])
 		return
 	phase = to
 	day = d
@@ -331,7 +335,7 @@ func _on_phase_changed(p: Dictionary) -> void:
 
 ## day 추적. 제안 중인 구제는 자동 수락(auto: true).
 func _on_day_started(p: Dictionary) -> void:
-	var d: Variant = EconomyConfig.as_int(p.get("day"))
+	var d: Variant = JsonUtil.as_int(p.get("day"))
 	if d == null:
 		push_warning("[Economy] time.day_started 페이로드 무시: %s" % [p])
 		return
@@ -444,7 +448,7 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 			return "필드 누락: %s" % key
 	var out: Dictionary = {}
 	for key: String in ["cash", "tier", "day", "ticket_price", "upkeep_per_day", "last_settled_day", "bailouts_left"]:
-		var v: Variant = EconomyConfig.as_int(d[key])
+		var v: Variant = JsonUtil.as_int(d[key])
 		if v == null:
 			return "%s 가 정수가 아니다: %s" % [key, d[key]]
 		out[key] = v
@@ -464,7 +468,7 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 		return "ledger 가 객체가 아니다"
 	var new_ledger: Dictionary = _new_ledger()
 	for key: String in [LEDGER_ADMISSIONS, LEDGER_AUDIENCE, LEDGER_GUARANTEE]:
-		var v: Variant = EconomyConfig.as_int((lg as Dictionary).get(key))
+		var v: Variant = JsonUtil.as_int((lg as Dictionary).get(key))
 		if v == null or v < 0:
 			return "ledger.%s 가 0 이상 정수가 아니다" % key
 		new_ledger[key] = v
@@ -506,7 +510,7 @@ func _parse_snapshot(d: Dictionary) -> Variant:
 static func _parse_record(rec: Dictionary, int_fields: Array[String], label: String) -> Variant:
 	var out: Dictionary = {}
 	for key: String in int_fields:
-		var v: Variant = EconomyConfig.as_int(rec.get(key))
+		var v: Variant = JsonUtil.as_int(rec.get(key))
 		if v == null:
 			return "%s.%s 가 정수가 아니다: %s" % [label, key, rec.get(key)]
 		out[key] = v
@@ -515,7 +519,7 @@ static func _parse_record(rec: Dictionary, int_fields: Array[String], label: Str
 		return "%s.installments 가 비어 있지 않은 배열이 아니다" % label
 	var arr: Array = []
 	for x: Variant in inst:
-		var n: Variant = EconomyConfig.as_int(x)
+		var n: Variant = JsonUtil.as_int(x)
 		if n == null:
 			return "%s.installments 원소가 정수가 아니다: %s" % [label, x]
 		arr.append(n)

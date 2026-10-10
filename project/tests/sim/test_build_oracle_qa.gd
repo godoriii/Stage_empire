@@ -118,10 +118,10 @@ func test_build_system_matches_independent_oracle() -> void:
 ## tier1_club 에서는 등면 이웃이 벽 + 비벽 섞이는 배치가 없다(입구 [11..12,0] 바로 아래가 완충 타일이라 buildable 이 아님) —
 ## 그래서 위쪽 벽의 [9,0] 또는 [10,0] 을 기둥('P', mountable 아님)으로 바꾼 맵 사본으로 확인한다(MK5 는 기둥도 walkable 아님이라 통과).
 func _cfg_with_pillar_at(x: int) -> BuildConfig:
-	var f: Variant = MapConfig.read_json(FurnitureConfig.DEFAULT_PATH)
-	var m: Variant = MapConfig.read_json(MapConfig.DEFAULT_PATH)
-	var t: Variant = MapConfig.read_json(MapConfig.TIERS_PATH)
-	var e: Variant = MapConfig.read_json(BuildConfig.ECONOMY_PATH)
+	var f: Variant = JsonUtil.read_json(FurnitureConfig.DEFAULT_PATH)
+	var m: Variant = JsonUtil.read_json(MapConfig.DEFAULT_PATH)
+	var t: Variant = JsonUtil.read_json(MapConfig.TIERS_PATH)
+	var e: Variant = JsonUtil.read_json(BuildConfig.ECONOMY_PATH)
 	var row0: String = m["tiles"][0]
 	m["tiles"][0] = row0.substr(0, x) + "P" + row0.substr(x + 1)
 	return BuildConfig.from_dicts(f, m, t, e)

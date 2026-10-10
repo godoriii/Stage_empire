@@ -31,7 +31,7 @@ var _sets: Array = []        # reference_sets (정수 정규화)
 ## rate_scale·refund_bp 는 economy.json 값(FC2).
 static func from_dict(d: Dictionary, rate_scale: int, refund_bp: int) -> FurnitureConfig:
 	var f: FurnitureConfig = FurnitureConfig.new()
-	var ver: Variant = MapConfig.as_int(d.get("version"))
+	var ver: Variant = JsonUtil.as_int(d.get("version"))
 	if ver == null or ver != SUPPORTED_VERSION:
 		return _fail("version 은 %d 이어야 한다: %s" % [SUPPORTED_VERSION, d.get("version")])
 	f.version = ver
@@ -50,7 +50,7 @@ static func from_dict(d: Dictionary, rate_scale: int, refund_bp: int) -> Furnitu
 	if not (rots is Array):
 		return _fail("build_rules.allowed_rotations 는 배열이어야 한다")
 	for r: Variant in rots:
-		var ri: Variant = MapConfig.as_int(r)
+		var ri: Variant = JsonUtil.as_int(r)
 		if ri == null or not GridOccupancy.KNOWN_ROTATIONS.has(ri):
 			return _fail("FC3 allowed_rotations 의 %s 는 방향표 회전(%s)이 아니다" % [r, GridOccupancy.KNOWN_ROTATIONS])
 		f.allowed_rotations.append(ri)
@@ -60,11 +60,11 @@ static func from_dict(d: Dictionary, rate_scale: int, refund_bp: int) -> Furnitu
 	if not (cmc is Dictionary):
 		return _fail("build_rules.category_max_count 는 객체여야 한다")
 	for c: Variant in cmc:
-		var n: Variant = MapConfig.as_int(cmc[c])
+		var n: Variant = JsonUtil.as_int(cmc[c])
 		if not (c is String) or n == null or n < 0:
 			return _fail("category_max_count.%s 는 0 이상 정수여야 한다" % [c])
 		f.category_max_count[c] = n
-	var cap: Variant = MapConfig.as_int(rules.get("satisfaction_bonus_cap_bp"))
+	var cap: Variant = JsonUtil.as_int(rules.get("satisfaction_bonus_cap_bp"))
 	if cap == null or cap < 0:
 		return _fail("build_rules.satisfaction_bonus_cap_bp 는 0 이상 정수여야 한다")
 	f.satisfaction_bonus_cap_bp = cap
@@ -94,7 +94,7 @@ static func from_dict(d: Dictionary, rate_scale: int, refund_bp: int) -> Furnitu
 		for it: Variant in s["items"]:
 			if not (it is Dictionary) or not f._by_id.has(it.get("furniture_id")):                    # FC5
 				return _fail("FC5 reference_sets '%s' 의 furniture_id '%s' 가 행에 없다" % [s["id"], (it as Dictionary).get("furniture_id") if it is Dictionary else it])
-		f._sets.append(MapConfig.int_deep(s))
+		f._sets.append(JsonUtil.int_deep(s))
 	return f
 
 
@@ -147,13 +147,13 @@ static func _parse_row(raw: Variant) -> Variant:
 	var cat: Variant = raw.get("category")
 	if not (cat is String) or (cat as String).is_empty():
 		return _fail("%s.category 는 문자열이어야 한다" % rid)
-	var fp: Variant = MapConfig.as_int_pair(raw.get("footprint"))
+	var fp: Variant = JsonUtil.as_int_pair(raw.get("footprint"))
 	if fp == null or fp[0] < 1 or fp[1] < 1:
 		return _fail("%s.footprint 는 1 이상 정수 [w, d] 여야 한다" % rid)
-	var cost: Variant = MapConfig.as_int(raw.get("build_cost"))
+	var cost: Variant = JsonUtil.as_int(raw.get("build_cost"))
 	if cost == null or cost < 1:
 		return _fail("%s.build_cost 는 1 이상 정수여야 한다" % rid)
-	var upkeep: Variant = MapConfig.as_int(raw.get("upkeep_per_day"))
+	var upkeep: Variant = JsonUtil.as_int(raw.get("upkeep_per_day"))
 	if upkeep == null or upkeep < 0:
 		return _fail("%s.upkeep_per_day 는 0 이상 정수여야 한다" % rid)
 	for b: String in ["rotatable", "wall_required"]:
@@ -164,7 +164,7 @@ static func _parse_row(raw: Variant) -> Variant:
 		return _fail("%s.effects 는 객체여야 한다" % rid)
 	var effects: Dictionary = {}
 	for k: String in EFFECT_INT_FIELDS:
-		var v: Variant = MapConfig.as_int(eff.get(k))
+		var v: Variant = JsonUtil.as_int(eff.get(k))
 		if v == null or v < 0:
 			return _fail("%s.effects.%s 는 0 이상 정수여야 한다" % [rid, k])
 		effects[k] = v
@@ -176,7 +176,7 @@ static func _parse_row(raw: Variant) -> Variant:
 		return _fail("%s.model 은 문자열이어야 한다" % rid)
 	if not (model as String).is_empty() and model != MODEL_PREFIX + rid + MODEL_SUFFIX:          # FC4
 		return _fail("FC4 %s.model '%s' 가 '%s' 가 아니다" % [rid, model, MODEL_PREFIX + rid + MODEL_SUFFIX])
-	var out: Dictionary = MapConfig.int_deep(raw)
+	var out: Dictionary = JsonUtil.int_deep(raw)
 	out["footprint"] = fp
 	out["build_cost"] = cost
 	out["upkeep_per_day"] = upkeep

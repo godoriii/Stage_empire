@@ -1,5 +1,5 @@
 extends GutTest
-## SE-032 AC4 — Coverage (C0~C8, 시야 레이). docs/gdd/build.md#커버리지. 기준 배치 2개는 tier1_club.json
+## SE-032 AC4 — Coverage (C0~C8, 시야 레이). docs/gdd/build.md#커버리지. 기준 배치(BC21 포함, SE-044)는 tier1_club.json
 ## reference_layouts[].expected 와 전 키 대조(BC22·BC23 의 순수 함수 쪽). 규칙 판정(B*) 없이 인스턴스 목록만 넣는다.
 
 var _cfg: BuildConfig
@@ -71,14 +71,46 @@ func test_ac4_baseline_show_matches_expected() -> void:
 		assert_eq(a, sorted, "%s 정렬" % key)
 
 
+## BC21: 기대값은 reference_layouts[baseline_plus_two_speakers].expected(전 키)에서 읽는다(SE-044, 리터럴 없음).
 func test_bc21_two_more_speakers_pure() -> void:
-	var inst: Array = _layout_instances("baseline_show")
-	inst.append({"entity_id": "f7", "furniture_id": "speaker_floor", "cell": [5, 10], "rotation": 0, "paid": 0})
-	inst.append({"entity_id": "f8", "furniture_id": "speaker_floor", "cell": [18, 10], "rotation": 0, "paid": 0})
-	var cov: Dictionary = _compute(inst)
-	assert_eq(cov["viewing_count"], 403)
-	assert_eq((cov["sound_tiles"] as Array).size(), 313)
-	assert_eq(cov["sound_bp"], 7766)
+	_assert_layout("baseline_plus_two_speakers")
+	var base: Dictionary = _cfg.layout("baseline_show")
+	var more: Dictionary = _cfg.layout("baseline_plus_two_speakers")
+	assert_eq((more["placements"] as Array).slice(0, (base["placements"] as Array).size()), base["placements"], "전제: 기준 배치 + 추가분")
+	assert_gt(more["expected"]["sound_bp"], base["expected"]["sound_bp"], "스피커가 음향을 올린다")
+	assert_gt(_compute(_layout_instances("baseline_plus_two_speakers"))["sound_bp"], _compute(_layout_instances("baseline_show"))["sound_bp"])
+
+
+## placements 의 G3 점유 셀 합집합을 G6(z → x) 순서로. blocked_cells 의 독립 기대값.
+func _union_cells(placements: Array) -> Array:
+	var seen: Dictionary = {}
+	for p: Dictionary in placements:
+		for c: Array in BuildConfig.cells_of(_cfg.furniture(p["furniture_id"])["footprint"], p["cell"], p["rotation"]):
+			seen[Vector2i(c[0], c[1])] = true
+	var out: Array = []
+	for z: int in _cfg.map.depth:
+		for x: int in _cfg.map.width:
+			if seen.has(Vector2i(x, z)):
+				out.append([x, z])
+	assert_eq(out.size(), seen.size(), "전제: 점유 셀은 맵 안")
+	return out
+
+
+## SE-044 AC3(순수 함수 쪽): blocked_cells = 점유 셀 전체, G6 순서, int, 빈 방 [], 마지막 키.
+func test_blocked_cells_union_g6() -> void:
+	assert_eq(Coverage.KEYS.back(), "blocked_cells", "마지막 키")
+	assert_eq(_compute([])["blocked_cells"], [], "빈 방 []")
+	for lid: String in _cfg.map.layout_ids():
+		var placements: Array = _cfg.layout(lid)["placements"]
+		var got: Array = _compute(_instances(placements))["blocked_cells"]
+		var want: Array = _union_cells(placements)
+		assert_eq(got, want, "%s: 점유 셀 합집합 G6" % lid)
+		var n: int = 0
+		for p: Dictionary in placements:
+			n += (BuildConfig.cells_of(_cfg.furniture(p["furniture_id"])["footprint"], p["cell"], p["rotation"]) as Array).size()
+		assert_eq(got.size(), n, "%s: 겹침 없음 → 셀 수 = Σ 점유 칸" % lid)
+		for c: Array in got:
+			assert_true(c[0] is int and c[1] is int, "%s: int 좌표" % lid)
 
 
 func test_compute_is_pure() -> void:

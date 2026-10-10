@@ -1,21 +1,22 @@
 # SE-023 예시 변이: SE-016 순서 되돌리기 (qa 변이 2)
 # 대상: project/sim/economy.gd  _on_phase_changed / _on_day_started
 # 변경: 파산 뒤 처리(`if bankrupt: return`)를 페이로드 검사·day/phase 대입 뒤에서 함수 맨 앞으로 되돌린다.
-# 기대(tests/sim): 실패 정확히 1건 = test_bankrupt_after_bailouts_exhausted, 나머지 녹색 (SE-016 리포트 변이 2).
+# 기대(tests/sim): 실패 정확히 2건 = test_bankrupt_after_bailouts_exhausted, test_bankrupt_restore_keeps_pending_bailout, 나머지 녹색 (SE-016 리포트 변이 2).
+# SE-044 에서 economy.gd 의 줄 위치·EconomyConfig.as_int → JsonUtil.as_int 로 컨텍스트가 바뀌어 패치를 다시 만들었다.
 # 사용: tools/bot/mutate_and_test.sh tools/bot/mutations/se016_bankrupt_order.diff
 diff --git a/project/sim/economy.gd b/project/sim/economy.gd
 --- a/project/sim/economy.gd
 +++ b/project/sim/economy.gd
-@@ -313,6 +313,8 @@
- ## phase·day 추적. close 진입이면 정산(1회성). 1회성 검사를 통과했는데 제안 중인 구제가 남아 있으면
+@@ -314,6 +314,8 @@ func _on_bailout_accept_requested(_p: Dictionary) -> void:
  ## (time.day_started 없이 다음 close 가 옴 = 시간 이벤트 계약 위반) S0: push_warning 1회 후 auto 수락, 그다음 정산.
+ ## `to` 가 SimConfig.PHASE_IDS(sim.json phases) 밖이면 push_error 1회 후 전체 무시(파산 뒤에도 같음).
  func _on_phase_changed(p: Dictionary) -> void:
 +	if bankrupt:
 +		return
  	var to: Variant = p.get("to")
- 	var d: Variant = EconomyConfig.as_int(p.get("day"))
+ 	var d: Variant = JsonUtil.as_int(p.get("day"))
  	if not (to is String) or d == null:
-@@ -320,8 +322,6 @@
+@@ -324,8 +326,6 @@ func _on_phase_changed(p: Dictionary) -> void:
  		return
  	phase = to
  	day = d
@@ -24,13 +25,13 @@ diff --git a/project/sim/economy.gd b/project/sim/economy.gd
  	if phase == PHASE_CLOSE and last_settled_day != d:
  		if pending_bailout != null:                                                            # S0
  			push_warning("[Economy] S0: time.day_started 없이 %d일 close — %d일 제안 구제를 자동 수락" % [d, int(pending_bailout["day"])])
-@@ -331,13 +331,13 @@
+@@ -335,13 +335,13 @@ func _on_phase_changed(p: Dictionary) -> void:
  
  ## day 추적. 제안 중인 구제는 자동 수락(auto: true).
  func _on_day_started(p: Dictionary) -> void:
 +	if bankrupt:
 +		return
- 	var d: Variant = EconomyConfig.as_int(p.get("day"))
+ 	var d: Variant = JsonUtil.as_int(p.get("day"))
  	if d == null:
  		push_warning("[Economy] time.day_started 페이로드 무시: %s" % [p])
  		return

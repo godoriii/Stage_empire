@@ -2,9 +2,11 @@ class_name EconomyConfig
 extends RefCounted
 ## economy.json 로더 (SE-012). 규칙: docs/gdd/economy.md#설정-로드와-공개-api (교차 검사 K1~K5).
 ## 스키마(economy.schema.json)로 못 하는 검사만 여기서 한다. 모든 필드는 읽기 전용으로 취급한다.
-## JSON 숫자는 float 로 파싱되므로 정수값 float 는 int 로 정규화해서 보관한다(R1: 금액은 int).
+## JSON 숫자는 float 로 파싱되므로 정수값 float 는 int 로 정규화해서 보관한다(R1: 금액은 int, JsonUtil — SE-044).
 
 const DEFAULT_PATH: String = "res://data/economy/economy.json"
+## push_error 접두어.
+const LOG_TAG: String = "EconomyConfig"
 ## K3: 이 로더가 읽는 테이블 version 과 비율 분모(단위 정의, 스키마 enum 과 같은 값).
 const SUPPORTED_VERSION: int = 1
 const REQUIRED_RATE_SCALE: int = 10000
@@ -43,12 +45,8 @@ var _guarantee_by_grade: Dictionary = {}   # grade -> int
 
 ## res://data/economy/economy.json 을 읽어 검증한다. 실패 시 push_error 후 null.
 static func load(path: String = DEFAULT_PATH) -> EconomyConfig:
-	if not FileAccess.file_exists(path):
-		push_error("[EconomyConfig] 파일 없음: %s" % path)
-		return null
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not (parsed is Dictionary):
-		push_error("[EconomyConfig] JSON 객체가 아님: %s" % path)
+	var parsed: Variant = JsonUtil.read_json(path, LOG_TAG)
+	if parsed == null:
 		return null
 	return from_dict(parsed)
 
@@ -57,17 +55,17 @@ static func load(path: String = DEFAULT_PATH) -> EconomyConfig:
 static func from_dict(d: Dictionary) -> EconomyConfig:
 	var cfg: EconomyConfig = EconomyConfig.new()
 
-	var ver: Variant = as_int(d.get("version"))
+	var ver: Variant = JsonUtil.as_int(d.get("version"))
 	if ver == null or ver != SUPPORTED_VERSION:
 		return _fail("K3 version 은 %d 이어야 한다: %s" % [SUPPORTED_VERSION, d.get("version")])
 	cfg.version = ver
-	var scale: Variant = as_int(d.get("rate_scale"))
+	var scale: Variant = JsonUtil.as_int(d.get("rate_scale"))
 	if scale == null or scale != REQUIRED_RATE_SCALE:
 		return _fail("K3 rate_scale 은 %d 이어야 한다: %s" % [REQUIRED_RATE_SCALE, d.get("rate_scale")])
 	cfg.rate_scale = scale
 
 	for key: String in ["starting_cash", "bailout_count", "demolish_refund_rate_bp"]:
-		var v: Variant = as_int(d.get(key))
+		var v: Variant = JsonUtil.as_int(d.get(key))
 		if v == null or v < 0:
 			return _fail("%s 는 0 이상 정수여야 한다" % key)
 		cfg.set(key, v)
@@ -76,7 +74,7 @@ static func from_dict(d: Dictionary) -> EconomyConfig:
 	if not (grades is Dictionary):
 		return _fail("guarantee_by_grade 는 객체여야 한다")
 	for g: Variant in grades:
-		var amount: Variant = as_int(grades[g])
+		var amount: Variant = JsonUtil.as_int(grades[g])
 		if not (g is String) or amount == null or amount < 0:
 			return _fail("guarantee_by_grade.%s 는 0 이상 정수여야 한다" % [g])
 		cfg._guarantee_by_grade[g] = amount
@@ -119,7 +117,7 @@ static func from_dict(d: Dictionary) -> EconomyConfig:
 		var grade: Variant = sc.get("guarantee_grade")
 		if not (grade is String) or not cfg._guarantee_by_grade.has(grade):
 			return _fail("K4 reference_scenarios '%s' 의 guarantee_grade '%s' 가 guarantee_by_grade 에 없다" % [sc.get("id"), grade])
-		cfg.reference_scenarios.append(_int_deep(sc))
+		cfg.reference_scenarios.append(JsonUtil.int_deep(sc))
 	return cfg
 
 
@@ -152,15 +150,6 @@ func scenario(id: String) -> Dictionary:
 	return {}
 
 
-## int, 또는 정수값인 유한 float 만 int 로. 그 밖(bool·문자열·1.5·null)은 null.
-static func as_int(v: Variant) -> Variant:
-	if v is int:
-		return v
-	if v is float and is_finite(v) and v == floorf(v):
-		return int(v)
-	return null
-
-
 static func _parse_row(raw: Variant) -> Variant:
 	if not (raw is Dictionary):
 		return _fail("rows[] 원소는 객체여야 한다")
@@ -169,30 +158,11 @@ static func _parse_row(raw: Variant) -> Variant:
 		return _fail("rows[].id 는 문자열이어야 한다")
 	var out: Dictionary = {"id": id}
 	for key: String in ROW_INT_FIELDS:
-		var v: Variant = as_int(raw.get(key))
+		var v: Variant = JsonUtil.as_int(raw.get(key))
 		if v == null or v < 0:
 			return _fail("%s.%s 는 0 이상 정수여야 한다" % [id, key])
 		out[key] = v
 	return out
-
-
-## 정수값 float → int (재귀). 그 밖의 값은 그대로.
-static func _int_deep(v: Variant) -> Variant:
-	match typeof(v):
-		TYPE_FLOAT:
-			var n: Variant = as_int(v)
-			return n if n != null else v
-		TYPE_ARRAY:
-			var arr: Array = []
-			for e: Variant in v:
-				arr.append(_int_deep(e))
-			return arr
-		TYPE_DICTIONARY:
-			var d: Dictionary = {}
-			for k: Variant in v:
-				d[k] = _int_deep(v[k])
-			return d
-	return v
 
 
 static func _fail(msg: String) -> Variant:
