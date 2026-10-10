@@ -9,6 +9,7 @@ const RNG_FILE: String = "res://core/rng.gd"
 const EXPECTED: Array[String] = [
 	"res://core/event_bus.gd", "res://core/rng.gd", "res://core/sim_config.gd", "res://core/tick.gd",
 	"res://sim/economy.gd", "res://sim/economy_config.gd", "res://sim/artist_config.gd", "res://sim/artist_system.gd",
+	"res://sim/audience_config.gd", "res://sim/audience_system.gd",
 	"res://core/event_bus.gd", "res://core/json_util.gd", "res://core/rng.gd", "res://core/sim_config.gd", "res://core/tick.gd",
 	"res://sim/economy.gd", "res://sim/economy_config.gd",
 ]
@@ -103,10 +104,15 @@ func test_core_has_no_node_or_direct_random() -> void:
 	assert_gt(files.size(), 0, "core·sim 스크립트를 찾는다")
 	var presentation: RegEx = RegEx.create_from_string(PRESENTATION_RE)
 	var forbidden: RegEx = RegEx.create_from_string("extends\\s+Node|_process\\(|_physics_process\\(|get_node\\(|(?<![\\w])Time\\.")
-	var random_re: RegEx = RegEx.create_from_string("randi\\(|randf\\(|randomize\\(|RandomNumberGenerator")
+	# tick.md "금지 (sim·core·world)": 전역 randi()/randf()/randomize()·RandomNumberGenerator 생성. 시드 고정 스트림의 메서드
+	# 호출(rng.stream("audience").randi(), audience.md R1)은 허용한다 — 앞에 '.' 이 붙은 호출은 걸지 않는다(SE-034).
+	var random_re: RegEx = RegEx.create_from_string("(?<![\\w.])(randi|randf|randomize|randfn|randi_range|randf_range)\\(|RandomNumberGenerator")
 	var class_re: RegEx = RegEx.create_from_string("(?m)^class_name\\s+\\w+\\s*$")
 	var extends_re: RegEx = RegEx.create_from_string("(?m)^extends\\s+(\\w+)\\s*$")
 	var inner_re: RegEx = RegEx.create_from_string("(?m)^\\s*class\\s+\\w+")
+	# 검사기 자체 확인(SE-034): 전역 호출·RNG 생성은 걸리고, 스트림 메서드 호출은 걸리지 않는다.
+	assert_eq(_hits(random_re, "var a := randi()\nvar b := randf()\nrandomize()\nvar r := RandomNumberGenerator.new()", "self").size(), 4, "전역 난수·RNG 생성은 걸린다")
+	assert_eq(_hits(random_re, "var u: int = rng.stream(STREAM).randi()", "self").size(), 0, "스트림 .randi() 는 허용")
 	var bad: PackedStringArray = []
 	for f: String in files:
 		var src: String = FileAccess.get_file_as_string(f)
