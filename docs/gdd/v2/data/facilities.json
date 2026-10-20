@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/show.md#기둥-3-시설",
+  "facilities": [
+    {
+      "id": "toilet", "name": "화장실(추가 칸)", "kind": "count", "unlock_act": 1,
+      "effect": "장소 기본 칸(venues.toilets)에 더한다. 칸마다 구간당 serve 명",
+      "by_act": [
+        { "act": 1, "status": "final", "cost": 10, "serve": 15, "max": 3 },
+        { "act": 2, "status": "draft", "cost": 10, "serve": 15, "max": 40 },
+        { "act": 3, "status": "draft", "cost": 8, "serve": 15, "max": 500 },
+        { "act": 4, "status": "draft", "cost": 8, "serve": 15, "max": 900 }
+      ]
+    },
+    {
+      "id": "food", "name": "푸드 부스", "kind": "count", "unlock_act": 2,
+      "effect": "부스마다 구간당 serve 명. 판매 1건 = food_price 매출",
+      "by_act": [
+        { "act": 2, "status": "draft", "cost": 30, "serve": 40, "max": 20, "food_price": 1 },
+        { "act": 3, "status": "draft", "cost": 40, "serve": 60, "max": 200, "food_price": 1 },
+        { "act": 4, "status": "draft", "cost": 40, "serve": 60, "max": 400, "food_price": 1 }
+      ]
+    },
+    {
+      "id": "sound", "name": "음향 등급", "kind": "grade", "unlock_act": 2,
+      "effect": "장소 음향(venues.sound)에 등급 보정을 더한다",
+      "by_act": [
+        { "act": 2, "status": "draft", "grades": [ { "cost": 0, "sat": 0 }, { "cost": 150, "sat": 3 }, { "cost": 400, "sat": 6 } ] },
+        { "act": 3, "status": "draft", "grades": [ { "cost": 0, "sat": -3 }, { "cost": 1500, "sat": 2 }, { "cost": 4000, "sat": 6 } ] },
+        { "act": 4, "status": "draft", "grades": [ { "cost": 0, "sat": -3 }, { "cost": 4000, "sat": 2 }, { "cost": 10000, "sat": 6 } ] }
+      ]
+    },
+    {
+      "id": "medical_tent", "name": "의료 텐트", "kind": "count", "unlock_act": 3,
+      "effect": "의료 인력 상한 = 텐트 × 4",
+      "by_act": [
+        { "act": 3, "status": "draft", "cost": 100, "max": 20, "staff_slots": 4 },
+        { "act": 4, "status": "draft", "cost": 100, "max": 40, "staff_slots": 4 }
+      ]
+    },
+    {
+      "id": "bar_booth", "name": "바 부스", "kind": "count", "unlock_act": 3,
+      "effect": "바텐더 상한 += 부스 × staff_slots",
+      "by_act": [
+        { "act": 3, "status": "draft", "cost": 60, "max": 60, "staff_slots": 4 },
+        { "act": 4, "status": "draft", "cost": 60, "max": 120, "staff_slots": 4 }
+      ]
+    }
+  ]
+}

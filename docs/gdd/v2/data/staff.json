@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/show.md#기둥-4-인력",
+  "staff": [
+    {
+      "id": "security", "name": "보안", "unlock_act": 1,
+      "effect": "구간마다 보안 부담(인원 × 장르 소란도 × 구간 열기)을 cover 명까지 감당",
+      "by_act": [
+        { "act": 1, "status": "final", "wage": 10, "cover": 50, "min": 1, "max": 6 },
+        { "act": 2, "status": "draft", "wage": 12, "cover": 60, "max": 50 },
+        { "act": 3, "status": "draft", "wage": 15, "cover": 80, "max": 400 },
+        { "act": 4, "status": "draft", "wage": 15, "cover": 80, "max": 700 }
+      ]
+    },
+    {
+      "id": "bar", "name": "바텐더", "unlock_act": 1,
+      "effect": "구간마다 serve 잔을 판다. 인원 상한은 장소 bar_slots (+ 바 부스)",
+      "by_act": [
+        { "act": 1, "status": "final", "wage": 8, "serve": 30, "min": 1, "max_source": "bar_slots" },
+        { "act": 2, "status": "draft", "wage": 10, "serve": 40, "max_source": "bar_slots" },
+        { "act": 3, "status": "draft", "wage": 12, "serve": 50, "max_source": "bar_slots" },
+        { "act": 4, "status": "draft", "wage": 12, "serve": 50, "max_source": "bar_slots" }
+      ]
+    },
+    {
+      "id": "cleaning", "name": "청소", "unlock_act": 2,
+      "effect": "공연 전체 쓰레기(관객 × 구간 food_pct+bar_pct 합)를 cover 명분까지 처리",
+      "by_act": [
+        { "act": 2, "status": "draft", "wage": 8, "cover": 150, "max": 30 },
+        { "act": 3, "status": "draft", "wage": 10, "cover": 200, "max": 200 },
+        { "act": 4, "status": "draft", "wage": 10, "cover": 200, "max": 400 }
+      ]
+    },
+    {
+      "id": "medical", "name": "의료", "unlock_act": 3,
+      "effect": "헤드라이너 구간 열기 부담을 cover 명분까지 처리. 의료 텐트 1개당 인원 상한 4",
+      "by_act": [
+        { "act": 3, "status": "draft", "wage": 20, "cover": 1500, "max_source": "medical_tent" },
+        { "act": 4, "status": "draft", "wage": 20, "cover": 1500, "max_source": "medical_tent" }
+      ]
+    }
+  ]
+}

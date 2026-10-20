@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/show.md#기둥-2-라인업",
+  "genres": [
+    { "id": "rock", "name": "록", "rowdy_pct": 120 },
+    { "id": "hiphop", "name": "힙합", "rowdy_pct": 110 },
+    { "id": "electronic", "name": "일렉트로닉", "rowdy_pct": 100 },
+    { "id": "indie", "name": "인디", "rowdy_pct": 70 }
+  ],
+  "artists": [
+    { "id": "a1_rusty_bike", "act": 1, "status": "final", "name": "녹슨 자전거", "genre": "rock", "draw": 70, "skill": 55, "fee": 90, "fair_price": 2 },
+    { "id": "a1_dawn_laundry", "act": 1, "status": "final", "name": "새벽 세탁소", "genre": "rock", "draw": 120, "skill": 70, "fee": 200, "fair_price": 3 },
+    { "id": "a1_rebar", "act": 1, "status": "final", "name": "철근 콘크리트", "genre": "rock", "draw": 170, "skill": 78, "fee": 320, "fair_price": 3 },
+    { "id": "a1_alley_boss", "act": 1, "status": "final", "name": "골목대장 MC", "genre": "hiphop", "draw": 90, "skill": 50, "fee": 110, "fair_price": 2 },
+    { "id": "a1_halfbasement", "act": 1, "status": "final", "name": "반지하 크루", "genre": "hiphop", "draw": 140, "skill": 65, "fee": 220, "fair_price": 3 },
+    { "id": "a1_rhyme_garage", "act": 1, "status": "final", "name": "라임 정비소", "genre": "hiphop", "draw": 100, "skill": 82, "fee": 200, "fair_price": 4 },
+    { "id": "a1_fluorescent", "act": 1, "status": "final", "name": "형광등 DJ", "genre": "electronic", "draw": 80, "skill": 60, "fee": 115, "fair_price": 2 },
+    { "id": "a1_neon_aquarium", "act": 1, "status": "final", "name": "네온 수족관", "genre": "electronic", "draw": 150, "skill": 72, "fee": 260, "fair_price": 3 },
+    { "id": "a1_two_umbrellas", "act": 1, "status": "final", "name": "우산 두 개", "genre": "indie", "draw": 60, "skill": 76, "fee": 110, "fair_price": 3 },
+    { "id": "a1_cat_post", "act": 1, "status": "final", "name": "고양이 우체국", "genre": "indie", "draw": 110, "skill": 68, "fee": 180, "fair_price": 3 },
+    { "id": "a1_fullmoon_diner", "act": 1, "status": "final", "name": "보름달 식당", "genre": "indie", "draw": 160, "skill": 88, "fee": 340, "fair_price": 4 },
+
+    { "id": "a2_paper_planes", "act": 2, "status": "draft", "name": "종이비행기 편대", "genre": "rock", "draw": 700, "skill": 70, "fee": 500, "fair_price": 5 },
+    { "id": "a2_iron_lung", "act": 2, "status": "draft", "name": "무쇠 허파", "genre": "rock", "draw": 1300, "skill": 80, "fee": 1200, "fair_price": 5 },
+    { "id": "a2_subway_poets", "act": 2, "status": "draft", "name": "막차 시인들", "genre": "hiphop", "draw": 900, "skill": 66, "fee": 650, "fair_price": 4 },
+    { "id": "a2_gold_tooth", "act": 2, "status": "draft", "name": "금니 연구소", "genre": "hiphop", "draw": 1400, "skill": 75, "fee": 1300, "fair_price": 5 },
+    { "id": "a2_static_bloom", "act": 2, "status": "draft", "name": "정전기 꽃", "genre": "electronic", "draw": 800, "skill": 72, "fee": 600, "fair_price": 4 },
+    { "id": "a2_tidal_lamp", "act": 2, "status": "draft", "name": "조수 램프", "genre": "electronic", "draw": 1500, "skill": 78, "fee": 1500, "fair_price": 5 },
+    { "id": "a2_tin_garden", "act": 2, "status": "draft", "name": "양철 정원", "genre": "indie", "draw": 600, "skill": 82, "fee": 450, "fair_price": 5 },
+    { "id": "a2_winter_kiosk", "act": 2, "status": "draft", "name": "겨울 매점", "genre": "indie", "draw": 1100, "skill": 76, "fee": 900, "fair_price": 5 },
+
+    { "id": "a3_thunder_orchard", "act": 3, "status": "draft", "name": "천둥 과수원", "genre": "rock", "draw": 9000, "skill": 82, "fee": 12000, "fair_price": 10 },
+    { "id": "a3_rust_choir", "act": 3, "status": "draft", "name": "녹물 합창단", "genre": "rock", "draw": 5000, "skill": 72, "fee": 5000, "fair_price": 8 },
+    { "id": "a3_midnight_bakery", "act": 3, "status": "draft", "name": "자정 제과점", "genre": "hiphop", "draw": 8000, "skill": 76, "fee": 10000, "fair_price": 9 },
+    { "id": "a3_low_orbit", "act": 3, "status": "draft", "name": "저궤도", "genre": "hiphop", "draw": 4500, "skill": 70, "fee": 4500, "fair_price": 8 },
+    { "id": "a3_glass_whale", "act": 3, "status": "draft", "name": "유리 고래", "genre": "electronic", "draw": 10000, "skill": 80, "fee": 14000, "fair_price": 10 },
+    { "id": "a3_pixel_tide", "act": 3, "status": "draft", "name": "픽셀 밀물", "genre": "electronic", "draw": 5500, "skill": 68, "fee": 5000, "fair_price": 8 },
+    { "id": "a3_quiet_lighthouse", "act": 3, "status": "draft", "name": "조용한 등대", "genre": "indie", "draw": 6000, "skill": 86, "fee": 8000, "fair_price": 10 },
+    { "id": "a3_cardboard_moon", "act": 3, "status": "draft", "name": "골판지 달", "genre": "indie", "draw": 4000, "skill": 74, "fee": 3500, "fair_price": 8 },
+
+    { "id": "a4_sky_foundry", "act": 4, "status": "draft", "name": "하늘 주물공장", "genre": "rock", "draw": 22000, "skill": 88, "fee": 40000, "fair_price": 16 },
+    { "id": "a4_velvet_engine", "act": 4, "status": "draft", "name": "벨벳 엔진", "genre": "hiphop", "draw": 20000, "skill": 84, "fee": 35000, "fair_price": 15 },
+    { "id": "a4_aurora_switch", "act": 4, "status": "draft", "name": "오로라 스위치", "genre": "electronic", "draw": 24000, "skill": 86, "fee": 42000, "fair_price": 16 },
+    { "id": "a4_paper_lantern", "act": 4, "status": "draft", "name": "종이 등불", "genre": "indie", "draw": 15000, "skill": 92, "fee": 30000, "fair_price": 16 },
+    { "id": "a4_salt_kingdom", "act": 4, "status": "draft", "name": "소금 왕국", "genre": "rock", "draw": 12000, "skill": 78, "fee": 15000, "fair_price": 13 },
+    { "id": "a4_comet_market", "act": 4, "status": "draft", "name": "혜성 시장", "genre": "electronic", "draw": 11000, "skill": 76, "fee": 14000, "fair_price": 13 },
+    { "id": "a4_grain_radio", "act": 4, "status": "draft", "name": "곡물 라디오", "genre": "indie", "draw": 9000, "skill": 82, "fee": 12000, "fair_price": 13 },
+    { "id": "a4_neon_temple", "act": 4, "status": "draft", "name": "네온 사원", "genre": "hiphop", "draw": 13000, "skill": 80, "fee": 17000, "fair_price": 14 }
+  ]
+}

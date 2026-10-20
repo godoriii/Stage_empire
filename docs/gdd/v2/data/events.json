@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/events.md",
+  "conditions": {
+    "security_short": "기준 시뮬(돌발 없음)에서 어느 구간이든 보안 미감당 인원 > 0",
+    "toilet_short": "기준 시뮬에서 화장실 못 간 인원 합 > 0",
+    "bar_short": "기준 시뮬에서 바 못 산 인원 합 > 0",
+    "sold_out": "수요 ≥ 수용 인원",
+    "att_ge": "입장 관객 ≥ value",
+    "venue_trait": "장소 traits 에 value 포함",
+    "mood_ge": "기준 시뮬에서 이 카드 구간 종료 시 분위기 ≥ value",
+    "has_opener": "오프닝 아티스트가 있다",
+    "security_ok": "기준 시뮬에서 이 카드 구간의 보안 미감당 인원 = 0"
+  },
+  "events": [
+    {
+      "id": "entrance_jam", "act": [1], "status": "final", "name": "입구 병목",
+      "text": "입장 줄이 골목 끝까지 늘어섰다. 표 검사가 밀린다.",
+      "segment": "doors", "weight": 6, "weight_mods": [ { "if": "security_short", "mult_pct": 300 } ], "tags": ["crowd"],
+      "choices": [
+        { "id": "hire", "label": "즉석 인력 2명 고용", "effects": [ { "type": "money", "value": -20 }, { "type": "seg_add", "key": "units.security", "value": 2 }, { "type": "sat", "value": -1 } ] },
+        { "id": "slow", "label": "천천히 입장시킨다", "effects": [ { "type": "sat", "value": -4 } ] }
+      ]
+    },
+    {
+      "id": "amp_fail", "act": [1], "status": "final", "name": "앰프 고장",
+      "text": "오프닝 첫 곡에서 메인 앰프가 꺼졌다.",
+      "segment": "opening", "weight": 8, "weight_mods": [], "tags": ["equipment"],
+      "choices": [
+        { "id": "repair", "label": "긴급 수리 기사 호출(20분 지연)", "effects": [ { "type": "money", "value": -30 }, { "type": "sat", "value": -3 } ] },
+        { "id": "unplugged", "label": "언플러그드로 버틴다", "effects": [ { "type": "sat", "value": -6 } ] }
+      ]
+    },
+    {
+      "id": "influencer", "act": [1], "status": "final", "name": "공연 블로거 방문",
+      "text": "구독자 많은 공연 블로거가 줄 서 있다.",
+      "segment": "opening", "weight": 6, "weight_mods": [], "tags": ["press"],
+      "choices": [
+        { "id": "vip", "label": "VIP 대접", "effects": [ { "type": "money", "value": -15 }, { "type": "fame", "value": 2 } ] },
+        { "id": "normal", "label": "평소대로", "effects": [] }
+      ]
+    },
+    {
+      "id": "beer_shortage", "act": [1], "status": "final", "name": "맥주 재고 부족",
+      "text": "전환 시간에 생맥주 통이 바닥났다.",
+      "segment": "changeover", "weight": 6, "weight_mods": [ { "if": "att_ge", "value": 180, "mult_pct": 200 } ], "tags": ["supply"],
+      "choices": [
+        { "id": "mart", "label": "근처 마트에서 긴급 조달", "effects": [ { "type": "money", "value": -25 }, { "type": "sat", "value": -1 } ] },
+        { "id": "limit", "label": "남은 음료만 판다", "effects": [ { "type": "seg_pct", "key": "cap.bar", "value": -50 } ] }
+      ]
+    },
+    {
+      "id": "toilet_clog", "act": [1], "status": "final", "name": "화장실 막힘",
+      "text": "화장실 한 칸이 막혔다.",
+      "segment": "changeover", "weight": 6, "weight_mods": [ { "if": "toilet_short", "mult_pct": 200 } ], "tags": ["facility"],
+      "choices": [
+        { "id": "plumber", "label": "배관 업체 호출", "effects": [ { "type": "money", "value": -30 }, { "type": "sat", "value": -1 } ] },
+        { "id": "close", "label": "그 칸을 닫는다", "effects": [ { "type": "seg_add", "key": "units.toilet", "value": -1 } ] }
+      ]
+    },
+    {
+      "id": "drunk_fight", "act": [1], "status": "final", "name": "취객 시비",
+      "text": "헤드라이너 무대 앞에서 취객 둘이 밀치기 시작했다.",
+      "segment": "headline", "weight": 6, "weight_mods": [ { "if": "security_short", "mult_pct": 300 } ], "tags": ["crowd"],
+      "choices": [
+        { "id": "guards", "label": "보안팀이 데리고 나간다", "requires": "security_ok", "effects": [] },
+        { "id": "stop", "label": "직접 말린다", "effects": [ { "type": "sat", "value": -5 } ] },
+        { "id": "police", "label": "경찰을 부른다", "effects": [ { "type": "sat", "value": -2 }, { "type": "fame", "value": -1 } ] }
+      ]
+    },
+    {
+      "id": "noise_complaint", "act": [1], "status": "final", "name": "소음 민원",
+      "text": "이웃이 소음 신고를 했다. 단속반이 문 앞에 왔다.",
+      "segment": "headline", "weight": 3, "weight_mods": [ { "if": "venue_trait", "value": "residential", "mult_pct": 300 } ], "tags": ["venue"],
+      "choices": [
+        { "id": "lower", "label": "볼륨을 줄인다", "effects": [ { "type": "sat", "value": -5 } ] },
+        { "id": "endure", "label": "버틴다(과태료)", "effects": [ { "type": "money", "value": -40 } ] }
+      ]
+    },
+    {
+      "id": "encore", "act": [1], "status": "final", "name": "앙코르 요청",
+      "text": "관객이 앙코르를 외친다. 연장하면 추가 개런티가 나간다.",
+      "segment": "close", "weight": 2, "weight_mods": [ { "if": "mood_ge", "value": 72, "mult_pct": 400 } ], "tags": ["artist"],
+      "choices": [
+        { "id": "encore", "label": "앙코르 한 곡 더", "effects": [ { "type": "money", "value": -10 }, { "type": "sat", "value": 3 }, { "type": "fame", "value": 1 } ] },
+        { "id": "end", "label": "여기서 마친다", "effects": [] }
+      ]
+    }
+  ]
+}

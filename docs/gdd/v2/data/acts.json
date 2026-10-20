@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/run.md, docs/gdd/v2/show.md",
+  "acts": [
+    {
+      "id": 1,
+      "name": "1막 · 클럽",
+      "status": "final",
+      "normal_shows": 3,
+      "offers_per_show": 3,
+      "market_size": 6,
+      "events_per_show": 2,
+      "credit_limit": 100,
+      "money_scale_pct": 100,
+      "drink_price": 1,
+      "lineup": { "headliner_slots": 1, "opener_slots": 1 },
+      "knobs": {
+        "staff": ["security", "bar"],
+        "facilities": ["toilet"],
+        "promo": false,
+        "weather": false
+      },
+      "price_levels": [
+        { "price": 1, "demand_pct": 125 },
+        { "price": 2, "demand_pct": 100 },
+        { "price": 3, "demand_pct": 80 },
+        { "price": 4, "demand_pct": 60 }
+      ],
+      "promo_levels": [],
+      "segments": [
+        { "id": "doors", "name": "개장", "stage": "none", "arrive_pct": 45, "bar_pct": 25, "toilet_pct": 5, "food_pct": 0, "heat_pct": 60 },
+        { "id": "opening", "name": "오프닝", "stage": "opener", "arrive_pct": 35, "bar_pct": 15, "toilet_pct": 10, "food_pct": 0, "heat_pct": 90 },
+        { "id": "changeover", "name": "전환", "stage": "none", "arrive_pct": 15, "bar_pct": 35, "toilet_pct": 40, "food_pct": 0, "heat_pct": 70 },
+        { "id": "headline", "name": "헤드라이너", "stage": "headliner", "arrive_pct": 5, "bar_pct": 10, "toilet_pct": 10, "food_pct": 0, "heat_pct": 120 },
+        { "id": "close", "name": "마감", "stage": "none", "arrive_pct": 0, "bar_pct": 5, "toilet_pct": 20, "food_pct": 0, "heat_pct": 80 }
+      ],
+      "offer_templates": [
+        { "id": "weeknight", "name": "평일 밤", "weight": 10, "demand_pct": 85, "venue_fee_pct": 80, "fame_pct": 100, "sponsor": 0 },
+        { "id": "friday", "name": "금요일 밤", "weight": 10, "demand_pct": 100, "venue_fee_pct": 100, "fame_pct": 100, "sponsor": 0 },
+        { "id": "weekend", "name": "주말 특집", "weight": 8, "demand_pct": 120, "venue_fee_pct": 130, "fame_pct": 150, "sponsor": 0 },
+        { "id": "sponsored", "name": "동네 양조장 협찬", "weight": 6, "demand_pct": 90, "venue_fee_pct": 100, "fame_pct": 100, "sponsor": 40 },
+        { "id": "critic", "name": "평론가 초대석", "weight": 6, "demand_pct": 95, "venue_fee_pct": 100, "fame_pct": 200, "sponsor": 0 }
+      ],
+      "gate": {
+        "name": "1막 결산 쇼케이스",
+        "events_per_show": 3,
+        "template": { "id": "showcase", "name": "결산 쇼케이스", "weight": 0, "demand_pct": 110, "venue_fee_pct": 100, "fame_pct": 150, "sponsor": 0 },
+        "min_grade": "B",
+        "min_fame": 12
+      }
+    },
+    {
+      "id": 2,
+      "name": "2막 · 공연장",
+      "status": "draft",
+      "normal_shows": 3,
+      "offers_per_show": 3,
+      "market_size": 6,
+      "events_per_show": 3,
+      "credit_limit": 600,
+      "money_scale_pct": 500,
+      "drink_price": 1,
+      "lineup": { "headliner_slots": 1, "opener_slots": 2 },
+      "knobs": {
+        "staff": ["security", "bar", "cleaning"],
+        "facilities": ["toilet", "food", "sound"],
+        "promo": true,
+        "weather": false
+      },
+      "price_levels": [
+        { "price": 3, "demand_pct": 125 },
+        { "price": 4, "demand_pct": 100 },
+        { "price": 5, "demand_pct": 80 },
+        { "price": 6, "demand_pct": 60 }
+      ],
+      "promo_levels": [
+        { "cost": 0, "demand_pct": 0 },
+        { "cost": 150, "demand_pct": 15 },
+        { "cost": 400, "demand_pct": 30 }
+      ],
+      "segments": [
+        { "id": "doors", "name": "개장", "stage": "none", "arrive_pct": 40, "bar_pct": 20, "toilet_pct": 5, "food_pct": 20, "heat_pct": 60 },
+        { "id": "opening", "name": "오프닝", "stage": "opener", "arrive_pct": 40, "bar_pct": 15, "toilet_pct": 10, "food_pct": 10, "heat_pct": 90 },
+        { "id": "changeover", "name": "전환", "stage": "none", "arrive_pct": 15, "bar_pct": 30, "toilet_pct": 35, "food_pct": 25, "heat_pct": 70 },
+        { "id": "headline", "name": "헤드라이너", "stage": "headliner", "arrive_pct": 5, "bar_pct": 10, "toilet_pct": 10, "food_pct": 5, "heat_pct": 120 },
+        { "id": "close", "name": "마감", "stage": "none", "arrive_pct": 0, "bar_pct": 5, "toilet_pct": 20, "food_pct": 0, "heat_pct": 80 }
+      ],
+      "offer_templates": [
+        { "id": "weeknight", "name": "평일 공연", "weight": 10, "demand_pct": 85, "venue_fee_pct": 80, "fame_pct": 100, "sponsor": 0 },
+        { "id": "friday", "name": "금요일 공연", "weight": 10, "demand_pct": 100, "venue_fee_pct": 100, "fame_pct": 100, "sponsor": 0 },
+        { "id": "weekend", "name": "주말 공연", "weight": 8, "demand_pct": 120, "venue_fee_pct": 130, "fame_pct": 150, "sponsor": 0 },
+        { "id": "sponsored", "name": "음료 브랜드 협찬", "weight": 6, "demand_pct": 90, "venue_fee_pct": 100, "fame_pct": 100, "sponsor": 200 },
+        { "id": "broadcast", "name": "라디오 생중계", "weight": 6, "demand_pct": 95, "venue_fee_pct": 100, "fame_pct": 200, "sponsor": 0 }
+      ],
+      "gate": {
+        "name": "2막 결산 공연",
+        "template": { "id": "gate", "name": "결산 공연", "weight": 0, "demand_pct": 110, "venue_fee_pct": 100, "fame_pct": 150, "sponsor": 0 },
+        "min_grade": "B",
+        "min_fame": 45
+      }
+    },
+    {
+      "id": 3,
+      "name": "3막 · 야외 페스티벌",
+      "status": "draft",
+      "normal_shows": 3,
+      "offers_per_show": 3,
+      "market_size": 7,
+      "events_per_show": 3,
+      "credit_limit": 3000,
+      "money_scale_pct": 2500,
+      "drink_price": 1,
+      "lineup": { "headliner_slots": 2, "opener_slots": 2 },
+      "knobs": {
+        "staff": ["security", "bar", "cleaning", "medical"],
+        "facilities": ["toilet", "food", "sound", "medical_tent", "bar_booth"],
+        "promo": true,
+        "weather": true
+      },
+      "price_levels": [
+        { "price": 6, "demand_pct": 125 },
+        { "price": 8, "demand_pct": 100 },
+        { "price": 10, "demand_pct": 80 },
+        { "price": 12, "demand_pct": 60 }
+      ],
+      "promo_levels": [
+        { "cost": 0, "demand_pct": 0 },
+        { "cost": 800, "demand_pct": 15 },
+        { "cost": 2000, "demand_pct": 30 }
+      ],
+      "segments": [
+        { "id": "doors", "name": "개장", "stage": "none", "arrive_pct": 35, "bar_pct": 20, "toilet_pct": 10, "food_pct": 25, "heat_pct": 60 },
+        { "id": "opening", "name": "오프닝", "stage": "opener", "arrive_pct": 40, "bar_pct": 20, "toilet_pct": 15, "food_pct": 20, "heat_pct": 90 },
+        { "id": "changeover", "name": "전환", "stage": "none", "arrive_pct": 20, "bar_pct": 25, "toilet_pct": 30, "food_pct": 30, "heat_pct": 70 },
+        { "id": "headline", "name": "헤드라이너", "stage": "headliner", "arrive_pct": 5, "bar_pct": 10, "toilet_pct": 10, "food_pct": 5, "heat_pct": 130 },
+        { "id": "close", "name": "마감", "stage": "none", "arrive_pct": 0, "bar_pct": 5, "toilet_pct": 20, "food_pct": 0, "heat_pct": 90 }
+      ],
+      "offer_templates": [
+        { "id": "oneday", "name": "원데이 페스티벌", "weight": 10, "demand_pct": 100, "venue_fee_pct": 100, "fame_pct": 100, "sponsor": 0 },
+        { "id": "city", "name": "도심 공원 페스티벌", "weight": 8, "demand_pct": 115, "venue_fee_pct": 130, "fame_pct": 120, "sponsor": 0 },
+        { "id": "remote", "name": "산속 캠핑 페스티벌", "weight": 8, "demand_pct": 85, "venue_fee_pct": 70, "fame_pct": 150, "sponsor": 0 },
+        { "id": "brand", "name": "브랜드 페스티벌", "weight": 6, "demand_pct": 95, "venue_fee_pct": 100, "fame_pct": 80, "sponsor": 1500 }
+      ],
+      "gate": {
+        "name": "3막 결산 페스티벌",
+        "template": { "id": "gate", "name": "결산 페스티벌", "weight": 0, "demand_pct": 110, "venue_fee_pct": 100, "fame_pct": 150, "sponsor": 0 },
+        "min_grade": "B",
+        "min_fame": 90
+      }
+    },
+    {
+      "id": 4,
+      "name": "피날레 · 메가 페스티벌",
+      "status": "draft",
+      "normal_shows": 0,
+      "offers_per_show": 1,
+      "market_size": 8,
+      "events_per_show": 3,
+      "credit_limit": 8000,
+      "money_scale_pct": 6000,
+      "drink_price": 1,
+      "lineup": { "headliner_slots": 2, "opener_slots": 3 },
+      "knobs": {
+        "staff": ["security", "bar", "cleaning", "medical"],
+        "facilities": ["toilet", "food", "sound", "medical_tent", "bar_booth"],
+        "promo": true,
+        "weather": true
+      },
+      "price_levels": [
+        { "price": 10, "demand_pct": 125 },
+        { "price": 13, "demand_pct": 100 },
+        { "price": 16, "demand_pct": 80 },
+        { "price": 20, "demand_pct": 60 }
+      ],
+      "promo_levels": [
+        { "cost": 0, "demand_pct": 0 },
+        { "cost": 2000, "demand_pct": 15 },
+        { "cost": 5000, "demand_pct": 30 }
+      ],
+      "segments": [
+        { "id": "doors", "name": "개장", "stage": "none", "arrive_pct": 35, "bar_pct": 20, "toilet_pct": 10, "food_pct": 25, "heat_pct": 60 },
+        { "id": "opening", "name": "오프닝", "stage": "opener", "arrive_pct": 40, "bar_pct": 20, "toilet_pct": 15, "food_pct": 20, "heat_pct": 90 },
+        { "id": "changeover", "name": "전환", "stage": "none", "arrive_pct": 20, "bar_pct": 25, "toilet_pct": 30, "food_pct": 30, "heat_pct": 70 },
+        { "id": "headline", "name": "헤드라이너", "stage": "headliner", "arrive_pct": 5, "bar_pct": 10, "toilet_pct": 10, "food_pct": 5, "heat_pct": 140 },
+        { "id": "close", "name": "마감", "stage": "none", "arrive_pct": 0, "bar_pct": 5, "toilet_pct": 20, "food_pct": 0, "heat_pct": 90 }
+      ],
+      "offer_templates": [],
+      "gate": {
+        "name": "메가 페스티벌",
+        "template": { "id": "finale", "name": "메가 페스티벌", "weight": 0, "demand_pct": 100, "venue_fee_pct": 100, "fame_pct": 100, "sponsor": 0 },
+        "min_grade": "B",
+        "min_fame": 0
+      }
+    }
+  ]
+}
