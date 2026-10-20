@@ -22,7 +22,7 @@ function cheapestPlan(eng, state) {
     for (const v of eng.actVenues(A.id)) {
       for (const h of ctx.market) {
         const p = basePlan(eng, state);
-        Object.assign(p, { offer: oi, venue: v.id, headliners: [h] });
+        Object.assign(p, { offer: oi, theme: ctx.offers[oi].trend, venue: v.id, headliners: [h] });
         const c = eng.cost(eng.collectMods(state.cards), A, ctx.offers[oi], v, p).total;
         if (!best || c < best.c) best = { p, c };
       }
@@ -40,6 +40,7 @@ const random = {
     for (let t = 0; t < 50; t++) {
       const p = basePlan(eng, state);
       p.offer = r.int(ctx.offers.length);
+      p.theme = eng.data.artists.genres[r.int(eng.data.artists.genres.length)].id;
       const vs = eng.actVenues(A.id);
       const v = vs[r.int(vs.length)];
       p.venue = v.id;
@@ -98,11 +99,18 @@ function rationalCandidates(eng, state) {
       const art = eng.ARTISTS.get(h);
       let pi = 0;
       A.price_levels.forEach((lv, i) => { if (lv.price <= art.fair_price) pi = i; });
+      // 테마 = 헤드라이너 장르. 오프닝 후보: 같은 장르 중 가장 싼 아티스트, 아무 장르 중 가장 싼 아티스트, 없음
       const rest = ctx.market.filter((x) => x !== h).map((id) => eng.ARTISTS.get(id)).sort((a, b) => a.fee - b.fee);
-      const openerOpts = A.lineup.opener_slots > 0 && rest.length ? [[rest[0].id], []] : [[]];
+      const openerOpts = [];
+      if (A.lineup.opener_slots > 0 && rest.length) {
+        const same = rest.find((a) => a.genre === art.genre);
+        if (same) openerOpts.push([same.id]);
+        if (!same || same.id !== rest[0].id) openerOpts.push([rest[0].id]);
+      }
+      openerOpts.push([]);
       for (const openers of openerOpts) {
         const p = basePlan(eng, state);
-        Object.assign(p, { offer: oi, headliners: [h], openers, price: pi });
+        Object.assign(p, { offer: oi, theme: art.genre, headliners: [h], openers, price: pi });
         // 예상 수요(분산 0)를 담는 가장 싼 장소, 없으면 가장 큰 곳
         let pick = null, biggest = null;
         for (const v of eng.actVenues(A.id)) {
@@ -117,7 +125,6 @@ function rationalCandidates(eng, state) {
         if (eng.validatePlan(state, p).length) continue;
         const ev = eng.evaluate(state, p, 0);
         out.push({ p, ev });
-        if (ev.cost <= state.funds) break; // 오프닝을 넣고도 외상 없이 되면 '없음' 안은 보지 않는다
       }
     }
   }

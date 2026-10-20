@@ -6,7 +6,7 @@ export const STREAM = { OFFER: 1, MARKET: 2, DEMAND: 3, EVENT: 4, REWARD: 5, WEA
 export const GRADE_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
 const QUEUE_KEYS = ["bar_queue", "toilet_queue", "security", "food_queue", "cleaning", "medical"];
 // 결과 리뷰 동점 정렬용 순서 (show.md S6 표 순서)
-const LINE_ORDER = ["price_over", "opener", "sound", "headliner", "theme", "empty_room", "sold_out",
+const LINE_ORDER = ["price_over", "opener", "opener_theme", "sound", "headliner", "theme", "empty_room", "sold_out",
   "bar_queue", "toilet_queue", "security", "event", "base_bonus", "food_queue", "cleaning", "medical"];
 
 // ---------- 정수 규칙 (run.md I2·I3) ----------
@@ -104,7 +104,7 @@ export function createEngine(data, opts = {}) {
     const r = stream(state.seed, state.show_idx, STREAM.OFFER);
     if (isGate) {
       const t = clone(A.gate.template);
-      t.theme = GENRES[r.int(GENRES.length)];
+      t.trend = GENRES[r.int(GENRES.length)];
       return [t];
     }
     const pool = A.offer_templates.filter((t) => t.weight > 0);
@@ -113,7 +113,7 @@ export function createEngine(data, opts = {}) {
       const i = weightedPick(r, pool.map((t) => t.weight));
       const t = clone(pool[i]);
       pool.splice(i, 1);
-      t.theme = GENRES[r.int(GENRES.length)];
+      t.trend = GENRES[r.int(GENRES.length)];
       out.push(t);
     }
     return out;
@@ -193,7 +193,7 @@ export function createEngine(data, opts = {}) {
     const { ctx } = state.pending;
     const venue = actVenues(A.id).reduce((a, b) => (b.fee < a.fee ? b : a));
     const plan = {
-      offer: 0, venue: venue.id, headliners: [ctx.market[0]], openers: [],
+      offer: 0, theme: ctx.offers[0].trend, venue: venue.id, headliners: [ctx.market[0]], openers: [],
       staff: {}, fac: {}, price: 0, promo: 0,
     };
     for (const role of A.knobs.staff) plan.staff[role] = staffMin(A, role);
@@ -233,6 +233,7 @@ export function createEngine(data, opts = {}) {
     const err = [];
     const offer = ctx.offers[plan.offer];
     if (!offer) err.push("offer");
+    if (!GENRES.includes(plan.theme)) err.push("theme");
     const venue = VENUES.get(plan.venue);
     if (!venue || venue.act !== A.id) err.push("venue");
     const slots = lineupSlots(A, M);
@@ -283,8 +284,10 @@ export function createEngine(data, opts = {}) {
     for (const o of O) raw += div(o.draw * dm.opener_draw_pct, 100);
     raw += state.fame * dm.fame_draw;
     raw = div(raw * offer.demand_pct, 100);
-    const themeMatch = H.some((h) => h.genre === offer.theme);
+    const themeMatch = H.some((h) => h.genre === plan.theme);
     if (themeMatch) raw = div(raw * (100 + dm.theme_demand_pct), 100);
+    const trendMatch = plan.theme === offer.trend;
+    if (trendMatch) raw = div(raw * (100 + dm.trend_demand_pct), 100);
     raw = div(raw * level.demand_pct, 100);
     if (A.knobs.promo) raw = div(raw * (100 + A.promo_levels[plan.promo || 0].demand_pct), 100);
     raw = div(raw * (100 + venue.demand_pct), 100);
@@ -299,7 +302,7 @@ export function createEngine(data, opts = {}) {
     const att = Math.min(demand, venue.capacity);
     return {
       state, A, M, ctx, plan, offer, venue, H, O, units, rowdy, raw, v, vRoll, demand, att,
-      price: level.price, themeMatch, soldOut: demand >= venue.capacity,
+      price: level.price, themeMatch, trendMatch, soldOut: demand >= venue.capacity,
       cost: cost(M, A, offer, venue, plan),
     };
   }
@@ -318,6 +321,7 @@ export function createEngine(data, opts = {}) {
     if (S.A.lineup.opener_slots > 0) {
       if (S.O.length) push("opening", "opener", S.O.reduce((s, o) => s + div(o.skill * L.opener.weight_pct, 100), 0));
       else push("opening", "opener", L.opener.none);
+      push("opening", "opener_theme", S.O.filter((o) => o.genre !== S.plan.theme).length * L.opener_off_theme);
     }
     let sound = S.venue.sound + addv(S.M, "line.sound");
     if (S.A.knobs.facilities.includes("sound")) sound += facRow("sound", S.A.id).grades[S.plan.fac.sound || 0].sat;
@@ -586,6 +590,7 @@ export function createEngine(data, opts = {}) {
       perStaff: { bar: per(S.units.bar), toilet: per(S.units.toilet), security: per(S.units.security) },
       warnings: lines.filter((l) => l.value <= B.preview.warn_at).map((l) => l),
       positives: lines.filter((l) => l.value > 0).map((l) => l.key),
+      trendMatch: S.trendMatch, themeMatch: S.themeMatch,
       units: S.units,
       legal: validatePlan(state, plan).length === 0,
       errors: validatePlan(state, plan),
@@ -649,6 +654,7 @@ export function createEngine(data, opts = {}) {
     const res = {
       act: A.id, show_idx: state.show_idx, isGate: S.ctx.isGate,
       offer: S.offer, venue: S.venue.id, plan: clone(S.plan),
+      trendMatch: S.trendMatch, themeMatch: S.themeMatch,
       demand: S.demand, att: S.att, capacity: S.venue.capacity, soldOut: S.soldOut, variance: S.v, varianceRoll: S.vRoll,
       satisfaction, grade: grade.id, lines: sortLines(lines), mood: sim.mood, segs: sim.segs,
       cost: S.cost, ticket, bar, food, sponsor: S.offer.sponsor, evMoney: sim.evMoney, profit,
