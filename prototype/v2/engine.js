@@ -588,7 +588,8 @@ export function createEngine(data, opts = {}) {
       fundsAfterCost: state.funds - S.cost.total,
       breakEven: ceilDiv((S.cost.total - S.offer.sponsor) * 100, S.price * 100 + barPctSum * S.A.drink_price),
       perStaff: { bar: per(S.units.bar), toilet: per(S.units.toilet), security: per(S.units.security) },
-      warnings: lines.filter((l) => l.value <= B.preview.warn_at).map((l) => l),
+      // opener_theme 은 임계와 무관하게 0 이 아니면 경고 (show.md P5)
+      warnings: lines.filter((l) => l.value <= B.preview.warn_at || (l.key === "opener_theme" && l.value < 0)),
       positives: lines.filter((l) => l.value > 0).map((l) => l.key),
       trendMatch: S.trendMatch, themeMatch: S.themeMatch,
       units: S.units,

@@ -3,6 +3,7 @@
 import { createEngine, mulberry32 } from "../engine.js";
 
 const DATA = JSON.parse(document.getElementById("se-data").textContent);
+document.documentElement.lang ||= "ko";
 const eng = createEngine(DATA, { lastAct: 1 });
 const B = DATA.balance;
 const $app = document.getElementById("app");
@@ -120,7 +121,7 @@ function planCtx() {
 
 const WARN_TEXT = {
   security: "보안 인원이 모자랄 것 같다", toilet_queue: "화장실 줄이 길어질 것 같다", bar_queue: "바 줄이 길어질 것 같다",
-  opener: "오프닝 없이 빈 무대로 시작한다", price_over: "티켓값이 라인업 적정가보다 비싸다",
+  opener: "오프닝 없이 빈 무대로 시작한다", opener_theme: "오프닝이 테마와 다른 장르다", price_over: "티켓값이 라인업 적정가보다 비싸다",
   empty_room: "장소에 비해 관객이 적다", sound: "장소 음향이 나쁘다",
 };
 
