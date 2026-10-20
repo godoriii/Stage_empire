@@ -96,7 +96,10 @@ for (const [w, h, scheme] of [[375, 812, "light"], [1280, 900, "dark"]]) {
         }
         await page.waitForTimeout(700); await shot("show");
         if (await page.locator(".modal").count()) continue; // 자동 진행 중 돌발이 떴다
-        await page.click('[data-act="skip"]', { timeout: 2000 }).catch(() => {}); // 그사이 돌발이 뜨면 다음 바퀴에서 처리
+        // 그사이 돌발 모달이 뜨거나 공연이 끝났으면 다음 바퀴에서 처리, 그 밖의 실패는 그대로 던진다
+        await page.click('[data-act="skip"]', { timeout: 2000 }).catch(async (e) => {
+          if (!(await page.locator(".modal").count()) && await page.locator('[data-act="skip"]').count()) throw e;
+        });
       }
       else if (screen === "event") { modals++; await shot("event"); await page.locator(".modal .choice").first().click(); }
       else if (screen === "result") { await shot("result"); await page.click('[data-act="to-reward"], [data-act="to-over"]'); }

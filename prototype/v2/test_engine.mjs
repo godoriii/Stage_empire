@@ -193,6 +193,10 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
     }
   }
   check("RN3 offers/market/variance same across policies", compared > 30 && diff === 0, `${diff}/${compared}`);
+  check("RN3 log carries trend", !JSON.stringify(runBot(eng, POLICIES.random, 1, { keepLog: true }).shows[0].ctx).includes("undefined"));
+  // SE-071: 트렌드 시퀀스 = SE-068 의 테마 시퀀스(RNG 호출 순서 불변). 시드 42 첫 공연은 SE-069 때 friday:indie, weekend:electronic, critic:electronic
+  eq("SE-071 trend sequence unchanged", eng.beginShow(eng.newRun(42)).pending.ctx.offers.map((o) => o.id + ":" + o.trend),
+    ["friday:indie", "weekend:electronic", "critic:electronic"]);
   // 보상 제시: 같은 (시드, show_idx, 등급, 관문 통과, 받은 카드)면 자금·명성·보유 카드 상태와 무관하게 같다
   const ra = eng.newRun(77), rb = eng.newRun(77);
   rb.funds = 999; rb.fame = 40; rb.cards = [eng.materialize(data.rewards.cards[0], 0)];
@@ -249,7 +253,7 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
   // 관문 실패
   const s3 = fixedState({ funds: 500, fame: 30, offerId: "friday", trend: "rock", market: ["a1_fluorescent"] });
   s3.pending.ctx.isGate = true;
-  s3.pending.ctx.offers = [{ ...eng.act(1).gate.template, theme: "rock" }];
+  s3.pending.ctx.offers = [{ ...eng.act(1).gate.template, trend: "rock" }];
   const r3 = play(s3, plan("club_rooftop", ["a1_fluorescent"], [], 1, 1, 0, 3)).after;
   check("RN5 gate_fail", r3.result === "gate_fail", r3.result);
   // 개최 불가

@@ -167,10 +167,11 @@ function renderPlan() {
     return `<button data-act="theme" data-id="${g.id}" class="${p.theme === g.id ? "on" : ""}" aria-pressed="${p.theme === g.id}">
       ${g.name}<small>${g.id === offer.trend ? "트렌드 · " : ""}시장 ${n}팀</small></button>`;
   }).join("");
+  // 테마 관련 안내는 엔진 미리보기 값(themeMatch, opener_theme 경고)만 쓴다 — 규칙을 화면에서 다시 계산하지 않는다
   const offTheme = [];
-  const H0 = p.headliners.map((id) => eng.ARTISTS.get(id));
-  if (H0.length && !H0.some((h) => h.genre === p.theme)) offTheme.push(`헤드라이너가 ${GENRE_NAME[p.theme]} 장르가 아니다 — 테마 보너스를 놓친다`);
-  for (const id of p.openers) if (eng.ARTISTS.get(id).genre !== p.theme) offTheme.push(`오프닝 ${esc(eng.ARTISTS.get(id).name)}이 테마와 다른 장르다 (만족 ${B.lines.opener_off_theme})`);
+  if (pv && !pv.themeMatch) offTheme.push(`헤드라이너가 ${GENRE_NAME[p.theme]} 장르가 아니다 — 테마 보너스를 놓친다`);
+  const ot = pv && pv.warnings.find((x) => x.key === "opener_theme");
+  if (ot) offTheme.push(`${WARN_TEXT.opener_theme} (예상 ${signed(ot.value)})`);
   const sec = eng.staffRow("security", A.id), bar = eng.staffRow("bar", A.id), toi = eng.facRow("toilet", A.id);
   const units = pv ? pv.units : null;
   const steppers = [

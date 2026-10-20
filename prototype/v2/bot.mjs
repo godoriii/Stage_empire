@@ -93,22 +93,15 @@ function rationalCandidates(eng, state) {
   const A = eng.act(state.act);
   const { ctx } = state.pending;
   const M = eng.collectMods(state.cards);
+  const score = (c) => c.ev.satisfaction + div(c.ev.profit, 20);
   const out = [];
   for (let oi = 0; oi < ctx.offers.length; oi++) {
     for (const h of ctx.market) {
       const art = eng.ARTISTS.get(h);
       let pi = 0;
       A.price_levels.forEach((lv, i) => { if (lv.price <= art.fair_price) pi = i; });
-      // 테마 = 헤드라이너 장르. 오프닝 후보: 같은 장르 중 가장 싼 아티스트, 아무 장르 중 가장 싼 아티스트, 없음
-      const rest = ctx.market.filter((x) => x !== h).map((id) => eng.ARTISTS.get(id)).sort((a, b) => a.fee - b.fee);
-      const openerOpts = [];
-      if (A.lineup.opener_slots > 0 && rest.length) {
-        const same = rest.find((a) => a.genre === art.genre);
-        if (same) openerOpts.push([same.id]);
-        if (!same || same.id !== rest[0].id) openerOpts.push([rest[0].id]);
-      }
-      openerOpts.push([]);
-      for (const openers of openerOpts) {
+      // 오프닝 후보 하나로 계획을 완성한다(테마 = 헤드라이너 장르). 합법이 아니면 null
+      const build = (openers) => {
         const p = basePlan(eng, state);
         Object.assign(p, { offer: oi, theme: art.genre, headliners: [h], openers, price: pi });
         // 예상 수요(분산 0)를 담는 가장 싼 장소, 없으면 가장 큰 곳
@@ -122,10 +115,25 @@ function rationalCandidates(eng, state) {
         }
         p.venue = (pick || biggest).id;
         fixWarnings(eng, state, p);
-        if (eng.validatePlan(state, p).length) continue;
-        const ev = eng.evaluate(state, p, 0);
-        out.push({ p, ev });
-      }
+        if (eng.validatePlan(state, p).length) return null;
+        return { p, ev: eng.evaluate(state, p, 0) };
+      };
+      const inBudget = (c) => c && c.ev.cost <= state.funds;
+      // run.md 합리적: 테마와 같은 장르 중 가장 싼 오프닝(예산 안 되면 후보 없음으로 봄),
+      // 없으면 {가장 싼 아티스트(예산 안 되면 제외), 없음} 중 점수 높은 쪽, 같으면 없음
+      const rest = ctx.market.filter((x) => x !== h).map((id) => eng.ARTISTS.get(id)).sort((a, b) => a.fee - b.fee);
+      const none = build([]);
+      let chosen = null;
+      if (A.lineup.opener_slots > 0) {
+        const same = rest.find((a) => a.genre === art.genre);
+        const withSame = same ? build([same.id]) : null;
+        if (inBudget(withSame)) chosen = withSame;
+        else {
+          const cheap = rest.length ? build([rest[0].id]) : null;
+          chosen = inBudget(cheap) && (!none || score(cheap) > score(none)) ? cheap : none;
+        }
+      } else chosen = none;
+      if (chosen) out.push(chosen);
     }
   }
   return out;
@@ -177,7 +185,7 @@ export function runBot(eng, policy, seed, o = {}) {
   for (let guard = 0; guard < 40; guard++) {
     s = eng.beginShow(s);
     if (s.phase === "over") break;
-    const ctxLog = o.keepLog ? { offers: s.pending.ctx.offers.map((x) => x.id + ":" + x.theme), market: s.pending.ctx.market } : null;
+    const ctxLog = o.keepLog ? { offers: s.pending.ctx.offers.map((x) => x.id + ":" + x.trend), market: s.pending.ctx.market } : null;
     const p = policy.plan(eng, s, r);
     const extra = o.analyze ? o.analyze(eng, s, p) : null;
     const sim = eng.startShow(s, p);
