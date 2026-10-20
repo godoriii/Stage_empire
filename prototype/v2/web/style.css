@@ -8,7 +8,7 @@
   --pink: #ff3e9a;
   --blue: #2459d8;
   --good: #1d7f55;
-  --warn: #c5401b;
+  --warn: #b0360f;
   --r-normal: #6f6e77;
   --r-special: #2459d8;
   --r-rare: #7a3ff2;
@@ -82,7 +82,7 @@ h3 { font-size: 18px; }
 }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn.ghost { background: transparent; color: var(--ink); }
-.btn.hot { background: var(--pink); border-color: var(--pink); color: #fff; }
+.btn.hot { background: var(--pink); border-color: var(--pink); color: #14121a; }
 
 /* 타이틀 */
 .title-hero { padding-block: 24px 8px; display: grid; gap: 20px; }
@@ -141,7 +141,7 @@ h3 { font-size: 18px; }
 }
 .dock .info { flex: 1; min-width: 0; font-size: 13px; line-height: 1.3; }
 .dock .info b { font-family: var(--f-num); font-weight: 500; font-size: 15px; }
-.dock .btn { background: var(--pink); border-color: var(--pink); color: #fff; min-height: 44px; padding: 8px 16px; }
+.dock .btn { background: var(--pink); border-color: var(--pink); color: #14121a; min-height: 44px; padding: 8px 16px; }
 @media (min-width: 900px) { .dock { display: none; } }
 
 /* 개최 화면 */

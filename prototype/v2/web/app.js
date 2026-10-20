@@ -18,6 +18,11 @@ const RESULT_TEXT = {
   pass_act: "1막 통과 — 클럽 씬에서 이름을 알렸다", clear: "메가 페스티벌 성공",
 };
 const TAG_NAME = { equipment: "장비", facility: "시설", supply: "물품", crowd: "관객", venue: "장소", weather: "날씨", artist: "아티스트", press: "언론", "*": "모든 돌발" };
+const GRADES = ["S", "A", "B", "C", "D"];
+function gateGrade(A) {
+  const relax = app.state ? eng.rule(eng.collectMods(app.state.cards), "gate_grade_relax") : 0;
+  return GRADES[Math.min(GRADES.length - 1, GRADES.indexOf(A.gate.min_grade) + relax)];
+}
 const won = (n) => `${n < 0 ? "−" : ""}${Math.abs(n).toLocaleString("ko-KR")}만원`;
 const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : "0");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -92,7 +97,7 @@ function renderOffer() {
   const { ctx } = app.state.pending;
   const A = eng.act(app.state.act);
   const gateNote = ctx.isGate
-    ? `<div class="gate-banner">결산 쇼케이스 — 등급 ${A.gate.min_grade} 이상 + 명성 ${A.gate.min_fame} 이상이면 1막 통과. 돌발 카드 ${A.gate.events_per_show ?? A.events_per_show}장.</div>` : "";
+    ? `<div class="gate-banner">결산 쇼케이스 — 등급 ${gateGrade(A)} 이상 + 명성 ${A.gate.min_fame} 이상이면 1막 통과. 돌발 카드 ${A.gate.events_per_show ?? A.events_per_show}장.</div>` : "";
   return `${topBar()}<section class="stack">
     <div><div class="eyebrow">① 제안</div><h2>${ctx.isGate ? "마지막 무대다" : "다음 공연을 고른다"}</h2></div>
     ${gateNote}
@@ -138,7 +143,7 @@ function renderPlan() {
   const slots = { head: A.lineup.headliner_slots + eng.rule(M, "headliner_slots"), open: A.lineup.opener_slots };
 
   const venues = eng.actVenues(A.id).map((v) => {
-    const fee = eng.ap(M, Math.floor(v.fee * offer.venue_fee_pct / 100), "cost.venue");
+    const fee = eng.cost(M, A, offer, v, { ...p, venue: v.id }).venue;
     return `<button class="card pick ${v.id === p.venue ? "on" : ""}" data-act="venue" data-id="${v.id}" aria-pressed="${v.id === p.venue}">
       <div class="row" style="justify-content:space-between"><b>${esc(v.name)}</b>${v.traits.map((t) => `<span class="badge">${TRAIT_NAME[t]}</span>`).join(" ")}</div>
       <dl class="kv"><dt>수용</dt><dd>${v.capacity}명</dd><dt>대관료</dt><dd>${won(fee)}</dd><dt>음향</dt><dd>${signed(v.sound)}</dd>
@@ -295,7 +300,7 @@ function renderShow() {
     <div class="timeline" id="tl"></div>
     <div class="show-grid">
       <div class="stack">
-        <div class="stage-box"><canvas id="stage" width="800" height="500" aria-label="공연장 모습"></canvas></div>
+        <div class="stage-box"><canvas id="stage" width="800" height="500" role="img" aria-label="공연장 모습: 무대, 관객, 바와 화장실 줄"></canvas></div>
         <div class="live" id="live"></div>
       </div>
       <div class="stack">
@@ -303,7 +308,7 @@ function renderShow() {
         <div class="feed" id="feed" aria-live="polite"></div>
         <div class="controls">
           <button data-act="play">${app.playing ? "일시정지" : "재생"}</button>
-          ${[1, 2, 4].map((x) => `<button data-act="speed" data-x="${x}" class="${app.speed === x ? "on" : ""}">${x}×</button>`).join("")}
+          ${[1, 2, 4].map((x) => `<button data-act="speed" data-x="${x}" class="${app.speed === x ? "on" : ""}" aria-pressed="${app.speed === x}">${x}×</button>`).join("")}
           <button data-act="skip">건너뛰기</button>
         </div>
       </div>
@@ -327,7 +332,7 @@ function renderShowParts() {
     <div class="mood-ticks">${ticks.map((g) => `<span style="left:${g.min}%">${g.id}</span>`).join("")}</div>`;
   const feed = [];
   for (const b of app.beats) {
-    for (const l of b.lines) feed.push(`<div><span class="d ${l.value > 0 ? "pos" : "neg"}">${signed(l.value)}</span><span>${segs.find((g) => g.id === b.seg).name} · ${lineLabel(l.key)}</span></div>`);
+    for (const l of b.lines) feed.push(`<div><span class="d ${l.value > 0 ? "pos" : "neg"}">${signed(l.value)}</span><span>${esc(segs.find((g) => g.id === b.seg).name)} · ${esc(lineLabel(l.key))}</span></div>`);
   }
   document.getElementById("feed").innerHTML = feed.length ? feed.join("") : `<p class="muted" style="margin:0">문이 열리기를 기다린다…</p>`;
   const cumMiss = (k) => app.beats.reduce((s, b) => s + (b[k] || 0), 0);
@@ -337,7 +342,7 @@ function renderShowParts() {
     <div><small>바 판매 (잔)</small><b>${barSold}</b></div>
     <div><small>화장실 못 간 사람</small><b>${cumMiss("toiMiss")}</b>명</div>
     <div><small>보안 부담 / 감당</small><b>${last ? last.load : 0}</b> / ${last ? last.cover : 0}</div>`;
-  drawStage(S, last, doneN);
+  drawStage(S, last);
   const pb = app.pendingBeat;
   document.getElementById("modal").innerHTML = pb ? eventModal(pb) : "";
   if (pb) document.querySelector(".modal .choice")?.focus();
@@ -371,7 +376,7 @@ function eventModal(b) {
 }
 
 // 공연장 그림: 무대(위) · 관객 점(가운데) · 바(왼쪽 아래) · 화장실(오른쪽 아래). 점은 분홍/파랑 겹찍기.
-function drawStage(S, last, doneN) {
+function drawStage(S, last) {
   const cv = document.getElementById("stage");
   if (!cv) return;
   const ctx = cv.getContext("2d");
@@ -381,7 +386,6 @@ function drawStage(S, last, doneN) {
   ctx.clearRect(0, 0, W, H);
   ctx.fillStyle = col("--card"); ctx.fillRect(0, 0, W, H);
   // 무대
-  const seg = S.A.segments[Math.min(doneN, S.A.segments.length - 1)];
   const curSeg = last ? S.A.segments.find((g) => g.id === last.seg) : null;
   const onStage = curSeg?.stage === "headliner" ? S.H.map((h) => h.name).join(" · ") : curSeg?.stage === "opener" ? (S.O[0]?.name || "빈 무대") : "";
   ctx.fillStyle = col("--ink"); ctx.fillRect(W * 0.18, 18, W * 0.64, 70);
@@ -417,7 +421,6 @@ function drawStage(S, last, doneN) {
   const over = last && last.secOver > 0;
   ctx.fillStyle = over ? col("--warn") : col("--muted");
   ctx.fillText(last ? `보안 ${last.load}/${last.cover}${over ? " 초과" : ""}` : `수용 ${cap}명`, W / 2, H - 36);
-  void seg;
 }
 
 // ---------- ④ 결과 ----------
@@ -443,7 +446,7 @@ function reasonText(l, res) {
     sold_out: [`매진 (${res.demand}명이 오려 했다)`, "→ 장소 크기·가격"],
     bar_queue: [`바에서 못 산 사람 ${res.miss.bar_queue}명`, "→ 바텐더 수"],
     toilet_queue: [`화장실 못 간 사람 ${res.miss.toilet_queue}명`, "→ 화장실 칸 수"],
-    security: [`보안 ${plan.staff.security}명이 최대 ${maxLoad}명 부담을 맡음 (1명당 ${eng.staffRow("security", A.id).cover})`, "→ 보안 인원"],
+    security: [`보안 부담 최대 ${maxLoad}명, 감당 ${res.segs.find((s) => s.load === maxLoad).cover}명 (보안 ${plan.staff.security}명 배치)`, "→ 보안 인원"],
     base_bonus: ["운영 감각 (보상 카드)", ""],
   };
   return T[k] || [lineLabel(k), ""];
@@ -459,7 +462,7 @@ function renderResult() {
   let gate = "";
   if (res.isGate) {
     gate = res.gatePass ? `<div class="gate-banner ok">결산 통과 — 등급 ${res.grade}, 명성 ${s.fame}</div>`
-      : `<div class="gate-banner no">결산 실패 — 필요: 등급 ${A.gate.min_grade} 이상 + 명성 ${A.gate.min_fame} 이상</div>`;
+      : `<div class="gate-banner no">결산 실패 — 필요: 등급 ${gateGrade(A)} 이상 + 명성 ${A.gate.min_fame} 이상</div>`;
   }
   const next = s.phase === "reward" ? `<button class="btn hot" data-act="to-reward">보상 고르기</button>` : `<button class="btn hot" data-act="to-over">런 결과 보기</button>`;
   return `${topBar()}<section class="stack" style="gap:20px">
@@ -525,7 +528,7 @@ function renderReward() {
     <div class="rewards">${rw.map((c, i) => `<button class="rcard ${c.rarity} ${app.pickedReward === i ? "on" : ""}" data-act="reward" data-i="${i}" aria-pressed="${app.pickedReward === i}">
       <span class="rar">${RARITY_NAME[c.rarity]} · ${KIND_NAME[c.kind]}</span><h3>${esc(c.name)}</h3>
       <ul>${effectLines(c).map((t) => `<li>${esc(t)}</li>`).join("")}</ul><span class="muted" style="font-size:13px">${durationText(c)}</span></button>`).join("")}</div>
-    <div><button class="btn hot" data-act="take" ${app.pickedReward === null ? "disabled" : ""}>이 카드를 가져간다</button></div>
+    <div>${rw.length ? `<button class="btn hot" data-act="take" ${app.pickedReward === null ? "disabled" : ""}>이 카드를 가져간다</button>` : `<button class="btn hot" data-act="take">다음 공연으로</button>`}</div>
   </section>`;
 }
 
@@ -583,7 +586,7 @@ $app.addEventListener("click", (ev) => {
     case "venue": {
       p.venue = t.dataset.id;
       const v = eng.VENUES.get(p.venue);
-      p.staff.bar = Math.min(p.staff.bar, v.bar_slots);
+      p.staff.bar = Math.min(p.staff.bar, eng.staffMax(eng.act(app.state.act), "bar", v, p));
       render(); break;
     }
     case "head": {
@@ -606,7 +609,7 @@ $app.addEventListener("click", (ev) => {
     case "price": p.price = +t.dataset.i; render(); break;
     case "go": startLive(); break;
     case "play": app.playing = !app.playing; if (app.playing && !app.pendingBeat) schedule(300); else clearTimeout(app.timer); renderShowParts(); break;
-    case "speed": app.speed = +t.dataset.x; document.querySelectorAll('[data-act="speed"]').forEach((b) => b.classList.toggle("on", +b.dataset.x === app.speed)); break;
+    case "speed": app.speed = +t.dataset.x; document.querySelectorAll('[data-act="speed"]').forEach((b) => { b.classList.toggle("on", +b.dataset.x === app.speed); b.setAttribute("aria-pressed", String(+b.dataset.x === app.speed)); }); break;
     case "skip": if (!app.pendingBeat) skipShow(); break;
     case "choose": chooseEvent(t.dataset.id); break;
     case "to-reward": app.pickedReward = null; app.screen = "reward"; render(); break;
@@ -621,6 +624,14 @@ function snapshot() {
   return { screen: app.screen, state: app.state, plan: app.plan, choices: app.choices, beats: app.beats.length, speed: app.speed, seed: app.seed, pickedReward: app.pickedReward };
 }
 function start(saved) {
+  try { restore(saved); } catch (e) {
+    // 데이터가 바뀌어 저장된 상태를 되살릴 수 없으면 타이틀로 (SE-070 리뷰 M1)
+    console.warn("restore failed", e);
+    Object.assign(app, { screen: "title", state: null, plan: null, sim: null, pendingBeat: null, beats: [], choices: [] });
+  }
+  render();
+}
+function restore(saved) {
   if (saved && saved.state) {
     Object.assign(app, { screen: saved.screen, state: saved.state, plan: saved.plan, speed: saved.speed || 1, seed: saved.seed, pickedReward: saved.pickedReward ?? null });
     if (app.screen === "show") {
@@ -639,6 +650,8 @@ function start(saved) {
   }
   render();
 }
+// 스모크 테스트용: 정해진 시드로 런 시작
+window.stageEmpireTest = { startRun: (seed) => startRun(seed), seed: () => app.seed, history: () => app.state?.history.map((h) => [h.grade, h.satisfaction, h.profit]) };
 window.claude?.hot?.snapshot?.(snapshot);
 if (window.claude?.hot?.ready) window.claude.hot.ready(start);
 else start(window.claude?.hot?.data ?? null);
