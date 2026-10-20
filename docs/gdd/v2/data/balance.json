@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/show.md, docs/gdd/v2/run.md",
+  "money_unit": "만원",
+  "start": { "funds": 300, "fame": 10 },
+  "fail": { "funds_below": 0, "fame_at_or_below": 0 },
+  "satisfaction": { "base": 62, "min": 0, "max": 100 },
+  "grades": [
+    { "id": "S", "min": 84, "fame": 5 },
+    { "id": "A", "min": 74, "fame": 3 },
+    { "id": "B", "min": 59, "fame": 2 },
+    { "id": "C", "min": 48, "fame": 0 },
+    { "id": "D", "min": 0, "fame": -2 }
+  ],
+  "demand": {
+    "opener_draw_pct": 50,
+    "fame_draw": 2,
+    "theme_demand_pct": 20,
+    "variance_pct": 20
+  },
+  "lines": {
+    "headliner": { "pivot": 50, "weight_pct": 30 },
+    "opener": { "weight_pct": 8, "none": -3 },
+    "theme_match": 3,
+    "price_over": { "per_unit": -4, "cap": -12 },
+    "empty_room": { "fill_pct_below": 50, "div": 3, "cap": -10 },
+    "sold_out": 3,
+    "bar_queue": { "weight_pct": 30, "cap": -8 },
+    "toilet_queue": { "weight_pct": 70, "cap": -15 },
+    "security": { "weight_pct": 6, "cap": -12 },
+    "cleaning": { "weight_pct": 20, "cap": -10 },
+    "food_queue": { "weight_pct": 30, "cap": -8 },
+    "medical": { "weight_pct": 20, "cap": -12 },
+    "weather": { "cap": -12 }
+  },
+  "preview": {
+    "warn_at": -3,
+    "break_even_note": "손익분기 관객 = 비용 ÷ (티켓값 + 1인당 예상 바 매출) 올림"
+  },
+  "mods": { "pct_min": 20, "pct_max": 300 },
+  "rng": {
+    "algorithm": "mulberry32",
+    "stream_ids": { "OFFER": 1, "MARKET": 2, "DEMAND": 3, "EVENT": 4, "REWARD": 5, "WEATHER": 6 },
+    "seed_mix": { "show_mul": 1000003, "stream_mul": 7919 }
+  }
+}

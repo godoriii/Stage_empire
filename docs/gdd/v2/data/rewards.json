@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/rewards.md",
+  "offer_count": 3,
+  "rarities": [
+    { "id": "normal", "name": "노멀", "class": "scalable", "mag_pct": 100, "uses_add": 0 },
+    { "id": "special", "name": "스페셜", "class": "scalable", "mag_pct": 150, "uses_add": 1 },
+    { "id": "rare", "name": "레어", "class": "scalable", "mag_pct": 200, "uses_add": 2 },
+    { "id": "unique", "name": "유니크", "class": "unique", "mag_pct": 100, "uses_add": 0 },
+    { "id": "legendary", "name": "레전더리", "class": "legendary", "mag_pct": 100, "uses_add": 0 }
+  ],
+  "rarity_weights_by_act": [
+    { "act": 1, "weights": [55, 25, 13, 6, 1] },
+    { "act": 2, "weights": [48, 27, 16, 7, 2] },
+    { "act": 3, "weights": [40, 30, 19, 8, 3] },
+    { "act": 4, "weights": [40, 30, 19, 8, 3] }
+  ],
+  "gate_guarantee_min_rarity": "rare",
+  "grade_upgrade_min_grade": "A",
+  "kinds": [
+    { "id": "contact", "name": "인맥", "weight": 14 },
+    { "id": "knowhow", "name": "노하우", "weight": 14 },
+    { "id": "booking", "name": "섭외 혜택", "weight": 16 },
+    { "id": "rental", "name": "대여 할인", "weight": 16 },
+    { "id": "support", "name": "운영 지원", "weight": 16 },
+    { "id": "instant", "name": "즉시 보상", "weight": 12 },
+    { "id": "contingency", "name": "돌발 대비", "weight": 12 }
+  ],
+  "cards": [
+    { "id": "c_sound_friend", "kind": "contact", "class": "scalable", "min_act": 1, "name": "음향 엔지니어 친구", "duration": { "type": "run" }, "effects": [ { "type": "add", "key": "line.sound", "value": 1 } ] },
+    { "id": "c_local_reporter", "kind": "contact", "class": "scalable", "min_act": 1, "name": "지역 기자", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "demand", "value": 5 } ] },
+    { "id": "c_venue_manager", "kind": "contact", "class": "scalable", "min_act": 1, "name": "공연장 매니저 지인", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "cost.venue", "value": -8 } ] },
+    { "id": "c_bar_senior", "kind": "contact", "class": "scalable", "min_act": 1, "name": "바텐더 선배", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "cap.bar", "value": 10 } ] },
+    { "id": "c_guard_boss", "kind": "contact", "class": "scalable", "min_act": 1, "name": "경비업체 사장", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "cost.staff.security", "value": -15 } ] },
+    { "id": "c_rock_club", "kind": "contact", "class": "scalable", "min_act": 1, "name": "록 동호회 회장", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "demand.genre.rock", "value": 10 } ] },
+    { "id": "c_hiphop_crew", "kind": "contact", "class": "scalable", "min_act": 1, "name": "힙합 크루 형", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "demand.genre.hiphop", "value": 10 } ] },
+    { "id": "c_party_planner", "kind": "contact", "class": "scalable", "min_act": 1, "name": "파티 기획자", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "demand.genre.electronic", "value": 10 } ] },
+    { "id": "c_label_head", "kind": "contact", "class": "scalable", "min_act": 1, "name": "인디 레이블 대표", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "demand.genre.indie", "value": 10 } ] },
+
+    { "id": "k_flow_sense", "kind": "knowhow", "class": "scalable", "min_act": 1, "name": "동선 감각", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "cap.toilet", "value": 10 } ] },
+    { "id": "k_bar_margin", "kind": "knowhow", "class": "scalable", "min_act": 1, "name": "바 운영 요령", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "bar.price", "value": 10 } ] },
+    { "id": "k_queue_lines", "kind": "knowhow", "class": "scalable", "min_act": 1, "name": "줄 세우기 요령", "duration": { "type": "run" }, "effects": [ { "type": "add", "key": "pen.bar_queue", "value": 2 } ] },
+    { "id": "k_crowd_control", "kind": "knowhow", "class": "scalable", "min_act": 1, "name": "현장 통제 요령", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "cap.security", "value": 10 } ] },
+    { "id": "k_pricing", "kind": "knowhow", "class": "scalable", "min_act": 1, "name": "가격 책정 감각", "duration": { "type": "run" }, "effects": [ { "type": "add", "key": "pen.price_over", "value": 2 } ] },
+    { "id": "k_stagecraft", "kind": "knowhow", "class": "scalable", "min_act": 1, "name": "무대 진행 감각", "duration": { "type": "run" }, "effects": [ { "type": "add", "key": "sat.base", "value": 1 } ] },
+    { "id": "k_negotiation", "kind": "knowhow", "class": "scalable", "min_act": 1, "name": "협상 요령", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "cost.headliner", "value": -5 }, { "type": "pct", "key": "cost.opener", "value": -5 } ] },
+
+    { "id": "b_headliner_deal", "kind": "booking", "class": "scalable", "min_act": 1, "name": "헤드라이너 특가", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "pct", "key": "cost.headliner", "value": -20 } ] },
+    { "id": "b_opener_deal", "kind": "booking", "class": "scalable", "min_act": 1, "name": "오프닝 특가", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "pct", "key": "cost.opener", "value": -30 } ] },
+    { "id": "b_lineup_package", "kind": "booking", "class": "scalable", "min_act": 1, "name": "라인업 묶음 계약", "duration": { "type": "uses", "n": 2 }, "effects": [ { "type": "pct", "key": "cost.headliner", "value": -10 }, { "type": "pct", "key": "cost.opener", "value": -10 } ] },
+    { "id": "b_opener_favor", "kind": "booking", "class": "scalable", "min_act": 1, "name": "후배 밴드의 부탁", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "pct", "key": "cost.opener", "value": -50 } ] },
+    { "id": "b_regular_artist", "kind": "booking", "class": "scalable", "min_act": 1, "name": "단골 아티스트", "duration": { "type": "uses", "n": 3 }, "effects": [ { "type": "pct", "key": "cost.headliner", "value": -10 } ] },
+    { "id": "b_co_promote", "kind": "booking", "class": "scalable", "min_act": 1, "name": "공동 기획", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "pct", "key": "cost.headliner", "value": -30 }, { "type": "pct", "key": "fame.gain", "value": -50, "scales": false } ] },
+
+    { "id": "r_venue_15", "kind": "rental", "class": "scalable", "min_act": 1, "name": "대관료 할인권", "duration": { "type": "uses", "n": 2 }, "effects": [ { "type": "pct", "key": "cost.venue", "value": -15 } ] },
+    { "id": "r_venue_30", "kind": "rental", "class": "scalable", "min_act": 1, "name": "빈 날짜 대관", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "pct", "key": "cost.venue", "value": -30 } ] },
+    { "id": "r_toilet_50", "kind": "rental", "class": "scalable", "min_act": 1, "name": "간이 화장실 업체 쿠폰", "duration": { "type": "uses", "n": 2 }, "effects": [ { "type": "pct", "key": "cost.facility.toilet", "value": -50 } ] },
+    { "id": "r_facility_20", "kind": "rental", "class": "scalable", "min_act": 1, "name": "장비 대여 묶음", "duration": { "type": "uses", "n": 2 }, "effects": [ { "type": "pct", "key": "cost.facility", "value": -20 } ] },
+    { "id": "r_offseason", "kind": "rental", "class": "scalable", "min_act": 1, "name": "비수기 대관", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "pct", "key": "cost.venue", "value": -25 }, { "type": "pct", "key": "demand", "value": -5, "scales": false } ] },
+    { "id": "r_long_lease", "kind": "rental", "class": "scalable", "min_act": 1, "name": "장기 대관 계약", "duration": { "type": "uses", "n": 4 }, "effects": [ { "type": "pct", "key": "cost.venue", "value": -10 } ] },
+
+    { "id": "s_guards_2", "kind": "support", "class": "scalable", "min_act": 1, "name": "경비 지원 2명", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "add", "key": "free.security", "value": 2 } ] },
+    { "id": "s_bartender_1", "kind": "support", "class": "scalable", "min_act": 1, "name": "바텐더 지원", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "add", "key": "free.bar", "value": 1 } ] },
+    { "id": "s_toilets_2", "kind": "support", "class": "scalable", "min_act": 1, "name": "간이 화장실 기증", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "add", "key": "free.toilet", "value": 2 } ] },
+    { "id": "s_volunteers", "kind": "support", "class": "scalable", "min_act": 1, "name": "팬 자원봉사단", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "add", "key": "free.security", "value": 1 }, { "type": "add", "key": "free.bar", "value": 1 } ] },
+    { "id": "s_cleaners_3", "kind": "support", "class": "scalable", "min_act": 2, "name": "청소 업체 지원", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "add", "key": "free.cleaning", "value": 3 } ] },
+    { "id": "s_medics_2", "kind": "support", "class": "scalable", "min_act": 3, "name": "응급구조 봉사단", "duration": { "type": "uses", "n": 1 }, "effects": [ { "type": "add", "key": "free.medical", "value": 2 } ] },
+
+    { "id": "i_grant", "kind": "instant", "class": "scalable", "min_act": 1, "name": "문화재단 후원금", "duration": { "type": "instant" }, "effects": [ { "type": "money", "value": 30 } ] },
+    { "id": "i_ad_deal", "kind": "instant", "class": "scalable", "min_act": 1, "name": "광고 계약", "duration": { "type": "instant" }, "effects": [ { "type": "money", "value": 60 }, { "type": "fame", "value": -1, "scales": false } ] },
+    { "id": "i_press", "kind": "instant", "class": "scalable", "min_act": 1, "name": "언론 노출", "duration": { "type": "instant" }, "effects": [ { "type": "fame", "value": 2 } ] },
+    { "id": "i_fan_board", "kind": "instant", "class": "scalable", "min_act": 1, "name": "팬 커뮤니티 결성", "duration": { "type": "instant" }, "effects": [ { "type": "fame", "value": 1 }, { "type": "money", "value": 15 } ] },
+    { "id": "i_merch", "kind": "instant", "class": "scalable", "min_act": 1, "name": "굿즈 완판", "duration": { "type": "instant" }, "effects": [ { "type": "money", "value": 40 } ] },
+
+    { "id": "g_spare_amp", "kind": "contingency", "class": "scalable", "min_act": 1, "name": "예비 앰프", "duration": { "type": "charges", "n": 1 }, "effects": [ { "type": "shield", "tag": "equipment" } ] },
+    { "id": "g_plumbing_kit", "kind": "contingency", "class": "scalable", "min_act": 1, "name": "배관 공구함", "duration": { "type": "charges", "n": 1 }, "effects": [ { "type": "shield", "tag": "facility" } ] },
+    { "id": "g_spare_kegs", "kind": "contingency", "class": "scalable", "min_act": 1, "name": "여분 맥주 통", "duration": { "type": "charges", "n": 1 }, "effects": [ { "type": "shield", "tag": "supply" } ] },
+    { "id": "g_guard_hotline", "kind": "contingency", "class": "scalable", "min_act": 1, "name": "경비 비상 연락망", "duration": { "type": "charges", "n": 1 }, "effects": [ { "type": "shield", "tag": "crowd" } ] },
+    { "id": "g_neighbor_tea", "kind": "contingency", "class": "scalable", "min_act": 1, "name": "이웃과 차 한잔", "duration": { "type": "charges", "n": 1 }, "effects": [ { "type": "shield", "tag": "venue" } ] },
+    { "id": "g_crisis_manual", "kind": "contingency", "class": "scalable", "min_act": 1, "name": "만능 수습 매뉴얼", "duration": { "type": "charges", "n": 1 }, "effects": [ { "type": "shield", "tag": "*" } ] },
+    { "id": "g_drills", "kind": "contingency", "class": "scalable", "min_act": 1, "name": "위기 대응 훈련", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "event.money", "value": -20 } ] },
+    { "id": "g_rain_tent", "kind": "contingency", "class": "scalable", "min_act": 3, "name": "우천 대비 천막", "duration": { "type": "charges", "n": 1 }, "effects": [ { "type": "shield", "tag": "weather" } ] },
+
+    { "id": "u_eardrum", "kind": "contact", "class": "unique", "min_act": 1, "name": "은퇴한 음향감독 '고막'", "duration": { "type": "run" }, "effects": [ { "type": "add", "key": "line.sound", "value": 3 }, { "type": "pct", "key": "cost.facility.sound", "value": -30 } ] },
+    { "id": "u_landlord", "kind": "contact", "class": "unique", "min_act": 1, "name": "골목 건물주 '박 사장'", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "cost.venue", "value": -20 } ] },
+    { "id": "u_night_owl", "kind": "contact", "class": "unique", "min_act": 1, "name": "밤의 기록자 '올빼미'", "duration": { "type": "run" }, "effects": [ { "type": "pct", "key": "fame.gain", "value": 50 } ] },
+    { "id": "u_two_hands", "kind": "knowhow", "class": "unique", "min_act": 1, "name": "만능 무대감독 '두 손'", "duration": { "type": "run" }, "effects": [ { "type": "add", "key": "pen.bar_queue", "value": 3 }, { "type": "add", "key": "pen.toilet_queue", "value": 3 }, { "type": "add", "key": "pen.security", "value": 3 } ] },
+
+    { "id": "l_double_bill", "kind": "booking", "class": "legendary", "min_act": 1, "name": "두 번째 헤드라이너", "duration": { "type": "run" }, "effects": [ { "type": "rule", "key": "headliner_slots", "value": 1 } ] },
+    { "id": "l_guarantor", "kind": "instant", "class": "legendary", "min_act": 1, "name": "보증인", "duration": { "type": "run" }, "effects": [ { "type": "rule", "key": "bankrupt_shield", "value": 1 } ] },
+    { "id": "l_crowd_trust", "kind": "contact", "class": "legendary", "min_act": 1, "name": "관객의 신뢰", "duration": { "type": "run" }, "effects": [ { "type": "rule", "key": "gate_grade_relax", "value": 1 } ] },
+    { "id": "l_hit_instinct", "kind": "knowhow", "class": "legendary", "min_act": 1, "name": "흥행 감각", "duration": { "type": "run" }, "effects": [ { "type": "rule", "key": "demand_floor", "value": 1 } ] }
+  ]
+}

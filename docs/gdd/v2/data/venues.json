@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "doc": "docs/gdd/v2/show.md#기둥-1-장소",
+  "traits": [
+    { "id": "residential", "name": "주택가", "note": "소음 민원 돌발 카드 가중치 ×3 (events.json)" },
+    { "id": "remote", "name": "외곽", "note": "집객 보정 demand_pct 가 음수" },
+    { "id": "outdoor", "name": "야외", "note": "날씨 판정 대상 (3막부터)" }
+  ],
+  "venues": [
+    { "id": "club_basement", "act": 1, "status": "final", "name": "반지하 소극장", "capacity": 120, "fee": 40, "sound": 0, "toilets": 2, "bar_slots": 2, "demand_pct": 0, "traits": ["residential"] },
+    { "id": "club_alley", "act": 1, "status": "final", "name": "골목 라이브바", "capacity": 160, "fee": 70, "sound": 2, "toilets": 2, "bar_slots": 3, "demand_pct": 0, "traits": [] },
+    { "id": "club_warehouse", "act": 1, "status": "final", "name": "부둣가 창고", "capacity": 240, "fee": 90, "sound": -4, "toilets": 3, "bar_slots": 3, "demand_pct": -10, "traits": ["remote"] },
+    { "id": "club_studio", "act": 1, "status": "final", "name": "흡음벽 스튜디오홀", "capacity": 200, "fee": 130, "sound": 4, "toilets": 3, "bar_slots": 3, "demand_pct": 0, "traits": [] },
+    { "id": "club_rooftop", "act": 1, "status": "final", "name": "옥상 라운지", "capacity": 300, "fee": 170, "sound": 0, "toilets": 4, "bar_slots": 4, "demand_pct": 0, "traits": ["residential"] },
+
+    { "id": "hall_church", "act": 2, "status": "draft", "name": "옛 성당 공연장", "capacity": 1000, "fee": 300, "sound": 4, "toilets": 8, "bar_slots": 6, "demand_pct": 0, "traits": [] },
+    { "id": "hall_gym", "act": 2, "status": "draft", "name": "구립 체육관", "capacity": 2500, "fee": 500, "sound": -4, "toilets": 14, "bar_slots": 10, "demand_pct": -10, "traits": ["remote"] },
+    { "id": "hall_theater", "act": 2, "status": "draft", "name": "시립 대극장", "capacity": 1800, "fee": 800, "sound": 4, "toilets": 14, "bar_slots": 8, "demand_pct": 0, "traits": [] },
+    { "id": "hall_factory", "act": 2, "status": "draft", "name": "방직공장 홀", "capacity": 3000, "fee": 900, "sound": 0, "toilets": 16, "bar_slots": 12, "demand_pct": 0, "traits": ["residential"] },
+
+    { "id": "fest_riverside", "act": 3, "status": "draft", "name": "강변 둔치", "capacity": 15000, "fee": 3000, "sound": 0, "toilets": 0, "bar_slots": 0, "demand_pct": 0, "traits": ["outdoor"] },
+    { "id": "fest_park", "act": 3, "status": "draft", "name": "도심 숲 공원", "capacity": 20000, "fee": 6000, "sound": 2, "toilets": 20, "bar_slots": 0, "demand_pct": 0, "traits": ["outdoor", "residential"] },
+    { "id": "fest_valley", "act": 3, "status": "draft", "name": "고원 목장", "capacity": 30000, "fee": 4000, "sound": 0, "toilets": 0, "bar_slots": 0, "demand_pct": -15, "traits": ["outdoor", "remote"] },
+    { "id": "fest_harbor", "act": 3, "status": "draft", "name": "항구 매립지", "capacity": 25000, "fee": 7000, "sound": -2, "toilets": 10, "bar_slots": 0, "demand_pct": 0, "traits": ["outdoor"] },
+
+    { "id": "mega_plain", "act": 4, "status": "draft", "name": "간척지 대평원", "capacity": 50000, "fee": 15000, "sound": 0, "toilets": 0, "bar_slots": 0, "demand_pct": 0, "traits": ["outdoor", "remote"] },
+    { "id": "mega_stadium_park", "act": 4, "status": "draft", "name": "주경기장 광장", "capacity": 50000, "fee": 25000, "sound": 2, "toilets": 60, "bar_slots": 0, "demand_pct": 10, "traits": ["outdoor"] }
+  ]
+}
