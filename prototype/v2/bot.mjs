@@ -170,6 +170,7 @@ export function runBot(eng, policy, seed, o = {}) {
   for (let guard = 0; guard < 40; guard++) {
     s = eng.beginShow(s);
     if (s.phase === "over") break;
+    const ctxLog = o.keepLog ? { offers: s.pending.ctx.offers.map((x) => x.id + ":" + x.theme), market: s.pending.ctx.market } : null;
     const p = policy.plan(eng, s, r);
     const extra = o.analyze ? o.analyze(eng, s, p) : null;
     const sim = eng.startShow(s, p);
@@ -177,7 +178,8 @@ export function runBot(eng, policy, seed, o = {}) {
     s = eng.finishShow(s, sim);
     const res = s.pending.res;
     shows.push({ act: res.act, gate: res.isGate, grade: res.grade, sat: res.satisfaction, profit: res.profit,
-      funds: s.funds, fame: s.fame, events: res.events.map((e) => e.event + ":" + e.choice), ...(extra ? { extra } : {}) });
+      funds: s.funds, fame: s.fame, events: res.events.map((e) => e.event + ":" + e.choice), variance: res.varianceRoll,
+      ...(ctxLog ? { ctx: ctxLog } : {}), ...(extra ? { extra } : {}) });
     if (s.phase === "over") break;
     s = eng.chooseReward(s, policy.reward(eng, s, s.pending.rewards, r));
   }

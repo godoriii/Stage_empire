@@ -168,9 +168,25 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
   const a = runBot(eng, POLICIES.rational, 1234, { keepLog: true });
   const b = runBot(eng, POLICIES.rational, 1234, { keepLog: true });
   check("RN1 same seed same run", JSON.stringify(a) === JSON.stringify(b));
-  // 정책만 바꿔도 첫 공연의 제안·시장·보상 제시는 같다
-  const s1 = eng.beginShow(eng.newRun(55)), s2 = eng.beginShow(eng.newRun(55));
-  eq("RN3 offers/market", s1.pending.ctx, s2.pending.ctx);
+  // RN3: 정책만 바꾸고 시드를 같게 하면 공연마다 제안·시장·수요 분산 난수가 같다(두 정책이 모두 도달한 공연까지).
+  // 분산은 굴린 값(vRoll) 기준 — '흥행 감각' 카드의 하한 적용 전.
+  let compared = 0, diff = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const ra = runBot(eng, POLICIES.random, seed, { keepLog: true });
+    const rb = runBot(eng, POLICIES.rational, seed, { keepLog: true });
+    const n = Math.min(ra.shows.length, rb.shows.length);
+    for (let i = 0; i < n; i++) {
+      compared++;
+      const a = ra.shows[i], b = rb.shows[i];
+      if (JSON.stringify([a.ctx, a.variance]) !== JSON.stringify([b.ctx, b.variance])) diff++;
+    }
+  }
+  check("RN3 offers/market/variance same across policies", compared > 30 && diff === 0, `${diff}/${compared}`);
+  // 보상 제시: 같은 (시드, show_idx, 등급, 관문 통과, 받은 카드)면 자금·명성·보유 카드 상태와 무관하게 같다
+  const ra = eng.newRun(77), rb = eng.newRun(77);
+  rb.funds = 999; rb.fame = 40; rb.cards = [eng.materialize(data.rewards.cards[0], 0)];
+  ra.owned_ids = rb.owned_ids = ["c_sound_friend"];
+  eq("RN3 rewards depend only on seed/show/grade/gate/owned", eng.rollRewards(ra, eng.act(1), false, "B"), eng.rollRewards(rb, eng.act(1), false, "B"));
 }
 
 // ---- RW 보상 ----

@@ -293,11 +293,12 @@ export function createEngine(data, opts = {}) {
     let v;
     if (forceVariance !== undefined) v = forceVariance;
     else v = stream(state.seed, state.show_idx, STREAM.DEMAND).range(-dm.variance_pct, dm.variance_pct);
+    const vRoll = v;
     if (rule(M, "demand_floor") > 0) v = Math.max(0, v);
     const demand = div(raw * (100 + v), 100);
     const att = Math.min(demand, venue.capacity);
     return {
-      state, A, M, ctx, plan, offer, venue, H, O, units, rowdy, raw, v, demand, att,
+      state, A, M, ctx, plan, offer, venue, H, O, units, rowdy, raw, v, vRoll, demand, att,
       price: level.price, themeMatch, soldOut: demand >= venue.capacity,
       cost: cost(M, A, offer, venue, plan),
     };
@@ -648,7 +649,7 @@ export function createEngine(data, opts = {}) {
     const res = {
       act: A.id, show_idx: state.show_idx, isGate: S.ctx.isGate,
       offer: S.offer, venue: S.venue.id, plan: clone(S.plan),
-      demand: S.demand, att: S.att, capacity: S.venue.capacity, soldOut: S.soldOut, variance: S.v,
+      demand: S.demand, att: S.att, capacity: S.venue.capacity, soldOut: S.soldOut, variance: S.v, varianceRoll: S.vRoll,
       satisfaction, grade: grade.id, lines: sortLines(lines), mood: sim.mood, segs: sim.segs,
       cost: S.cost, ticket, bar, food, sponsor: S.offer.sponsor, evMoney: sim.evMoney, profit,
       fameDelta: state.fame - fameBefore, fundsBefore, fameBefore,
