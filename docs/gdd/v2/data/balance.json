@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "doc": "docs/gdd/v2/show.md, docs/gdd/v2/run.md",
   "money_unit": "만원",
   "start": { "funds": 300, "fame": 10 },
@@ -16,12 +16,14 @@
     "opener_draw_pct": 50,
     "fame_draw": 2,
     "theme_demand_pct": 20,
+    "trend_demand_pct": 10,
     "variance_pct": 20
   },
   "lines": {
     "headliner": { "pivot": 50, "weight_pct": 30 },
     "opener": { "weight_pct": 8, "none": -3 },
-    "theme_match": 3,
+    "theme_match": 2,
+    "opener_off_theme": -2,
     "price_over": { "per_unit": -4, "cap": -12 },
     "empty_room": { "fill_pct_below": 50, "div": 3, "cap": -10 },
     "sold_out": 3,

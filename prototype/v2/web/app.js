@@ -3,6 +3,7 @@
 import { createEngine, mulberry32 } from "../engine.js";
 
 const DATA = JSON.parse(document.getElementById("se-data").textContent);
+document.documentElement.lang ||= "ko";
 const eng = createEngine(DATA, { lastAct: 1 });
 const B = DATA.balance;
 const $app = document.getElementById("app");
@@ -46,7 +47,7 @@ function nextShow() {
 }
 function pickOffer(i) {
   const p = eng.defaultPlan(app.state);
-  p.offer = i; p.headliners = []; p.openers = []; p.price = 1;
+  p.offer = i; p.theme = app.state.pending.ctx.offers[i].trend; p.headliners = []; p.openers = []; p.price = 1;
   app.plan = p;
   app.screen = "plan";
   render();
@@ -102,10 +103,10 @@ function renderOffer() {
     <div><div class="eyebrow">① 제안</div><h2>${ctx.isGate ? "마지막 무대다" : "다음 공연을 고른다"}</h2></div>
     ${gateNote}
     <div class="grid-cards">${ctx.offers.map((o, i) => `<button class="card pick" data-act="offer" data-i="${i}">
-      <div class="eyebrow">테마 <span class="genre-${o.theme}">${GENRE_NAME[o.theme]}</span></div>
+      <div class="eyebrow">요즘 뜨는 장르 <span class="genre-${o.trend}">${GENRE_NAME[o.trend]}</span></div>
       <h3 style="font-size:24px">${esc(o.name)}</h3>
       <div class="muted" style="font-size:13px">${offerSummary(o)}</div>
-      <div style="font-size:13px;margin-top:6px">테마 장르 헤드라이너면 수요 +${B.demand.theme_demand_pct}%, 만족 +${B.lines.theme_match}</div>
+      <div style="font-size:13px;margin-top:6px">공연 테마를 이 장르로 잡으면 수요 +${B.demand.trend_demand_pct}%</div>
     </button>`).join("")}</div>
     <div><div class="eyebrow">이번 섭외 시장 (제안과 무관하게 같다)</div></div>
     <div class="grid-cards">${ctx.market.map((id) => `<div class="card">${artistCard(id)}</div>`).join("")}</div>
@@ -120,7 +121,7 @@ function planCtx() {
 
 const WARN_TEXT = {
   security: "보안 인원이 모자랄 것 같다", toilet_queue: "화장실 줄이 길어질 것 같다", bar_queue: "바 줄이 길어질 것 같다",
-  opener: "오프닝 없이 빈 무대로 시작한다", price_over: "티켓값이 라인업 적정가보다 비싸다",
+  opener: "오프닝 없이 빈 무대로 시작한다", opener_theme: "오프닝이 테마와 다른 장르다", price_over: "티켓값이 라인업 적정가보다 비싸다",
   empty_room: "장소에 비해 관객이 적다", sound: "장소 음향이 나쁘다",
 };
 
@@ -157,9 +158,20 @@ function renderPlan() {
     const btns = `<div class="artist-actions">
       <button data-act="head" data-id="${id}" class="${isH ? "on" : ""}" aria-pressed="${isH}" ${isO || (hFull && slots.head > 1) ? "disabled" : ""}>헤드라이너</button>
       ${slots.open ? `<button data-act="open" data-id="${id}" class="${isO ? "on" : ""}" aria-pressed="${isO}" ${isH || (oFull && slots.open > 1) ? "disabled" : ""}>오프닝</button>` : ""}</div>`;
-    return `<div class="card ${isH || isO ? "pick on" : ""}">${artistCard(id, btns)}</div>`;
+    const fit = eng.ARTISTS.get(id).genre === p.theme ? `<div class="good-line" style="margin-top:4px">테마 장르</div>` : "";
+    return `<div class="card ${isH || isO ? "pick on" : ""}">${artistCard(id, fit + btns)}</div>`;
   }).join("");
 
+  const themes = DATA.artists.genres.map((g) => {
+    const n = ctx.market.filter((id) => eng.ARTISTS.get(id).genre === g.id).length;
+    return `<button data-act="theme" data-id="${g.id}" class="${p.theme === g.id ? "on" : ""}" aria-pressed="${p.theme === g.id}">
+      ${g.name}<small>${g.id === offer.trend ? "트렌드 · " : ""}시장 ${n}팀</small></button>`;
+  }).join("");
+  // 테마 관련 안내는 엔진 미리보기 값(themeMatch, opener_theme 경고)만 쓴다 — 규칙을 화면에서 다시 계산하지 않는다
+  const offTheme = [];
+  if (pv && !pv.themeMatch) offTheme.push(`헤드라이너가 ${GENRE_NAME[p.theme]} 장르가 아니다 — 테마 보너스를 놓친다`);
+  const ot = pv && pv.warnings.find((x) => x.key === "opener_theme");
+  if (ot) offTheme.push(`${WARN_TEXT.opener_theme} (예상 ${signed(ot.value)})`);
   const sec = eng.staffRow("security", A.id), bar = eng.staffRow("bar", A.id), toi = eng.facRow("toilet", A.id);
   const units = pv ? pv.units : null;
   const steppers = [
@@ -177,13 +189,16 @@ function renderPlan() {
 
   return `${topBar()}<div class="stack">
     <div class="offer-bar"><span class="eyebrow">② 준비</span><b>${esc(offer.name)}</b>
-      <span>테마 <span class="genre-${offer.theme}">${GENRE_NAME[offer.theme]}</span></span><span class="muted" style="font-size:13px">${offerSummary(offer)}</span>
+      <span>트렌드 <span class="genre-${offer.trend}">${GENRE_NAME[offer.trend]}</span></span><span class="muted" style="font-size:13px">${offerSummary(offer)}</span>
       <span class="spacer" style="flex:1"></span>${ctx.isGate ? "" : `<button class="chip-btn" data-act="back-offer">제안 다시 고르기</button>`}</div>
     <div class="plan-grid"><div class="stack" style="gap:28px">
+      <section class="sec"><div class="sec-h"><span class="n">0</span><h3>공연 테마</h3><span class="muted" style="font-size:13px">헤드라이너가 테마 장르면 수요 +${B.demand.theme_demand_pct}%·만족 +${B.lines.theme_match} · 트렌드와 같으면 수요 +${B.demand.trend_demand_pct}% · 오프닝이 다른 장르면 만족 ${B.lines.opener_off_theme}</span></div>
+        <div class="seg">${themes}</div></section>
       <section class="sec"><div class="sec-h"><span class="n">1</span><h3>장소</h3></div><div class="grid-cards">${venues}</div></section>
       <section class="sec"><div class="sec-h"><span class="n">2</span><h3>라인업</h3><span class="muted" style="font-size:13px">헤드라이너 ${slots.head}명(필수) · 오프닝 ${slots.open}명까지</span></div>
         <div class="grid-cards">${artists}</div>
-        ${pv && pv.warnings.find((x) => x.key === "opener") ? `<div class="warn-line">! ${WARN_TEXT.opener} (예상 ${signed(B.lines.opener.none)})</div>` : ""}</section>
+        ${pv && pv.warnings.find((x) => x.key === "opener") ? `<div class="warn-line">! ${WARN_TEXT.opener} (예상 ${signed(B.lines.opener.none)})</div>` : ""}
+        ${offTheme.map((t) => `<div class="warn-line">! ${t}</div>`).join("")}</section>
       <section class="sec"><div class="sec-h"><span class="n">3·4</span><h3>시설 · 인력</h3></div>${steppers}</section>
       <section class="sec"><div class="sec-h"><span class="n">5</span><h3>티켓</h3></div><div class="seg">${prices}</div>
         ${priceWarn ? `<div class="warn-line">! ${WARN_TEXT.price_over} (예상 ${signed(priceWarn.value)})</div>` : ""}</section>
@@ -208,6 +223,8 @@ function previewPanel(pv) {
     ? pv.warnings.map((w) => `<div class="warn-line">! ${WARN_TEXT[w.key] || w.key} <span class="num">${signed(w.value)}</span></div>`).join("")
     : `<div class="good-line">경고 없음</div>`;
   const POS = { headliner: "헤드라이너 무대", opener: "오프닝 무대", theme: "테마 일치", sold_out: "매진 예상", sound: "좋은 음향", base_bonus: "운영 감각" };
+  const pos = pv.positives.map((k) => POS[k] || k);
+  if (pv.trendMatch) pos.push(`트렌드 일치(수요 +${B.demand.trend_demand_pct}%)`);
   const reason = blockReason(pv);
   return `<aside class="preview" aria-live="polite">
     <div class="eyebrow">예상치 미리보기</div>
@@ -217,7 +234,7 @@ function previewPanel(pv) {
     <div class="meter-row"><span>손익분기 관객</span><b class="num">${pv.breakEven}명</b></div>
     <div class="meter-row muted"><span>1명/1칸당 관객</span><span class="num">바 ${pv.perStaff.bar ?? "−"} · 화장실 ${pv.perStaff.toilet ?? "−"} · 보안 ${pv.perStaff.security ?? "−"}</span></div>
     <div class="stack" style="gap:4px">${warns}</div>
-    ${pv.positives.length ? `<div class="good-line">좋은 점: ${pv.positives.map((k) => POS[k] || k).join(", ")}</div>` : ""}
+    ${pos.length ? `<div class="good-line">좋은 점: ${pos.join(", ")}</div>` : ""}
     <div class="muted" style="font-size:12px">예상 만족도는 공연이 끝나야 안다.</div>
     <button class="btn hot" data-act="go" ${reason ? "disabled" : ""}>${reason || "개최한다"}</button>
   </aside>`;
@@ -286,7 +303,7 @@ function skipShow() {
 }
 
 const LINE_LABEL = {
-  price_over: "티켓값", opener: "오프닝", sound: "음향", headliner: "헤드라이너", theme: "테마 일치",
+  price_over: "티켓값", opener: "오프닝", opener_theme: "오프닝 장르", sound: "음향", headliner: "헤드라이너", theme: "테마 일치",
   empty_room: "빈 자리", sold_out: "매진", bar_queue: "바 줄", toilet_queue: "화장실 줄", security: "보안",
   base_bonus: "운영 감각", food_queue: "푸드 줄", cleaning: "청소", medical: "의료",
 };
@@ -441,7 +458,8 @@ function reasonText(l, res) {
     opener: [plan.openers.length ? `오프닝 ${plan.openers.map((id) => eng.ARTISTS.get(id).name).join(", ")}` : "빈 무대로 시작", "→ 오프닝 섭외"],
     sound: [`${v.name} 음향`, "→ 장소"],
     headliner: [`헤드라이너 ${H.map((h) => h.name).join(", ")} (실력 ${Math.max(...H.map((h) => h.skill))})`, "→ 헤드라이너"],
-    theme: [`${GENRE_NAME[res.offer.theme]} 테마에 맞는 헤드라이너`, "→ 제안·헤드라이너"],
+    theme: [`${GENRE_NAME[plan.theme]} 테마에 맞는 헤드라이너`, "→ 테마·헤드라이너"],
+    opener_theme: [`오프닝이 ${GENRE_NAME[plan.theme]} 테마와 다른 장르`, "→ 테마·오프닝"],
     empty_room: [`${v.capacity}석에 ${res.att}명`, "→ 장소 크기"],
     sold_out: [`매진 (${res.demand}명이 오려 했다)`, "→ 장소 크기·가격"],
     bar_queue: [`바에서 못 산 사람 ${res.miss.bar_queue}명`, "→ 바텐더 수"],
@@ -552,10 +570,10 @@ function renderTitle() {
   return `<section class="title-hero">
     <div class="eyebrow">프로토타입 · 1막 클럽</div>
     <div class="poster"><span class="p1">STAGE<br>EMPIRE</span><span class="p2" aria-hidden="true">STAGE<br>EMPIRE</span></div>
-    <p class="lede">무명 프로모터로 클럽 공연을 연다. 공연마다 장소·라인업·시설·인력·티켓을 정하고, 공연이 흘러가는 걸 보며 돌발 상황에 답하고, 성적표를 받는다. 공연 3번과 결산 쇼케이스 1번을 버티면 1막 통과.</p>
+    <p class="lede">무명 프로모터로 클럽 공연을 연다. 공연마다 음악 테마와 장소·라인업·시설·인력·티켓을 정하고, 공연이 흘러가는 걸 보며 돌발 상황에 답하고, 성적표를 받는다. 공연 3번과 결산 쇼케이스 1번을 버티면 1막 통과.</p>
     <div class="steps">
       <div><b>제안</b><span class="muted">기회 카드 3장 중 하나</span></div>
-      <div><b>준비</b><span class="muted">5가지 결정, 예상치 미리보기</span></div>
+      <div><b>준비</b><span class="muted">테마와 5가지 결정, 예상치 미리보기</span></div>
       <div><b>개최</b><span class="muted">자동 진행 + 돌발 카드</span></div>
       <div><b>결과</b><span class="muted">원인별 성적표</span></div>
       <div><b>보상</b><span class="muted">카드 3장 중 1장</span></div>
@@ -607,6 +625,7 @@ $app.addEventListener("click", (ev) => {
     }
     case "step": p[t.dataset.grp][t.dataset.k] += +t.dataset.d; render(); break;
     case "price": p.price = +t.dataset.i; render(); break;
+    case "theme": p.theme = t.dataset.id; render(); break;
     case "go": startLive(); break;
     case "play": app.playing = !app.playing; if (app.playing && !app.pendingBeat) schedule(300); else clearTimeout(app.timer); renderShowParts(); break;
     case "speed": app.speed = +t.dataset.x; document.querySelectorAll('[data-act="speed"]').forEach((b) => { b.classList.toggle("on", +b.dataset.x === app.speed); b.setAttribute("aria-pressed", String(+b.dataset.x === app.speed)); }); break;

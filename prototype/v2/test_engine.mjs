@@ -17,17 +17,17 @@ function eq(name, got, want) {
 }
 
 // 1막 상태를 직접 만든다(제안·시장을 고정).
-function fixedState({ funds, fame, offerId, theme, market, cards = [] }) {
+function fixedState({ funds, fame, offerId, trend, market, cards = [] }) {
   const s = eng.newRun(1);
   s.funds = funds; s.fame = fame; s.cards = cards;
   const A = eng.act(1);
-  const offer = { ...A.offer_templates.find((t) => t.id === offerId), theme };
+  const offer = { ...A.offer_templates.find((t) => t.id === offerId), trend };
   s.pending = { ctx: { act: 1, isGate: false, offers: [offer], market, minCost: 0, credit: A.credit_limit } };
   s.phase = "plan";
   return s;
 }
-const plan = (venue, H, O, sec, bar, toilet, priceIdx) =>
-  ({ offer: 0, venue, headliners: H, openers: O, staff: { security: sec, bar }, fac: { toilet }, price: priceIdx, promo: 0 });
+const plan = (venue, H, O, sec, bar, toilet, priceIdx, theme = "rock") =>
+  ({ offer: 0, theme, venue, headliners: H, openers: O, staff: { security: sec, bar }, fac: { toilet }, price: priceIdx, promo: 0 });
 
 function play(state, p, o = { forceVariance: 0, forceEvents: [] }, chooser) {
   const sim = eng.startShow(state, p, o);
@@ -45,8 +45,8 @@ const lineMap = (res) => Object.fromEntries(res.lines.map((l) => [l.key, l.value
 
 // ---- SH1 예시 (a) ----
 {
-  const s = fixedState({ funds: 300, fame: 10, offerId: "friday", theme: "indie", market: ["a1_two_umbrellas", "a1_rusty_bike"] });
-  const p = plan("club_basement", ["a1_two_umbrellas"], ["a1_rusty_bike"], 2, 2, 1, 2);
+  const s = fixedState({ funds: 300, fame: 10, offerId: "friday", trend: "rock", market: ["a1_two_umbrellas", "a1_rusty_bike"] });
+  const p = plan("club_basement", ["a1_two_umbrellas"], ["a1_rusty_bike"], 2, 2, 1, 2, "indie");
   const { sim, after } = play(s, p);
   const res = after.pending.res;
   eq("SH1 demand/att", [res.demand, res.att], [110, 110]);
@@ -55,41 +55,51 @@ const lineMap = (res) => Object.fromEntries(res.lines.map((l) => [l.key, l.value
   eq("SH1 bar served", sim.segs.map((x) => x.barServed), [12, 13, 36, 11, 5]);
   eq("SH1 toilet dem", sim.segs.map((x) => x.toiDem), [2, 8, 41, 11, 22]);
   eq("SH1 security load", sim.segs.map((x) => x.load), [20, 55, 50, 92, 61]);
-  eq("SH1 mood", res.mood, [62, 66, 66, 76, 76]);
-  eq("SH1 lines", lineMap(res), { headliner: 7, opener: 4, theme: 3 });
-  eq("SH1 sat/grade", [res.satisfaction, res.grade], [76, "A"]);
+  eq("SH1 mood", res.mood, [62, 64, 64, 73, 73]);
+  eq("SH1 lines", lineMap(res), { headliner: 7, opener: 4, opener_theme: -2, theme: 2 });
+  eq("SH1 sat/grade", [res.satisfaction, res.grade], [73, "B"]);
   eq("SH1 money", [res.ticket, res.bar, res.profit], [330, 77, 121]);
-  eq("SH1 fame/funds", [after.fame, after.funds], [13, 421]);
+  eq("SH1 fame/funds", [after.fame, after.funds], [12, 421]);
   const pv = eng.preview(s, p);
-  eq("SH1 preview", [pv.attLow, pv.attHigh, pv.breakEven, pv.warnings.length], [88, 120, 74, 0]);
+  eq("SH1 preview", [pv.attLow, pv.attHigh, pv.breakEven, pv.warnings.map((w) => w.key)], [88, 120, 74, ["opener_theme"]]);
+  // SH8 테마 필수
+  check("SH8 theme required", eng.validatePlan(s, { ...p, theme: undefined }).includes("theme") && eng.validatePlan(s, { ...p, theme: "jazz" }).includes("theme"));
+  // SH9 트렌드 일치 참고안
+  const s9 = fixedState({ funds: 300, fame: 10, offerId: "friday", trend: "indie", market: ["a1_two_umbrellas", "a1_rusty_bike"] });
+  const r9 = play(s9, p).after.pending.res;
+  eq("SH9 trend match", [r9.demand, r9.satisfaction, r9.grade, r9.profit, r9.mood], [120, 76, "A", 158, [62, 64, 64, 76, 76]]);
 }
 
 // ---- SH2 예시 (b) + 대조안 ----
-const sB = fixedState({ funds: 420, fame: 13, offerId: "weekend", theme: "hiphop", market: ["a1_dawn_laundry", "a1_rusty_bike"] });
-const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 2);
+const sB = fixedState({ funds: 420, fame: 13, offerId: "weekend", trend: "indie", market: ["a1_dawn_laundry", "a1_rusty_bike"] });
+const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 2, "hiphop");
 {
   const { sim, after } = play(sB, pB);
   const res = after.pending.res;
   eq("SH2 demand/att/cost", [res.demand, res.att, res.cost.total], [173, 173, 485]);
   eq("SH2 security load", sim.segs.map((x) => x.load), [55, 149, 137, 249, 166]);
   eq("SH2 miss", [res.miss.toilet_queue, res.miss.security], [20, 506]);
-  eq("SH2 lines", lineMap(res), { headliner: 6, opener: 4, security: -12, sound: 4, toilet_queue: -7 });
-  eq("SH2 mood", res.mood, [62, 67, 57, 57, 57]);
-  eq("SH2 sat/grade/profit/fame", [res.satisfaction, res.grade, res.profit, res.fameDelta], [57, "C", 155, 0]);
+  eq("SH2 lines", lineMap(res), { headliner: 6, opener: 4, opener_theme: -2, security: -12, sound: 4, toilet_queue: -7 });
+  eq("SH2 mood", res.mood, [62, 65, 55, 55, 55]);
+  eq("SH2 sat/grade/profit/fame", [res.satisfaction, res.grade, res.profit, res.fameDelta], [55, "C", 155, 0]);
   eq("SH2 review order", res.lines.slice(0, 2).map((l) => l.key), ["security", "toilet_queue"]);
   const pv = eng.preview(sB, pB);
-  eq("SH6 preview warnings", pv.warnings.map((w) => w.key).sort(), ["security", "toilet_queue"]);
+  eq("SH6 preview warnings", pv.warnings.map((w) => w.key).sort(), ["opener_theme", "security", "toilet_queue"]);
+  // SH10 테마 rock 참고안: 오프닝 rock = 테마 → opener_theme 없음
+  const r10 = play(sB, { ...pB, theme: "rock" }).after.pending.res;
+  check("SH10 no opener_theme key", !("opener_theme" in lineMap(r10)));
+  eq("SH10 theme rock", [r10.demand, r10.att, r10.satisfaction, r10.grade, r10.profit, r10.mood], [208, 200, 59, "B", 251, [62, 66, 53, 59, 59]]);
   // 대조안 비용 545 는 자금 420 + 외상 100 을 넘는다(스펙 예시의 가정 오류) → 자금 450 으로 검산
   const fix = { ...pB, staff: { security: 5, bar: 2 }, fac: { toilet: 2 } };
   check("SH2 contrast over budget at funds 420", eng.validatePlan(sB, fix).includes("budget"));
   const r2 = play({ ...sB, funds: 450 }, fix).after.pending.res;
   eq("SH2 contrast cost", r2.cost.total, 545);
-  eq("SH2 contrast", [r2.satisfaction, r2.grade, r2.profit, r2.fameDelta], [76, "A", 95, 4]);
+  eq("SH2 contrast", [r2.satisfaction, r2.grade, r2.profit, r2.fameDelta, r2.mood], [74, "A", 95, 4, [62, 68, 68, 74, 74]]);
 }
 
 // ---- SH5 예산 초과 거부 ----
 {
-  const s = fixedState({ funds: 100, fame: 10, offerId: "friday", theme: "rock", market: ["a1_fullmoon_diner", "a1_rebar"] });
+  const s = fixedState({ funds: 100, fame: 10, offerId: "friday", trend: "rock", market: ["a1_fullmoon_diner", "a1_rebar"] });
   const p = plan("club_rooftop", ["a1_fullmoon_diner"], ["a1_rebar"], 6, 4, 3, 0);
   check("SH5 over budget rejected", eng.validatePlan(s, p).includes("budget"));
   let threw = false;
@@ -99,7 +109,7 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
 
 // ---- SH4 분위기 마감 값 = 최종 만족도, SH3 줄 키 집합 (무작위 계획 1,000개) ----
 {
-  const allowed = new Set(["price_over", "opener", "sound", "headliner", "theme", "empty_room", "sold_out",
+  const allowed = new Set(["price_over", "opener", "opener_theme", "sound", "headliner", "theme", "empty_room", "sold_out",
     "bar_queue", "toilet_queue", "security", "base_bonus"]);
   const r = mulberry32(7);
   let bad = 0, badKey = 0, n = 0;
@@ -108,10 +118,11 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
   for (let i = 0; i < 1000; i++) {
     const h = artists[r.int(artists.length)];
     let o = artists[r.int(artists.length)];
-    const s = fixedState({ funds: 5000, fame: r.int(30) + 1, offerId: "friday", theme: "rock", market: [h, o] });
+    const s = fixedState({ funds: 5000, fame: r.int(30) + 1, offerId: "friday", trend: "rock", market: [h, o] });
     const v = venues[r.int(venues.length)];
     const vb = eng.VENUES.get(v).bar_slots;
-    const p = plan(v, [h], o === h || r.int(3) === 0 ? [] : [o], 1 + r.int(6), 1 + r.int(vb), r.int(4), r.int(4));
+    const p = plan(v, [h], o === h || r.int(3) === 0 ? [] : [o], 1 + r.int(6), 1 + r.int(vb), r.int(4), r.int(4),
+      data.artists.genres[r.int(4)].id);
     const sim = eng.startShow(s, p, { forceVariance: r.range(-20, 20), forceEvents: [] }).runAll(() => 0);
     const { satisfaction, lines } = sim.summary();
     n++;
@@ -124,7 +135,7 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
 
 // ---- EV2 조건 가중치: 보안 1명·록 200명 ----
 {
-  const s = fixedState({ funds: 5000, fame: 10, offerId: "friday", theme: "indie", market: ["a1_rebar"] });
+  const s = fixedState({ funds: 5000, fame: 10, offerId: "friday", trend: "indie", market: ["a1_rebar"] });
   const p = plan("club_rooftop", ["a1_rebar"], [], 1, 4, 0, 1);
   const S = eng.setup(s, p, 0);
   const base = eng.baseSim(S);
@@ -154,7 +165,7 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
 {
   const amp = eng.materialize(data.rewards.cards.find((c) => c.id === "g_spare_amp"), 0);
   amp.uid = 99;
-  const s = fixedState({ funds: 420, fame: 13, offerId: "weekend", theme: "hiphop", market: ["a1_dawn_laundry", "a1_rusty_bike"], cards: [amp] });
+  const s = fixedState({ funds: 420, fame: 13, offerId: "weekend", trend: "hiphop", market: ["a1_dawn_laundry", "a1_rusty_bike"], cards: [amp] });
   const sim = eng.startShow(s, pB, { forceVariance: 0, forceEvents: ["amp_fail", "toilet_clog"] });
   const seen = [];
   sim.runAll((b) => { seen.push([b.event.id, b.options.map((o) => o.id)]); return b.options.at(-1).id; });
@@ -182,6 +193,10 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
     }
   }
   check("RN3 offers/market/variance same across policies", compared > 30 && diff === 0, `${diff}/${compared}`);
+  check("RN3 log carries trend", !JSON.stringify(runBot(eng, POLICIES.random, 1, { keepLog: true }).shows[0].ctx).includes("undefined"));
+  // SE-071: 트렌드 시퀀스 = SE-068 의 테마 시퀀스(RNG 호출 순서 불변). 시드 42 첫 공연은 SE-069 때 friday:indie, weekend:electronic, critic:electronic
+  eq("SE-071 trend sequence unchanged", eng.beginShow(eng.newRun(42)).pending.ctx.offers.map((o) => o.id + ":" + o.trend),
+    ["friday:indie", "weekend:electronic", "critic:electronic"]);
   // 보상 제시: 같은 (시드, show_idx, 등급, 관문 통과, 받은 카드)면 자금·명성·보유 카드 상태와 무관하게 같다
   const ra = eng.newRun(77), rb = eng.newRun(77);
   rb.funds = 999; rb.fame = 40; rb.cards = [eng.materialize(data.rewards.cards[0], 0)];
@@ -226,19 +241,19 @@ const pB = plan("club_studio", ["a1_dawn_laundry"], ["a1_rusty_bike"], 1, 2, 0, 
 // ---- RN5 실패 4종 ----
 {
   // 파산: 자금 0, 외상으로 비싼 공연 + 수요 −20
-  const s = fixedState({ funds: 60, fame: 1, offerId: "weeknight", theme: "indie", market: ["a1_rusty_bike"] });
+  const s = fixedState({ funds: 60, fame: 1, offerId: "weeknight", trend: "indie", market: ["a1_rusty_bike"] });
   const pick = { amp_fail: "repair", noise_complaint: "endure" };
   const r = play(s, plan("club_basement", ["a1_rusty_bike"], [], 1, 1, 0, 0),
     { forceVariance: -20, forceEvents: ["amp_fail", "noise_complaint"] }, (b) => pick[b.event.id]).after;
   check("RN5 bankrupt", r.result === "bankrupt" && r.phase === "over" && !r.pending.rewards, `${r.result} funds ${r.funds}`);
   // 명성 0
-  const s2 = fixedState({ funds: 500, fame: 1, offerId: "critic", theme: "rock", market: ["a1_fluorescent"] });
+  const s2 = fixedState({ funds: 500, fame: 1, offerId: "critic", trend: "rock", market: ["a1_fluorescent"] });
   const r2 = play(s2, plan("club_rooftop", ["a1_fluorescent"], [], 1, 1, 0, 3)).after;
   check("RN5 fame_zero", r2.result === "fame_zero", `${r2.result} fame ${r2.fame} grade ${r2.pending.res.grade}`);
   // 관문 실패
-  const s3 = fixedState({ funds: 500, fame: 30, offerId: "friday", theme: "rock", market: ["a1_fluorescent"] });
+  const s3 = fixedState({ funds: 500, fame: 30, offerId: "friday", trend: "rock", market: ["a1_fluorescent"] });
   s3.pending.ctx.isGate = true;
-  s3.pending.ctx.offers = [{ ...eng.act(1).gate.template, theme: "rock" }];
+  s3.pending.ctx.offers = [{ ...eng.act(1).gate.template, trend: "rock" }];
   const r3 = play(s3, plan("club_rooftop", ["a1_fluorescent"], [], 1, 1, 0, 3)).after;
   check("RN5 gate_fail", r3.result === "gate_fail", r3.result);
   // 개최 불가
