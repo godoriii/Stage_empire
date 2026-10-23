@@ -19,7 +19,7 @@ const errors = [];
 const results = [];
 const KNOWN = ["자금이 바닥났다", "다음 공연을 열 돈이 없다", "아무도 이름을 기억하지 않는다", "결산 무대에서 증명하지 못했다", "1막 통과"];
 const histories = [];
-let modals = 0, usedSpeed = false;
+let modals = 0, usedSpeed = false, whatifs = 0, tipsSeen = 0;
 for (const [w, h, scheme] of [[375, 812, "light"], [1280, 900, "dark"]]) {
   const page = await browser.newPage({ viewport: { width: w, height: h }, colorScheme: scheme });
   page.on("console", (m) => { if (m.type() === "error" && !/fonts\.g/.test(m.text())) errors.push(`${w} console: ${m.text()}`); });
@@ -102,7 +102,10 @@ for (const [w, h, scheme] of [[375, 812, "light"], [1280, 900, "dark"]]) {
         });
       }
       else if (screen === "event") { modals++; await shot("event"); await page.locator(".modal .choice").first().click(); }
-      else if (screen === "result") { await shot("result"); await page.click('[data-act="to-reward"], [data-act="to-over"]'); }
+      else if (screen === "result") {
+        whatifs += await page.locator(".whatif").count();
+        if (await page.locator('[data-act="tip-ok"]').count()) { tipsSeen++; await page.click('[data-act="tip-ok"]'); }
+        await shot("result"); await page.click('[data-act="to-reward"], [data-act="to-over"]'); }
       else if (screen === "reward") { await shot("reward"); await page.locator(".rcard").first().click(); await page.click('[data-act="take"]'); }
       else if (screen === "over") {
         await shot("over");
@@ -115,12 +118,19 @@ for (const [w, h, scheme] of [[375, 812, "light"], [1280, 900, "dark"]]) {
       } else { errors.push(`${w}: unknown screen`); break; }
     }
   }
+  if (w < 500) {
+    // SE-073: 런 기록이 런마다 한 번씩(같은 시드 다시 포함) 쌓였는가
+    const rec = await page.evaluate(() => window.stageEmpireTest.records());
+    results.push(`${w} records: ${JSON.stringify(rec)}`);
+    if (rec.runs !== runs) errors.push(`${w}: records.runs ${rec.runs} != ${runs}`);
+  }
   await page.close();
 }
 await browser.close();
 if (histories.length !== 2 || JSON.stringify(histories[0]) !== JSON.stringify(histories[1])) errors.push("same-seed rerun differs: " + JSON.stringify(histories));
 if (modals === 0) errors.push("no event modal seen");
-results.push(`event modals: ${modals}`);
+results.push(`event modals: ${modals}, what-if boxes: ${whatifs}, result tips dismissed: ${tipsSeen}`);
+if (whatifs === 0) errors.push("no what-if box seen");
 console.log(results.join("\n"));
 console.log(errors.length ? "ERRORS:\n" + errors.join("\n") : "no errors");
 process.exit(errors.length ? 1 : 0);
