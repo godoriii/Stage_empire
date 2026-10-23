@@ -30,7 +30,10 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 
 // ---------- 이 브라우저에만 남는 편의 기록(첫 판 안내, 런 기록). 실패해도 게임은 그대로 돈다 ----------
 function loadLocal(key, fallback) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    return v && typeof v === "object" && !Array.isArray(v) ? v : fallback;
+  } catch { return fallback; }
 }
 function saveLocal(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* 저장 불가: 무시 */ } }
 const TIPS = {
@@ -44,10 +47,15 @@ function tip(screen) {
   if (tipsSeen[screen]) return "";
   return `<div class="tip" role="note"><span><b>처음이라면</b> ${TIPS[screen]}</span><button class="chip-btn" data-act="tip-ok" data-k="${screen}">알겠어요</button></div>`;
 }
-const records = loadLocal("se-v2-records", { runs: 0, passes: 0, bestSat: 0, bestFame: 0 });
+const records = (() => {
+  const r = loadLocal("se-v2-records", {});
+  const n = (x) => (Number.isFinite(+x) ? Math.max(0, Math.floor(+x)) : 0);
+  return { runs: n(r.runs), passes: n(r.passes), bestSat: n(r.bestSat), bestFame: n(r.bestFame) };
+})();
+// 런마다 한 번만 센다(같은 시드로 다시 한 런도 새 런). runId 는 startRun 에서 올린다.
 function recordRun(s) {
-  if (app.recordedRun === s.seed + ":" + s.history.length) return;
-  app.recordedRun = s.seed + ":" + s.history.length;
+  if (app.recordedRun === app.runId) return;
+  app.recordedRun = app.runId;
   records.runs += 1;
   if (s.result === "pass_act" || s.result === "clear") records.passes += 1;
   records.bestSat = Math.max(records.bestSat, ...s.history.map((h) => h.satisfaction), 0);
@@ -63,6 +71,7 @@ const app = { screen: "title", state: null, plan: null, sim: null, choices: [], 
 function newSeed() { return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0; }
 
 function startRun(seed) {
+  app.runId = (app.runId || 0) + 1;
   app.seed = seed >>> 0;
   app.state = eng.newRun(app.seed);
   nextShow();
@@ -419,6 +428,7 @@ function renderShowParts() {
     <div><small>화장실 못 간 사람</small><b>${cumMiss("toiMiss")}</b>명</div>
     <div><small>보안 부담 / 감당</small><b>${last ? last.load : 0}</b> / ${last ? last.cover : 0}</div>`;
   // 새로 실현된 줄을 무대 위에 띄운다
+  if (reduceMotion) app.floatedBeats = app.beats.length; // 움직임 줄이기: 떠오르는 숫자 없음
   if (app.beats.length > (app.floatedBeats || 0)) {
     const fl = document.getElementById("floats");
     const nb = app.beats.slice(app.floatedBeats || 0);
@@ -803,7 +813,7 @@ $app.addEventListener("click", (ev) => {
     case "choose": chooseEvent(t.dataset.id); break;
     case "to-reward": app.pickedReward = null; app.revealed = false; app.screen = "reward"; render(); app.revealed = true; break;
     case "to-over": app.screen = "over"; recordRun(app.state); render(); break;
-    case "tip-ok": tipsSeen[t.dataset.k] = true; saveLocal("se-v2-tips", tipsSeen); render(); break;
+    case "tip-ok": tipsSeen[t.dataset.k] = true; saveLocal("se-v2-tips", tipsSeen); t.closest(".tip")?.remove(); break;
     case "reward": app.pickedReward = +t.dataset.i; render(); break;
     case "take": app.state = eng.chooseReward(app.state, app.pickedReward); app.pickedReward = null; nextShow(); break;
   }
@@ -811,7 +821,8 @@ $app.addEventListener("click", (ev) => {
 
 // ---------- 다시 게시돼도 이어서 (뷰어 hot 훅) ----------
 function snapshot() {
-  return { screen: app.screen, state: app.state, plan: app.plan, choices: app.choices, beats: app.beats.length, speed: app.speed, seed: app.seed, pickedReward: app.pickedReward };
+  return { screen: app.screen, state: app.state, plan: app.plan, choices: app.choices, beats: app.beats.length, speed: app.speed, seed: app.seed,
+    pickedReward: app.pickedReward, preShow: app.preShow, revealed: app.revealed, runId: app.runId, recordedRun: app.recordedRun };
 }
 function start(saved) {
   try { restore(saved); } catch (e) {
@@ -823,7 +834,8 @@ function start(saved) {
 }
 function restore(saved) {
   if (saved && saved.state) {
-    Object.assign(app, { screen: saved.screen, state: saved.state, plan: saved.plan, speed: saved.speed || 1, seed: saved.seed, pickedReward: saved.pickedReward ?? null });
+    Object.assign(app, { screen: saved.screen, state: saved.state, plan: saved.plan, speed: saved.speed || 1, seed: saved.seed, pickedReward: saved.pickedReward ?? null,
+      preShow: saved.preShow ?? null, revealed: saved.revealed ?? true, runId: saved.runId ?? 0, recordedRun: saved.recordedRun ?? null });
     if (app.screen === "show") {
       // 공연 중이었다면 같은 계획·같은 선택으로 다시 재생한다(엔진은 결정적)
       app.sim = eng.startShow(app.state, app.plan);
@@ -842,7 +854,7 @@ function restore(saved) {
   render();
 }
 // 스모크 테스트용: 정해진 시드로 런 시작
-window.stageEmpireTest = { startRun: (seed) => startRun(seed), seed: () => app.seed, history: () => app.state?.history.map((h) => [h.grade, h.satisfaction, h.profit]) };
+window.stageEmpireTest = { startRun: (seed) => startRun(seed), seed: () => app.seed, history: () => app.state?.history.map((h) => [h.grade, h.satisfaction, h.profit]), records: () => ({ ...records }) };
 window.claude?.hot?.snapshot?.(snapshot);
 if (window.claude?.hot?.ready) window.claude.hot.ready(start);
 else start(window.claude?.hot?.data ?? null);
